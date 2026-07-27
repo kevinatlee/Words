@@ -9,7 +9,7 @@ everyone will search the same letter grid before time runs out.
 This repository is at **Stage 1: repository foundation and static interface
 prototype**. It is not multiplayer-ready or production-ready.
 
-## What works today
+## What works today.
 
 - A responsive role-selection page at `/`
 - A static shared-screen host preview at `/host`
