@@ -1,5 +1,8 @@
-# Future automated workflows
+# Automated workflows
 
-Stage 2.5 does not claim that automated checks or container publishing are
-configured. A later reviewed stage will add GitHub Actions for formatting,
-linting, type checking, tests, builds, and eventually GHCR publishing.
+`ci.yml` provides read-only GitHub-hosted checks for formatting, linting, type
+checking, tests, builds, dependency audit, and repository cleanliness. See
+[`docs/CI.md`](../../docs/CI.md) for its triggers, security boundary, pinned
+actions, check names, and branch-protection recommendation.
+
+There is no deployment, release, container, or package-publishing workflow.

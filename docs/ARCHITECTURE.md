@@ -1,7 +1,8 @@
 # Architecture
 
-This document describes the completed Stage 2.5 lobby, the Stage 3 engine in
-review, and the boundaries later game stages must preserve.
+This document describes the completed Stage 2.5 lobby and Stage 3 engine, the
+Stage 3.1 CI workflow in review, and the boundaries later game stages must
+preserve.
 
 ## Runtime pieces
 
@@ -359,6 +360,19 @@ The engine defines neither a default letter distribution nor a production
 dictionary. The recommended Stage 4 dictionary export and its licence
 conditions are in `DICTIONARY_EVALUATION.md`.
 
+## Hosted verification boundary
+
+Stage 3.1 adds one GitHub Actions workflow with two read-only jobs. `Quality`
+performs a locked `npm ci` install, formatting, lint, type checking, tests,
+builds, and a final repository-cleanliness check. `Dependency audit` applies the
+high-severity npm advisory threshold independently.
+
+The workflow runs for pull requests targeting `main`, pushes to `main`, and
+manual dispatches. It uses Node.js 24, official actions pinned to immutable
+commits, no secrets, no persisted checkout credentials, and workflow-level
+`contents: read` permission. It does not change runtime architecture or publish,
+deploy, release, approve, or write repository state. See [`CI.md`](CI.md).
+
 ## Why no database or Redis
 
 Rooms are intentionally temporary. Losing active rooms when the server process
@@ -375,5 +389,5 @@ The eventual production topology is one public HTTPS origin forwarding to one
 Words process on port `6532`. That process will serve the built client, health
 API, Socket.IO, game engine, and an openly licensed dictionary.
 
-Container packaging, static serving, tunnel configuration, and image publishing
-are not implemented in Stage 3.
+Container packaging, static serving, tunnel configuration, deployment
+automation, and image publishing are not implemented through Stage 3.1.

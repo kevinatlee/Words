@@ -2,8 +2,9 @@
 
 Stage 2.5 has a real network boundary and controller-authority actions. Stage 3
 adds an isolated, defensive game engine without exposing it to the network.
-This document separates implemented controls from protections still required
-before public deployment and gameplay.
+Stage 3.1 adds read-only hosted verification. This document separates
+implemented controls from protections still required before public deployment
+and gameplay.
 
 ## Implemented authority controls
 
@@ -219,6 +220,29 @@ metrics, and test the exact origin and TLS configuration.
 
 These controls protect pure engine calls. They do not authorize a socket,
 verify room phase, enforce a deadline, or rate-limit network submissions.
+
+## GitHub Actions security boundary
+
+The Stage 3.1 CI workflow has explicit workflow-level `contents: read`
+permission and no secrets. Checkout credentials are not persisted. The
+workflow cannot push commits, change pull requests, publish packages, create
+releases, deploy software, upload source to an external service, or alter
+repository settings.
+
+Only `actions/checkout` and `actions/setup-node` are used. Both official actions
+are pinned to full release commit SHAs rather than mutable branches or tags.
+There is no third-party action, downloaded shell script, `curl`-to-shell
+installer, dynamic code download, or write-capable token.
+
+Pull requests use the ordinary `pull_request` event, never
+`pull_request_target`. Repository scripts from the proposed revision execute
+with read-only repository permission and without secrets or Git credentials.
+Concurrency cancels superseded work for the same pull request or ref without
+mixing unrelated runs.
+
+Hosted verification supplements local review. Branch protection and repository
+Actions settings remain a separate settings task after the real check names
+have completed successfully.
 
 ## Future gameplay requirements
 

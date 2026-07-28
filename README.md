@@ -7,10 +7,10 @@ shared-screen browser creates and presents a temporary room. Phone players join
 without accounts, and the first player becomes the initial game host
 (controller).
 
-**Stage 2.5 is complete. Stage 3 is in review.** The secure lobby and its
-game-host authority controls work locally, and a separate game-engine package
-now provides tested board, path, word, and dictionary primitives. Live gameplay
-and production deployment do not exist yet.
+**Stage 3 is complete. Stage 3.1 GitHub Actions CI is in review.** The secure
+lobby and game-engine foundation work locally. The Stage 3.1 workflow repeats
+the locked install, quality checks, tests, build, and dependency audit on
+GitHub-hosted runners without adding live gameplay or production deployment.
 
 ## What works today
 
@@ -42,14 +42,18 @@ and production deployment do not exist yet.
   injected Set-backed dictionary lookup.
 - A pinned, reproducible, openly licensed dictionary export is recommended for
   Stage 4; no external word data is bundled in Stage 3.
+- Stage 3.1 adds read-only GitHub-hosted checks for pull requests to `main`,
+  pushes to `main`, and manual runs. Hosted CI supplements local review rather
+  than replacing it.
 
 ## What is not implemented
 
-Stage 3 does not connect the engine to the lobby. There are no gameplay socket
-events, live boards, touch tracing, synchronized rounds, word-submission
-networking, scoring, duplicate handling, timers, round starts, production
-dictionary data, scannable QR codes, persistence, container packaging, image
-publishing, server installation, or tunnel configuration.
+Stage 3.1 changes repository verification only. The engine remains disconnected
+from the lobby, with no gameplay events, live boards, touch tracing,
+synchronized rounds, word-submission networking, scoring, duplicate handling,
+timers, round starts, production dictionary data, scannable QR codes,
+persistence, deployment workflow, container packaging, image publishing,
+server installation, or tunnel configuration.
 
 `Start Round` remains disabled. Settings in the lobby are local interface
 previews and are not server actions yet.
@@ -154,6 +158,10 @@ npm test              # Run shared, engine, server, and client tests once
 npm run build         # Build the client and verify the server build boundary
 npm audit --audit-level=high
 ```
+
+GitHub runs the same locked-install and verification boundary through
+[`CI`](docs/CI.md). Run the local commands before review even when hosted checks
+are green.
 
 ## Environment variables
 
@@ -281,8 +289,8 @@ cannot recreate the display.
 
 ## Next stage
 
-After Stage 3 is reviewed and merged, the recommended Stage 4 is server-owned
-synchronized gameplay. It should reproduce the pinned ESDB size-60
+After Stage 3.1 CI is reviewed and merged, the recommended Stage 4 is
+server-owned synchronized gameplay. It should reproduce the pinned ESDB size-60
 American-plus-Canadian dictionary export, select and document a
 non-proprietary letter distribution, add strict shared submission contracts,
 and integrate authoritative boards, deadlines, word validation, scoring,

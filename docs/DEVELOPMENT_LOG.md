@@ -3,6 +3,64 @@
 Future meaningful work must add a new chronological entry. Record what changed,
 why, what remains open, and the exact verification results.
 
+## 2026-07-28 — Stage 3.1 GitHub Actions CI
+
+### Work completed
+
+- Added `.github/workflows/ci.yml` with stable `CI / Quality` and
+  `CI / Dependency audit` checks.
+- Configured pull requests targeting `main`, pushes to `main`, and manual
+  dispatch as the only triggers.
+- Added a locked `npm ci` install, separate formatting, lint, type-check, test,
+  and build steps, plus a final repository-cleanliness check.
+- Added an independent high-severity npm dependency audit that does not ignore
+  failures.
+- Added `docs/CI.md` with trigger, reproducibility, permissions, concurrency,
+  failure-investigation, known-limit, and future branch-protection guidance.
+- Updated project, architecture, security, workflow, and root documentation to
+  record Stage 3 as complete and Stage 3.1 CI as in review.
+- Changed no application, server, shared-contract, or engine source. No
+  gameplay, dictionary data, letter distribution, QR rendering, deployment,
+  release, package publishing, or Stage 4 work was added.
+
+### Security and reproducibility decisions
+
+- Set workflow permissions explicitly to `contents: read`.
+- Used the ordinary `pull_request` event, never `pull_request_target`.
+- Disabled persisted checkout credentials and supplied no secrets.
+- Resolved official `actions/checkout` v6.0.2 to
+  `de0fac2e4500dabe0009e67214ff5f5447ce83dd`.
+- Resolved official `actions/setup-node` v6.4.0 to
+  `48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e`.
+- Pinned both official actions to those immutable full commit SHAs.
+- Used Node.js 24 and npm caching keyed by the committed `package-lock.json`.
+- Added concurrency cancellation for superseded work on the same pull request
+  or ref.
+- Left branch protection, repository rulesets, Actions permissions, merge
+  settings, and administrator bypass settings unchanged. The two real check
+  names should be required only in a separate settings review after they have
+  completed successfully.
+
+### Local verification
+
+- Local tools — Node.js `v24.18.0`, npm `11.16.0`.
+- Official action tag resolution — passed; both repositories are active,
+  public, owned by the `actions` organization, and both specified tags resolve
+  directly to the pinned commits.
+- `npm ci` — passed; installed 406 packages from the committed lockfile.
+- `npm run format:check` — passed; all matched files use Prettier formatting.
+- `npm run lint` — passed with no warnings or errors.
+- `npm run typecheck` — passed for client, server, game-engine, and shared
+  workspaces.
+- `npm test` — passed; 249 tests across 14 files:
+  - client: 35 tests across 3 files
+  - server: 59 tests across 3 files
+  - game engine: 135 tests across 5 files
+  - shared: 20 tests across 3 files
+- `npm run build` — passed; Vite transformed 158 modules, and server and
+  game-engine strict TypeScript build boundaries passed.
+- `npm audit --audit-level=high` — passed; 0 vulnerabilities.
+
 ## 2026-07-28 — Stage 3 focused final review corrections
 
 ### Findings corrected
