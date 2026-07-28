@@ -1,6 +1,6 @@
 # Future dictionary data
 
-No dictionary is bundled in Stage 2.
+No dictionary is bundled in Stage 2.5.
 
 Before adding any word list, verify that its license permits redistribution and
 use in this project. Record the source, version or retrieval date, exact

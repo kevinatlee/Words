@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the implemented Stage 2 lobby and the boundaries that
+This document describes the implemented Stage 2.5 lobby and the boundaries that
 later game stages must preserve.
 
 ## Runtime pieces
@@ -11,7 +11,8 @@ never the source of truth for membership or controller authority.
 
 **Node.js server (`apps/server`):** Runs Express and Socket.IO in one process.
 It owns active rooms, display sessions, players, `controllerPlayerId`,
-role-specific reconnect credentials, expiration, capacity, and cleanup.
+`controllerStatus`, role-specific reconnect credentials, authorization,
+expiration, capacity, and cleanup.
 
 **Shared package (`packages/shared`):** Defines product configuration, strict
 Zod schemas, state shapes, structured errors, acknowledgements, and typed
@@ -28,12 +29,20 @@ Room
 ├── one display session
 │   └── TV/shared-screen presentation; not a player
 └── zero to eight player sessions
-    └── exactly one controllerPlayerId once any player exists
+    └── zero or one controller player, described by controllerStatus
 ```
 
 The controller is a participating phone player. The first player receives the
-role from the server. Future delegation will change only
-`controllerPlayerId`; it must not replace or modify the display session.
+role from the server. An authorized transfer or automatic succession changes
+only controller authority; it does not replace or modify the display session.
+The display is passive and has no event for selecting, recovering, or approving
+a controller.
+
+The valid controller states are:
+
+- `none`: `controllerPlayerId = null`, no player is marked as controller, and no
+  remaining player is connected
+- `assigned`: exactly one player matches `controllerPlayerId`
 
 The display is excluded from player capacity and cannot use player
 credentials. Future word-submission handlers must reject display-bound sockets.
@@ -57,7 +66,7 @@ Vite client on :5173
                             in-memory RoomStore
 ```
 
-The Vite proxy means the browser connects to its current origin. The Stage 2
+The Vite proxy means the browser connects to its current origin. The Stage 2.5
 production build does not yet serve the React build from Express.
 
 ## Health endpoint
@@ -68,7 +77,7 @@ production build does not yet serve the React build from Express.
 {
   "status": "ok",
   "service": "Words",
-  "version": "0.2.0"
+  "version": "0.2.5"
 }
 ```
 
@@ -96,6 +105,12 @@ Player events:
 | `player:reconnect` | `roomCode`, `playerReconnectToken` | Restore one player role      |
 | `player:leave`     | none                               | Leave the player socket room |
 
+Controller events:
+
+| Event                 | Client fields    | Authorized caller and purpose                 |
+| --------------------- | ---------------- | --------------------------------------------- |
+| `controller:transfer` | `targetPlayerId` | Current controller assigns a connected player |
+
 The server emits:
 
 | Event                  | Purpose                                           |
@@ -116,19 +131,26 @@ either token.
 ## Display creation flow
 
 ```text
-display:create {}
-  -> per-socket request limit
-  -> strict empty-object validation
-  -> allocate server room code
-  -> create display session and credential
-  -> controllerPlayerId = null
-  -> players = []
-  -> bind socket as role: display
-  -> acknowledge room + display credential
+browser opens /
+  -> load profile-local active display pointer
+  -> if credential exists: display:reconnect
+     -> success rotates credential and restores the same room
+     -> invalid/expired/missing room clears only that stale credential
+  -> if no usable credential: display:create {}
+     -> per-socket request limit
+     -> strict empty-object validation
+     -> allocate server room code
+     -> create display session and credential
+     -> controllerPlayerId = null
+     -> players = []
+     -> bind socket as role: display
+     -> acknowledge room + display credential
 ```
 
 Room creation accepts no name, room code, player ID, or role field. The display
-is never inserted into the player map.
+is never inserted into the player map. One guarded startup attempt prevents
+React development checks or rerenders from creating duplicate rooms. Genuine
+server or transport failures show an explicit retry instead of looping.
 
 ## Player join flow
 
@@ -138,7 +160,7 @@ player:join { roomCode, displayName }
   -> strict validation and code normalization
   -> capacity and duplicate-name checks
   -> create server player ID and credential
-  -> if first player: controllerPlayerId = new player ID
+  -> if no controller: assign the earliest-joined connected player
   -> otherwise: preserve existing controllerPlayerId
   -> bind socket as role: player
   -> acknowledge room + player credential
@@ -148,6 +170,41 @@ player:join { roomCode, displayName }
 No join payload can contain a controller claim. The room store, not player
 order supplied by the browser, decides initial authority.
 
+## Controller transfer flow
+
+```text
+controller:transfer { targetPlayerId }
+  -> strict validation and per-socket request limit
+  -> require a player-bound socket for the current controller
+  -> require a different, connected target in the same room
+  -> atomically replace controllerPlayerId
+  -> preserve controllerStatus = assigned
+  -> acknowledge and broadcast authoritative room state
+```
+
+An ordinary player, the display, a stale former controller, an unbound socket,
+and a disconnected or cross-room target are rejected with structured errors.
+The payload cannot include a requester ID, controller claim, role, or room
+state.
+
+## Automatic controller succession
+
+```text
+controller explicitly leaves, or cleanup expires controller grace
+  -> remove the former controller and invalidate its credential
+  -> collect connected remaining players
+  -> sort by joinedAt ascending, then player ID ascending
+  -> assign the first eligible player
+  -> or set controllerStatus = none when none is connected
+  -> broadcast one authoritative room state for the completed transition
+```
+
+If controller state is `none`, the next player to join or reconnect is selected
+automatically. A reconnect processed exactly at its grace deadline is valid if
+cleanup has not already removed the player. If cleanup wins, the expired token
+is invalid and cannot reclaim authority. The person may join again as a new
+ordinary player. The display does not participate in any of these transitions.
+
 ## In-memory room store
 
 Rooms are keyed by normalized room code. Each internal room holds:
@@ -156,6 +213,7 @@ Rooms are keyed by normalized room code. Each internal room holds:
 - creation, activity, and expiration timestamps
 - one internal display session
 - `controllerPlayerId`
+- `controllerStatus`
 - a bounded map of zero to eight players
 - read-only default settings
 
@@ -183,12 +241,20 @@ words:reconnect:player:<roomCode>:<playerId>
 ```
 
 The current tab stores a role, room code, and session-ID pointer in session
-storage. This lets tabs on one origin represent different players or the
-display without overwriting the active identity for another tab.
+storage. The browser profile also stores
+`words:active-display-session`, a token-free pointer to the display credential
+that belongs to that profile. This lets `/` find and reconnect its display while
+separate browser profiles continue to own separate display rooms.
 
-On `/room/:code`, the client validates the stored credential shape and calls
-only the matching reconnect event. A successful reconnect rotates and replaces
+On `/`, the client validates the display pointer and calls only
+`display:reconnect`. On `/room/:code`, it validates the per-tab player pointer
+and calls only `player:reconnect`. A successful reconnect rotates and replaces
 that role’s token.
+
+The display’s join link is built centrally as `/join/<normalizedCode>` using
+the current browser origin. `/join/:roomCode` locks the prefilled code while
+`/join` remains the manual-entry fallback. `/display` and `/host` canonicalize
+to `/`.
 
 If a valid token is presented while the previous socket still exists—for
 example, during a fast refresh—the new socket replaces the old socket binding.
@@ -208,30 +274,33 @@ socket a room-lifetime switch:
 - a display leave marks the display offline;
 - an ordinary player leave removes that player;
 - a sole controller leave removes that player and returns the room to zero
-  players with `controllerPlayerId = null`;
-- a controller leave while other players remain keeps that controller offline,
-  preserving authority without automatic transfer.
+  players with `controllerStatus = none`;
+- a controller leave while other players remain promotes the earliest-joined
+  connected player, with player ID as the tie-breaker;
+- if no remaining player is connected, controller state becomes `none` until a
+  player joins or reconnects.
 
 Periodic cleanup:
 
 - deletes any room whose sliding lifetime expired;
 - expires disconnected display credentials without removing present players;
 - removes ordinary players whose reconnect grace expired;
-- removes a sole disconnected controller after its grace period;
-- retains an offline controller record when other players remain, while
-  invalidating its expired credential;
+- removes a disconnected controller and invalidates its credential after grace;
+- promotes the earliest-joined connected remaining player after controller
+  expiry, or uses `none` if no player is connected;
 - removes an abandoned room when it has no players and its disconnected display
   credential has expired;
 - clears token mappings and bounded expired-code tombstones.
 
-This Stage 2 model deliberately prefers an unavailable offline controller to an
-unauthorized automatic election. Future delegation can assign a new
-`controllerPlayerId` through a server-authorized controller action. Room TTL
-still bounds every such room.
+The store performs transfer, succession, disconnect, reconnect, and cleanup
+mutations synchronously. Each action rechecks the current server binding and
+room state, so two requests from a formerly authorized socket cannot both win.
+A stale replaced socket cannot disconnect the newest valid socket. Room TTL
+still bounds every room, including one with no connected controller candidate.
 
 ## Server-authority boundary
 
-Browsers are controlled by users and can send invented events. Stage 2 trusts
+Browsers are controlled by users and can send invented events. Stage 2.5 trusts
 only data it validates and maps to a server-bound role session.
 
 Future stages must verify room membership, role, phase, controller player ID,
@@ -263,4 +332,4 @@ Words process on port `6532`. That process will serve the built client, health
 API, Socket.IO, game engine, and an openly licensed dictionary.
 
 Container packaging, static serving, tunnel configuration, and image publishing
-are not implemented in Stage 2.
+are not implemented in Stage 2.5.

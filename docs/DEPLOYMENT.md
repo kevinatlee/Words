@@ -1,6 +1,6 @@
 # Future deployment
 
-Production deployment is **not implemented in Stage 2**. The repository now
+Production deployment is **not implemented in Stage 2.5**. The repository now
 contains a working Node.js lobby server and health endpoint, but it does not
 contain a Dockerfile, Compose configuration, published image, Unraid template,
 Cloudflare configuration, or production static-file serving.

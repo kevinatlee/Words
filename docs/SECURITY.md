@@ -1,8 +1,8 @@
 # Security requirements
 
-Stage 2 introduces a real network boundary. This document separates implemented
-lobby controls from protections still required before public deployment and
-gameplay.
+Stage 2.5 has a real network boundary and controller-authority actions. This
+document separates implemented lobby controls from protections still required
+before public deployment and gameplay.
 
 ## Implemented authority controls
 
@@ -13,8 +13,16 @@ gameplay.
 - Player join accepts only room code and display name. It does not accept a
   controller flag or controller player ID.
 - The first player receives controller authority from the server.
-- `controllerPlayerId` must reference exactly one player whenever players
-  exist. It is `null` only when the room has no players.
+- Controller state is explicit: `none` has no controller ID or connected
+  player, and `assigned` references exactly one existing player.
+- Normal transfer accepts only `targetPlayerId`, requires the currently
+  connected controller socket, and requires a different connected player in
+  the same room.
+- The display has no controller-assignment event. It cannot select, recover, or
+  approve a game host.
+- Controller succession is a server-owned lifecycle transition. It considers
+  only connected remaining players and sorts by `joinedAt`, then player ID.
+- Transfer and succession never change display identity.
 - The display session is never inserted into the player collection and never
   counts toward the eight-player maximum.
 - Each connected socket is bound to at most one server-created role session:
@@ -22,7 +30,6 @@ gameplay.
 - Display and player reconnect tokens are stored in separate server indexes.
   Neither token can restore or impersonate the other role.
 - Display or controller disconnect does not directly close the room.
-- Stage 2 never automatically elects a replacement controller.
 - Public room state excludes socket IDs, token values, and private token
   indexes.
 
@@ -64,7 +71,7 @@ whether a validated action is allowed for the socket and current role.
 - Disconnect grace defaults to 60 seconds.
 - Cleanup runs every 30 seconds by default and removes expired rooms, ordinary
   players, token mappings, socket references, and expired-code tombstones.
-- A controller record retained after credential expiry is still bounded by the
+- A room with no connected controller candidate is still bounded by the
   eight-player cap and room lifetime.
 - Environment-provided numeric limits are range-checked and fall back to safe
   defaults when invalid.
@@ -96,10 +103,17 @@ role during a refresh race. Stale-tab cleanup compares the failed token before
 removing shared browser storage, so it cannot delete the replacement tab’s
 newly rotated credential.
 
-Browser storage is appropriate for this temporary, account-free Stage 2
+Browser storage is appropriate for this temporary, account-free Stage 2.5
 session, but it is accessible to JavaScript on the same origin. A future
 cross-site scripting flaw could expose it, so dependencies, text rendering, and
 future HTML features still require review.
+
+The automatic root display flow stores a separate profile-local pointer
+containing only the display role, room code, and display session ID. It never
+contains the reconnect token. Root startup validates the referenced
+role-specific credential and reconnects it before creating a room. Invalid
+display state clears only that display credential; it cannot consume a player
+credential or affect another browser profile’s room.
 
 ## Disconnect and controller behavior
 
@@ -107,17 +121,43 @@ Disconnect is presence loss, not room ownership loss:
 
 - the display going offline does not remove players;
 - the controller going offline does not close the room;
-- controller authority is not transferred automatically;
+- the disconnected controller retains authority during reconnect grace;
 - a disconnected display or player may restore only its own role during grace;
 - an ordinary player is removed after grace;
-- if a controller’s grace expires while other players remain, its token is
-  invalidated but its offline player record and `controllerPlayerId` remain;
+- if controller grace expires, its token and player record are removed;
+- the server promotes the earliest-joined connected remaining player, breaking
+  equal join-time ties by player ID;
+- if none is connected, state becomes `none` and the next join or reconnect
+  becomes controller;
+- the old credential cannot reconnect after expiry, although the person can
+  join again as an ordinary player;
 - room TTL remains the final bound.
 
-The offline-controller behavior is an intentional Stage 2 safety choice.
-Controller recovery after credential expiry requires a future, explicitly
-authorized delegation design. Silently choosing another connected player would
-be an authorization change.
+Controller absence is explicit rather than inferred. The display stays passive
+through disconnect, expiry, and succession; it cannot make itself or anyone
+else controller.
+
+## Controller race handling
+
+The room store authorizes and mutates each action synchronously against its
+current socket binding:
+
+- after one transfer succeeds, a second request from the former controller is
+  rejected;
+- a controller reconnect processed at the grace deadline before cleanup
+  preserves authority;
+- if cleanup wins, it invalidates the expired token before choosing a
+  successor;
+- duplicate cleanup work and competing leave/transfer operations resolve to
+  exactly one controller;
+- stale cleanup cannot overwrite a newer manual controller assignment;
+- if the selected successor disconnects, that player receives the same grace
+  behavior before the next deterministic succession;
+- a replaced stale socket cannot disconnect the newer valid socket.
+
+Tests cover these boundaries with competing requests, refreshed sockets,
+offline targets, deterministic ties, repeat cleanup, and old-token reconnect
+attempts.
 
 ## Origin and transport policy
 
@@ -130,15 +170,12 @@ WebSocket forwarding, and narrow the production origin policy to actual
 deployment needs. Reconnect tokens are application credentials and must never
 be sent over unencrypted public HTTP.
 
-## Known Stage 2 limits
+## Known Stage 2.5 limits
 
 - Throttling is per socket, not per IP, subnet, device, or room code.
 - A client can reconnect to obtain a new socket and a fresh request window.
 - Room-not-found and recently expired responses are distinguishable, which may
   help code enumeration.
-- An offline controller whose token expired cannot delegate control in Stage 2;
-  the room remains bounded but control is unavailable until future policy or
-  expiry.
 - There is no reverse-proxy request limit, network firewall policy, or
   production monitoring in this repository.
 - Temporary credentials have no account identity, revocation interface, or
@@ -156,9 +193,6 @@ When gameplay is added, the server must:
 
 - permit only allowlisted grid sizes, durations, and scoring modes
 - authorize settings and round starts against `controllerPlayerId`
-- require controller delegation to name an existing player ID and come from the
-  current controller socket
-- never change the display session during controller delegation
 - reject word submissions from display-bound sockets
 - generate and retain the official board
 - validate path bounds, adjacency, tile reuse, and maximum path length

@@ -42,8 +42,9 @@ describe('temporary role-specific lobby session storage', () => {
     store.save(session);
 
     expect(store.load('ABC234')).toEqual(session);
+    expect(store.loadDisplay()).toEqual(session);
     expect(window.sessionStorage.length).toBe(1);
-    expect(window.localStorage.length).toBe(1);
+    expect(window.localStorage.length).toBe(2);
   });
 
   it('stores player credentials separately from display credentials', () => {
@@ -107,6 +108,38 @@ describe('temporary role-specific lobby session storage', () => {
     expect(store.load('XYZ789')).toBeNull();
   });
 
+  it('keeps two browser profiles attached to their own display rooms', () => {
+    const firstProfileStore = createLobbySessionStore(
+      createMemoryStorage(),
+      createMemoryStorage(),
+    );
+    const secondProfileStore = createLobbySessionStore(
+      createMemoryStorage(),
+      createMemoryStorage(),
+    );
+    const firstDisplay: StoredDisplaySession = {
+      role: 'display',
+      roomCode: 'ABC234',
+      displaySessionId: '00000000-0000-4000-8000-000000000100',
+      displayReconnectToken: 'j'.repeat(43),
+    };
+    const secondDisplay: StoredDisplaySession = {
+      role: 'display',
+      roomCode: 'XYZ789',
+      displaySessionId: '00000000-0000-4000-8000-000000000200',
+      displayReconnectToken: 'k'.repeat(43),
+    };
+
+    firstProfileStore.save(firstDisplay);
+    secondProfileStore.save(secondDisplay);
+
+    expect(firstProfileStore.loadDisplay()).toEqual(firstDisplay);
+    expect(secondProfileStore.loadDisplay()).toEqual(secondDisplay);
+    expect(firstProfileStore.loadDisplay()).not.toEqual(
+      secondProfileStore.loadDisplay(),
+    );
+  });
+
   it('removes both the pointer and the role-specific credential', () => {
     const store = createLobbySessionStore(
       window.localStorage,
@@ -123,6 +156,7 @@ describe('temporary role-specific lobby session storage', () => {
     store.clear(session);
 
     expect(store.load('ABC234')).toBeNull();
+    expect(store.loadDisplay()).toBeNull();
     expect(window.sessionStorage.length).toBe(0);
     expect(window.localStorage.length).toBe(0);
   });

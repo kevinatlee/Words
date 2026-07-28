@@ -7,7 +7,9 @@ import {
   productConfig,
   reconnectDisplayInputSchema,
   reconnectPlayerInputSchema,
+  transferControllerInputSchema,
   type ClientToServerEvents,
+  type ControllerActionAcknowledgement,
   type CreateDisplayInput,
   type DisplayActionAcknowledgement,
   type JoinPlayerInput,
@@ -20,6 +22,7 @@ import {
   type RoomError,
   type RoomErrorCode,
   type ServerToClientEvents,
+  type TransferControllerInput,
 } from '@words/shared';
 import express from 'express';
 import { Server as SocketServer, type Socket } from 'socket.io';
@@ -50,6 +53,11 @@ export type WordsServer = ReturnType<typeof createWordsServer>;
 const publicErrorMessages: Record<RoomErrorCode, string> = {
   INVALID_PAYLOAD: 'Check the information you entered and try again.',
   INVALID_NAME: 'Choose a valid display name and try again.',
+  UNAUTHORIZED: 'That session is not authorized for this action.',
+  NOT_CONTROLLER: 'Only the current game host can do that.',
+  TARGET_PLAYER_NOT_FOUND: 'Choose a player who is in this room.',
+  TARGET_PLAYER_OFFLINE: 'Choose a connected player.',
+  TARGET_ALREADY_CONTROLLER: 'That player is already the game host.',
   ROOM_NOT_FOUND: 'No active room uses that code.',
   ROOM_FULL: 'That room already has the maximum number of players.',
   ROOM_EXPIRED: 'That temporary room has expired.',
@@ -361,6 +369,55 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
           });
           socket.to(result.room.code).emit('player:connected', result.player);
           io.to(result.room.code).emit('room:state', result.room);
+        } catch (error) {
+          acknowledgeFailure(acknowledge, toRoomError(error));
+        }
+      },
+    );
+
+    socket.on(
+      'controller:transfer',
+      (
+        payload: TransferControllerInput,
+        acknowledge: ControllerActionAcknowledgement,
+      ) => {
+        if (!checkRateLimit(acknowledge)) {
+          return;
+        }
+
+        const parsed = transferControllerInputSchema.safeParse(payload);
+        if (!parsed.success) {
+          acknowledgeFailure(acknowledge, {
+            code: 'INVALID_PAYLOAD',
+            message: publicErrorMessages.INVALID_PAYLOAD,
+          });
+          return;
+        }
+
+        const session = socket.data.session;
+        if (!session) {
+          acknowledgeFailure(acknowledge, {
+            code: 'UNAUTHORIZED',
+            message: publicErrorMessages.UNAUTHORIZED,
+          });
+          return;
+        }
+        if (session.role !== 'player') {
+          acknowledgeFailure(acknowledge, {
+            code: 'NOT_CONTROLLER',
+            message: publicErrorMessages.NOT_CONTROLLER,
+          });
+          return;
+        }
+
+        try {
+          const result = roomStore.transferController(
+            session,
+            parsed.data.targetPlayerId,
+            socket.id,
+          );
+          acknowledge({ ok: true, room: result.room });
+          io.to(session.roomCode).emit('room:state', result.room);
         } catch (error) {
           acknowledgeFailure(acknowledge, toRoomError(error));
         }

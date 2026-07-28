@@ -7,7 +7,7 @@ describe('product configuration', () => {
   it('keeps public identity and production values centralized', () => {
     expect(productConfig).toMatchObject({
       productName: 'Words',
-      version: '0.2.0',
+      version: '0.2.5',
       publicUrl: 'https://words.atlee.io',
       productionPort: 6532,
       defaultGridSize: 4,

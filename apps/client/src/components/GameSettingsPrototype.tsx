@@ -8,6 +8,7 @@ import {
 type GameSettingsPrototypeProps = {
   gridSize: GridSize;
   duration: RoundDurationSeconds;
+  disabled?: boolean;
   onGridSizeChange: (size: GridSize) => void;
   onDurationChange: (duration: RoundDurationSeconds) => void;
 };
@@ -15,6 +16,7 @@ type GameSettingsPrototypeProps = {
 export function GameSettingsPrototype({
   gridSize,
   duration,
+  disabled = false,
   onGridSizeChange,
   onDurationChange,
 }: GameSettingsPrototypeProps) {
@@ -22,7 +24,7 @@ export function GameSettingsPrototype({
     <section className="panel settings-panel" aria-labelledby="settings-title">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">Stage 2 preview</span>
+          <span className="eyebrow">Stage 2.5 preview</span>
           <h2 id="settings-title">Round setup</h2>
         </div>
         <span className="status-label">Not networked</span>
@@ -35,6 +37,7 @@ export function GameSettingsPrototype({
             <button
               type="button"
               aria-pressed={gridSize === size}
+              disabled={disabled}
               onClick={() => onGridSizeChange(size)}
               key={size}
             >
@@ -51,6 +54,7 @@ export function GameSettingsPrototype({
             <button
               type="button"
               aria-pressed={duration === seconds}
+              disabled={disabled}
               onClick={() => onDurationChange(seconds)}
               key={seconds}
             >

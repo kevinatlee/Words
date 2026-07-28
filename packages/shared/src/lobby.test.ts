@@ -10,9 +10,11 @@ import {
   reconnectPlayerInputSchema,
   roomCodeSchema,
   roomStateSchema,
+  transferControllerInputSchema,
 } from './lobby';
 
 const controllerPlayerId = '00000000-0000-4000-8000-000000000001';
+const ordinaryPlayerId = '00000000-0000-4000-8000-000000000002';
 
 function roomStateFixture() {
   return {
@@ -26,6 +28,7 @@ function roomStateFixture() {
       connected: true,
       createdAt: '2026-07-27T20:00:00.000Z',
     },
+    controllerStatus: 'assigned',
     controllerPlayerId,
     players: [
       {
@@ -97,6 +100,23 @@ describe('lobby contracts', () => {
     ).toBe(false);
   });
 
+  it('accepts only a target player ID for controller transfer', () => {
+    const input = { targetPlayerId: ordinaryPlayerId };
+
+    expect(transferControllerInputSchema.parse(input)).toEqual(input);
+    expect(
+      transferControllerInputSchema.safeParse({
+        ...input,
+        requesterPlayerId: controllerPlayerId,
+      }).success,
+    ).toBe(false);
+    expect(
+      transferControllerInputSchema.safeParse({
+        targetPlayerId: 'a'.repeat(1_000),
+      }).success,
+    ).toBe(false);
+  });
+
   it('keeps display and player reconnect payloads distinct', () => {
     const token = 'a'.repeat(43);
 
@@ -129,6 +149,7 @@ describe('lobby contracts', () => {
   it('accepts an empty room with a display session and no controller', () => {
     const state = roomStateSchema.parse({
       ...roomStateFixture(),
+      controllerStatus: 'none',
       controllerPlayerId: null,
       players: [],
     });
@@ -158,6 +179,55 @@ describe('lobby contracts', () => {
             isController: false,
           },
         ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('represents no controller only when no player is connected', () => {
+    const fixture = roomStateFixture();
+    const noControllerState = roomStateSchema.parse({
+      ...fixture,
+      controllerStatus: 'none',
+      controllerPlayerId: null,
+      players: fixture.players.map((player) => ({
+        ...player,
+        connected: false,
+        isController: false,
+      })),
+    });
+
+    expect(noControllerState.controllerStatus).toBe('none');
+    expect(noControllerState.controllerPlayerId).toBeNull();
+    expect(
+      noControllerState.players.every((player) => !player.isController),
+    ).toBe(true);
+  });
+
+  it('rejects controller status and player-ID mismatches', () => {
+    const fixture = roomStateFixture();
+
+    expect(
+      roomStateSchema.safeParse({
+        ...fixture,
+        controllerStatus: 'assigned',
+        controllerPlayerId: null,
+        players: fixture.players.map((player) => ({
+          ...player,
+          isController: false,
+        })),
+      }).success,
+    ).toBe(false);
+    expect(
+      roomStateSchema.safeParse({
+        ...fixture,
+        controllerStatus: 'none',
+        controllerPlayerId: null,
+      }).success,
+    ).toBe(false);
+    expect(
+      roomStateSchema.safeParse({
+        ...fixture,
+        controllerPlayerId: '00000000-0000-4000-8000-000000000100',
       }).success,
     ).toBe(false);
   });

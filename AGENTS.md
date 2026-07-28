@@ -23,7 +23,8 @@ and explain important choices in plain language.
   flag or ID, player ID, display session ID, reconnect expiry, or room code
   during display creation.
 - Keep the shared display and game host separate. The display is never a
-  player, never counts toward capacity, and never receives player authority.
+  player, never counts toward capacity, never receives player authority, and
+  never selects, recovers, or approves a controller.
 - Keep display and player reconnect credentials role-specific. Neither
   credential may be accepted as the other role.
 - Keep room, player, socket-attempt, and expired-code collections bounded.
@@ -31,10 +32,16 @@ and explain important choices in plain language.
   successful reconnect, absent from URLs and logs, and treated as secrets.
 - Preserve the Stage 2 maximum of eight phone players per room, excluding the
   display.
-- Controller authority must always reference a player ID when players exist.
-- Do not add automatic controller election. A disconnected controller retains
-  `controllerPlayerId`; delegation requires an explicit, authorized future
-  action.
+- Controller state must be explicit: `none` with no connected player and no
+  controller ID, or `assigned` with exactly one matching player ID.
+- A disconnected controller retains authority during reconnect grace. When the
+  controller explicitly leaves or expires, promote the connected remaining
+  player with the earliest `joinedAt`, breaking ties by player ID. If none is
+  connected, use `none`; the next player to join or reconnect becomes
+  controller automatically.
+- Normal controller transfer must come from the currently connected
+  controller and name an existing connected player in the same room. It changes
+  only controller authority, never display identity or player membership.
 - Do not close a room solely because the display socket or controller player
   socket disconnects.
 - Support 4 × 4, 5 × 5, and 6 × 6 grids generically. Never assume a grid has

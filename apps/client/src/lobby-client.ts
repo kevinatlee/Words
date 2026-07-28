@@ -3,6 +3,7 @@ import { io, type Socket } from 'socket.io-client';
 import type {
   ClientToServerEvents,
   ConnectionStatus,
+  ControllerActionResponse,
   CreateDisplayInput,
   DisplayActionResponse,
   JoinPlayerInput,
@@ -13,6 +14,7 @@ import type {
   RoomError,
   RoomState,
   ServerToClientEvents,
+  TransferControllerInput,
 } from '@words/shared';
 
 export type LobbyClient = {
@@ -27,6 +29,9 @@ export type LobbyClient = {
     input: ReconnectPlayerInput,
   ) => Promise<PlayerActionResponse>;
   leavePlayer: () => Promise<LeaveSessionResponse>;
+  transferController: (
+    input: TransferControllerInput,
+  ) => Promise<ControllerActionResponse>;
   onRoomState: (listener: (room: RoomState) => void) => () => void;
   onRoomError: (listener: (error: RoomError) => void) => () => void;
   onConnectionStatus: (
@@ -50,6 +55,11 @@ const playerConnectionFailure: PlayerActionResponse = {
 };
 
 const leaveConnectionFailure: LeaveSessionResponse = {
+  ok: false,
+  error: connectionError,
+};
+
+const controllerConnectionFailure: ControllerActionResponse = {
   ok: false,
   error: connectionError,
 };
@@ -158,6 +168,22 @@ export class SocketLobbyClient implements LobbyClient {
       this.socket.timeout(5_000).emit('player:leave', {}, (error, response) => {
         resolve(error ? leaveConnectionFailure : response);
       });
+    });
+  }
+
+  async transferController(
+    input: TransferControllerInput,
+  ): Promise<ControllerActionResponse> {
+    if (!this.socket.connected) {
+      return controllerConnectionFailure;
+    }
+
+    return new Promise((resolve) => {
+      this.socket
+        .timeout(5_000)
+        .emit('controller:transfer', input, (error, response) => {
+          resolve(error ? controllerConnectionFailure : response);
+        });
     });
   }
 

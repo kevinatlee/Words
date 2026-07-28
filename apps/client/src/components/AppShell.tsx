@@ -24,11 +24,11 @@ export function AppShell({
         </a>
         <div className="site-header__actions">
           {currentPath !== '/' && (
-            <a className="text-link" href="/">
-              Choose another view
+            <a className="text-link" href="/join">
+              Join another room
             </a>
           )}
-          <span className="stage-badge">Stage 2 lobby</span>
+          <span className="stage-badge">Stage 2.5 lobby</span>
         </div>
       </header>
       <main id="main-content">{children}</main>

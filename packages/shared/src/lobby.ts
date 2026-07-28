@@ -74,6 +74,14 @@ export const reconnectPlayerInputSchema = z
 
 export const leaveSessionInputSchema = z.object({}).strict();
 
+export const playerIdSchema = z.string().max(36).uuid();
+
+export const transferControllerInputSchema = z
+  .object({
+    targetPlayerId: playerIdSchema,
+  })
+  .strict();
+
 export const roomSettingsSchema = z
   .object({
     gridSize: z.union([z.literal(4), z.literal(5), z.literal(6)]),
@@ -98,13 +106,15 @@ export const displayStateSchema = z
 
 export const playerStateSchema = z
   .object({
-    id: z.string().uuid(),
+    id: playerIdSchema,
     displayName: displayNameSchema,
     connected: z.boolean(),
     joinedAt: z.string().datetime(),
     isController: z.boolean(),
   })
   .strict();
+
+export const controllerStatusSchema = z.enum(['none', 'assigned']);
 
 export const roomStateSchema = z
   .object({
@@ -115,7 +125,8 @@ export const roomStateSchema = z
     expiresAt: z.string().datetime(),
     maxPlayers: z.number().int().min(1).max(productConfig.maxPlayers),
     display: displayStateSchema,
-    controllerPlayerId: z.string().uuid().nullable(),
+    controllerStatus: controllerStatusSchema,
+    controllerPlayerId: playerIdSchema.nullable(),
     players: z.array(playerStateSchema).max(productConfig.maxPlayers),
     settings: roomSettingsSchema,
   })
@@ -125,12 +136,17 @@ export const roomStateSchema = z
       (player) => player.isController,
     );
 
-    if (room.players.length === 0) {
-      if (room.controllerPlayerId !== null || controllerPlayers.length !== 0) {
+    if (room.controllerStatus === 'none') {
+      if (
+        room.controllerPlayerId !== null ||
+        controllerPlayers.length !== 0 ||
+        room.players.some((player) => player.connected)
+      ) {
         context.addIssue({
           code: 'custom',
-          message: 'An empty room cannot have a controller player.',
-          path: ['controllerPlayerId'],
+          message:
+            'Controller status none requires no assigned or connected player.',
+          path: ['controllerStatus'],
         });
       }
       return;
@@ -167,6 +183,11 @@ export const playerSessionCredentialsSchema = z
 export const roomErrorCodeSchema = z.enum([
   'INVALID_PAYLOAD',
   'INVALID_NAME',
+  'UNAUTHORIZED',
+  'NOT_CONTROLLER',
+  'TARGET_PLAYER_NOT_FOUND',
+  'TARGET_PLAYER_OFFLINE',
+  'TARGET_ALREADY_CONTROLLER',
   'ROOM_NOT_FOUND',
   'ROOM_FULL',
   'ROOM_EXPIRED',
@@ -187,6 +208,13 @@ export const roomActionFailureSchema = z
   .object({
     ok: z.literal(false),
     error: roomErrorSchema,
+  })
+  .strict();
+
+const controllerActionSuccessSchema = z
+  .object({
+    ok: z.literal(true),
+    room: roomStateSchema,
   })
   .strict();
 
@@ -221,14 +249,23 @@ export const leaveSessionResponseSchema = z.discriminatedUnion('ok', [
   roomActionFailureSchema,
 ]);
 
+export const controllerActionResponseSchema = z.discriminatedUnion('ok', [
+  controllerActionSuccessSchema,
+  roomActionFailureSchema,
+]);
+
 export type CreateDisplayInput = z.infer<typeof createDisplayInputSchema>;
 export type JoinPlayerInput = z.infer<typeof joinPlayerInputSchema>;
 export type ReconnectDisplayInput = z.infer<typeof reconnectDisplayInputSchema>;
 export type ReconnectPlayerInput = z.infer<typeof reconnectPlayerInputSchema>;
 export type LeaveSessionInput = z.infer<typeof leaveSessionInputSchema>;
+export type TransferControllerInput = z.infer<
+  typeof transferControllerInputSchema
+>;
 export type RoomSettings = z.infer<typeof roomSettingsSchema>;
 export type DisplayState = z.infer<typeof displayStateSchema>;
 export type PlayerState = z.infer<typeof playerStateSchema>;
+export type ControllerStatus = z.infer<typeof controllerStatusSchema>;
 export type RoomState = z.infer<typeof roomStateSchema>;
 export type DisplaySessionCredentials = z.infer<
   typeof displaySessionCredentialsSchema
@@ -244,6 +281,9 @@ export type DisplayActionResponse = z.infer<typeof displayActionResponseSchema>;
 export type PlayerActionSuccess = z.infer<typeof playerActionSuccessSchema>;
 export type PlayerActionResponse = z.infer<typeof playerActionResponseSchema>;
 export type LeaveSessionResponse = z.infer<typeof leaveSessionResponseSchema>;
+export type ControllerActionResponse = z.infer<
+  typeof controllerActionResponseSchema
+>;
 export type DisplayActionAcknowledgement = (
   response: DisplayActionResponse,
 ) => void;
@@ -252,6 +292,9 @@ export type PlayerActionAcknowledgement = (
 ) => void;
 export type LeaveSessionAcknowledgement = (
   response: LeaveSessionResponse,
+) => void;
+export type ControllerActionAcknowledgement = (
+  response: ControllerActionResponse,
 ) => void;
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 
@@ -279,6 +322,10 @@ export interface ClientToServerEvents {
   'player:leave': (
     payload: LeaveSessionInput,
     acknowledge: LeaveSessionAcknowledgement,
+  ) => void;
+  'controller:transfer': (
+    payload: TransferControllerInput,
+    acknowledge: ControllerActionAcknowledgement,
   ) => void;
 }
 

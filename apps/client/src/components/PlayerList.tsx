@@ -33,7 +33,7 @@ export function PlayerList({
         <ul className="player-list">
           {players.map((player) => (
             <li
-              className={`player-list__item${player.connected ? '' : ' player-list__item--offline'}`}
+              className={`player-list__item${player.connected ? '' : ' player-list__item--offline'}${player.isController ? ' player-list__item--controller' : ''}`}
               key={player.id}
             >
               <span className="player-avatar" aria-hidden="true">
@@ -57,8 +57,8 @@ export function PlayerList({
               >
                 {player.isController
                   ? player.connected
-                    ? 'Controller'
-                    : 'Controller offline'
+                    ? 'Game Host'
+                    : 'Game Host offline'
                   : player.connected
                     ? 'Connected'
                     : 'Offline'}

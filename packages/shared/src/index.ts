@@ -5,8 +5,11 @@ export {
   type ScoringMode,
 } from './config';
 export { formatRoundDuration } from './duration';
+export { buildJoinUrl } from './join-url';
 export {
   createDisplayInputSchema,
+  controllerActionResponseSchema,
+  controllerStatusSchema,
   displayActionResponseSchema,
   displayNameSchema,
   displaySessionCredentialsSchema,
@@ -17,6 +20,7 @@ export {
   normalizeDisplayName,
   normalizeRoomCode,
   playerActionResponseSchema,
+  playerIdSchema,
   playerSessionCredentialsSchema,
   playerStateSchema,
   reconnectDisplayInputSchema,
@@ -29,8 +33,12 @@ export {
   roomErrorSchema,
   roomSettingsSchema,
   roomStateSchema,
+  transferControllerInputSchema,
   type ClientToServerEvents,
   type ConnectionStatus,
+  type ControllerActionAcknowledgement,
+  type ControllerActionResponse,
+  type ControllerStatus,
   type CreateDisplayInput,
   type DisplayActionAcknowledgement,
   type DisplayActionResponse,
@@ -54,4 +62,5 @@ export {
   type RoomSettings,
   type RoomState,
   type ServerToClientEvents,
+  type TransferControllerInput,
 } from './lobby';

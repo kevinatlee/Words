@@ -1,18 +1,29 @@
 import { useMemo, useState } from 'react';
 
 import {
+  buildJoinUrl,
   type ConnectionStatus,
   type GridSize,
+  type RoomError,
   type RoomState,
   type RoundDurationSeconds,
 } from '@words/shared';
 
 import { createDemoBoard } from '../utils/demoBoard';
+import { ControllerPanel } from './ControllerPanel';
 import { GameSettingsPrototype } from './GameSettingsPrototype';
 import { LetterGrid } from './LetterGrid';
 import { PlayerList } from './PlayerList';
 import { PrototypeNotice } from './PrototypeNotice';
 import { RoomCode } from './RoomCode';
+
+const placeholderCells = Array.from(
+  { length: 49 },
+  (_, index) =>
+    index % 3 === 0 ||
+    index % 7 === 0 ||
+    (index > 8 && index < 20 && index % 2 === 0),
+);
 
 type RoomLobbyProps = {
   room: RoomState;
@@ -20,6 +31,7 @@ type RoomLobbyProps = {
   currentPlayerId: string | null;
   connectionStatus: ConnectionStatus;
   onLeave: () => Promise<void>;
+  onTransferController: (targetPlayerId: string) => Promise<RoomError | null>;
 };
 
 export function RoomLobby({
@@ -28,6 +40,7 @@ export function RoomLobby({
   currentPlayerId,
   connectionStatus,
   onLeave,
+  onTransferController,
 }: RoomLobbyProps) {
   const [gridSize, setGridSize] = useState<GridSize>(room.settings.gridSize);
   const [duration, setDuration] = useState<RoundDurationSeconds>(
@@ -41,6 +54,7 @@ export function RoomLobby({
   );
   const letters = useMemo(() => createDemoBoard(gridSize), [gridSize]);
   const isDisplay = sessionRole === 'display';
+  const joinUrl = buildJoinUrl(window.location.origin, room.code);
 
   const heading = isDisplay
     ? 'Shared display is ready.'
@@ -51,7 +65,7 @@ export function RoomLobby({
     ? 'Share the code and keep this screen visible while phone players join.'
     : currentPlayer?.isController
       ? 'You play normally and will control lobby settings and round starts in a later stage.'
-      : `Waiting with ${controller?.displayName ?? 'the game host'} for a future round.`;
+      : `Waiting with ${controller?.displayName ?? 'the next Game Host'} for a future round.`;
 
   return (
     <div className="room-page">
@@ -74,18 +88,20 @@ export function RoomLobby({
               ? 'Reconnecting…'
               : 'Disconnected'}
         </span>
-        <button
-          className="text-button"
-          type="button"
-          onClick={() => void onLeave()}
-        >
-          Leave room
-        </button>
+        {!isDisplay && (
+          <button
+            className="text-button"
+            type="button"
+            onClick={() => void onLeave()}
+          >
+            Leave room
+          </button>
+        )}
       </div>
 
       <PrototypeNotice>
-        The lobby is live. Controller settings, delegation, gameplay, and round
-        starts are intentionally not implemented in Stage 2.
+        The lobby and Game Host authority are live. Gameplay and round starts
+        remain intentionally unavailable in Stage 2.5.
       </PrototypeNotice>
 
       <div className="room-dashboard">
@@ -105,14 +121,44 @@ export function RoomLobby({
               </span>
             </div>
             <p>
-              Players open the join page and enter {room.code}. QR joining comes
-              in a later stage.
+              Players can open{' '}
+              <a className="join-url" href={joinUrl}>
+                {joinUrl}
+              </a>{' '}
+              to join this room.
             </p>
           </section>
+          {isDisplay && (
+            <section
+              className="qr-placeholder"
+              aria-label="QR code placeholder"
+            >
+              <span className="qr-placeholder__pattern" aria-hidden="true">
+                {placeholderCells.map((filled, index) => (
+                  <span
+                    className={
+                      filled ? 'qr-placeholder__cell--filled' : undefined
+                    }
+                    key={index}
+                  />
+                ))}
+              </span>
+              <strong>Scan-to-join area</strong>
+              <small>
+                The exact join link is ready. A scannable QR image is deferred
+                to the next UI stage.
+              </small>
+            </section>
+          )}
           <PlayerList
             players={room.players}
             maxPlayers={room.maxPlayers}
             currentPlayerId={currentPlayerId}
+          />
+          <ControllerPanel
+            room={room}
+            currentPlayerId={currentPlayerId}
+            onTransfer={onTransferController}
           />
         </div>
 
@@ -120,6 +166,7 @@ export function RoomLobby({
           <GameSettingsPrototype
             gridSize={gridSize}
             duration={duration}
+            disabled={isDisplay}
             onGridSizeChange={setGridSize}
             onDurationChange={setDuration}
           />

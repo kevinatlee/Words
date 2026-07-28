@@ -7,31 +7,39 @@ shared-screen browser creates and presents a temporary room. Phone players join
 without accounts, and the first player becomes the initial game host
 (controller).
 
-This repository is at **Stage 2: secure server-backed multiplayer lobby**. The
-lobby works locally; gameplay and production deployment do not.
+This repository is at **Stage 2.5: controller delegation and automatic
+succession**. The secure lobby and its game-host authority controls work
+locally; gameplay and production deployment do not.
 
 ## What works today
 
-- A TV or shared screen can create a display session at `/display`.
+- Opening `/` on a TV or shared screen automatically reconnects its existing
+  display session or creates one temporary room.
 - The display receives a server-generated room code and is never counted as a
   player.
-- Zero to eight phone players can join by six-character room code at `/join`.
+- Zero to eight phone players can join through the room-specific
+  `/join/:roomCode` link or enter a six-character code manually at `/join`.
 - The first player becomes the server-assigned controller; later players join
   without gaining controller authority.
+- The connected game host can explicitly transfer authority to another
+  connected player.
+- If the game host explicitly leaves or misses reconnect grace, the server
+  automatically promotes the earliest-joined connected player, breaking equal
+  join-time ties by player ID.
 - Display and player presence update in real time.
 - Display and player tabs use separate, temporary reconnect credentials.
 - A display or controller disconnect does not immediately close the room.
 - Rooms and credentials live only in bounded server memory.
-- `GET /api/health` reports the service and Stage 2 version.
+- `GET /api/health` reports the service and Stage 2.5 version.
 - Shared strict Zod schemas validate every inbound lobby payload.
 - The Stage 1 visual identity and local board-setting previews remain.
 
 ## What is not implemented
 
-Stage 2 does not implement gameplay, board generation, touch tracing,
-dictionaries, word validation, scoring, timers, round starts, controller
-delegation, QR codes, automatic controller election, persistence, container
-packaging, image publishing, server installation, or tunnel configuration.
+Stage 2.5 does not implement gameplay, board generation, touch tracing,
+dictionaries, word validation, scoring, timers, round starts, scannable QR codes,
+arbitrary or random controller election, persistence, container packaging,
+image publishing, server installation, or tunnel configuration.
 
 `Start Round` remains disabled. Settings in the lobby are local interface
 previews and are not server actions yet.
@@ -39,13 +47,17 @@ previews and are not server actions yet.
 ## Roles and authority
 
 - The **display session** is the TV or shared-screen browser. It creates and
-  presents the room, but it is not a player and has no controller authority.
+  presents the room, but it is not a player, has no controller authority, and
+  never selects or approves a game host.
 - A **player session** belongs to one phone participant and can eventually
   submit words during gameplay.
 - The **controller** or **game host** is one player. The first player gets this
-  role from the server. Future stages may let that player delegate it.
+  role from the server. While connected, that player may delegate it to another
+  connected player.
 - Controller authority is stored as `controllerPlayerId`, which must reference
-  a player ID. A browser cannot submit or change it.
+  a player ID while assigned. A client cannot self-assign it.
+- `controllerStatus` is `none` only when no player is connected. The next join
+  or reconnect becomes game host automatically.
 
 The server owns room membership, roles, settings, and expiration. No database,
 Redis instance, account provider, or paid service is used.
@@ -91,24 +103,30 @@ Vite proxies `/api` and `/socket.io` to the Node server.
 
 Try the lobby:
 
-1. Open `http://localhost:5173/display` on the shared-screen tab and create a
-   room.
-2. Open `http://localhost:5173/join` in a phone-sized tab or another device.
-3. Enter the room code and a temporary display name. This first player becomes
-   the controller.
+1. Open `http://localhost:5173/` on the shared-screen browser. The room appears
+   automatically without a role-selection or creation step.
+2. Open the displayed `/join/:roomCode` link in a phone-sized tab or another
+   device. `/join` remains available for manually entering a code.
+3. Enter a temporary display name. This first player becomes the controller.
 4. Join from another phone tab and watch the shared display update.
-5. Disconnect the display or controller and confirm the room remains visible
-   to the other sessions.
+5. On the controller phone, transfer Game Host authority to the second player.
+6. Disconnect the new controller and confirm the room remains visible during
+   reconnect grace. After grace expires, confirm the server automatically
+   promotes the earliest-joined connected player without display action.
+7. As an isolation check, open `/` in a second browser profile. Confirm it gets a
+   different code, remains empty when players join the first room, and refreshes
+   back into only its own room.
 
 Stop both processes with `Control+C`.
 
 ## Routes and API
 
-- `/` — choose the shared display or phone-player flow
-- `/display` — create a display session and temporary room
-- `/host` — legacy alias for `/display`
+- `/` — automatically reconnect or create the passive shared display
+- `/display` — compatibility alias for `/`
+- `/host` — legacy compatibility alias for `/`
 - `/join` — join as a phone player by room code
-- `/room/:roomCode` — live lobby or role-specific reconnect flow
+- `/join/:roomCode` — room-specific phone join form with the code prefilled
+- `/room/:roomCode` — live player lobby or player reconnect flow
 - `/play/demo` — retained static Stage 1 round preview
 - `GET http://localhost:6532/api/health` — server health
 
@@ -159,18 +177,23 @@ React renders it as text.
 The server issues different credential shapes for display and player sessions.
 Each successful reconnect rotates the applicable token. Credentials are stored
 under role-specific local-storage keys, are absent from URLs and logs, and
-cannot be used to reconnect as the other role.
+cannot be used to reconnect as the other role. Each browser profile also keeps a
+token-free pointer to its active display credential so `/` can reconnect that
+display before creating a replacement. Separate browser profiles therefore
+create and retain separate rooms.
 
 A disconnect marks that display or player offline and starts a 60-second grace
 period. It does not immediately close the room:
 
 - an ordinary player is removed after their grace period;
 - an expired display credential does not remove remaining players;
-- the controller remains the referenced player and is never automatically
-  replaced;
-- if the controller credential expires while other players remain, the
-  controller stays visible as offline until future delegation support or room
-  expiry;
+- the controller remains assigned while its reconnect grace is active;
+- if controller grace expires while other players remain, the expired player
+  and credential are removed and the server promotes the earliest-joined
+  connected player, with player ID as the stable tie-breaker;
+- if nobody is connected, controller state becomes `none`; the next player to
+  join or reconnect becomes controller automatically;
+- the display stays passive and cannot select, recover, or approve a controller;
 - a room closes on its bounded lifetime, or when it has no players and its
   disconnected display credential has expired.
 
@@ -188,6 +211,10 @@ Player requests:
 - `player:reconnect`
 - `player:leave`
 
+Controller requests:
+
+- `controller:transfer` — current connected controller to connected player
+
 The server broadcasts:
 
 - `room:state`
@@ -199,7 +226,7 @@ The server broadcasts:
 
 All payloads, state, acknowledgements, and error codes are defined centrally in
 `packages/shared/src/lobby.ts`. See
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the complete Stage 2 flow.
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the complete Stage 2.5 flow.
 
 ## Repository structure
 
@@ -252,4 +279,4 @@ deployment.
 
 Words source code is available under the [MIT License](LICENSE). Third-party
 packages retain their own licenses. No dictionary or third-party visual asset
-is bundled in Stage 2.
+is bundled in Stage 2.5.
