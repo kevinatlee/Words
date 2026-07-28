@@ -3,6 +3,65 @@
 Future meaningful work must add a new chronological entry. Record what changed,
 why, what remains open, and the exact verification results.
 
+## 2026-07-28 — Stage 3.1 controller-succession test reliability
+
+### Finding and correction
+
+- Investigated the local timeout in
+  `automatically promotes the earliest connected player when the controller leaves`.
+- Classified the cause as a nondeterministic test fixture, not an application
+  race, listener-order race, cleanup leak, or machine delay.
+- Confirmed the test installed its display `room:state` listener before
+  `player:leave`, and the server acknowledged the leave before broadcasting the
+  authoritative final room state.
+- Found that rapid player joins can share one millisecond-resolution
+  `joinedAt`. The RoomStore correctly breaks those documented ties by player ID,
+  but the integration test always waited for the second player. When the third
+  player had the lower ID, the test ignored the valid final state and waited
+  until Vitest's five-second test timeout.
+- Updated only the server integration test and its wait helpers. The test now
+  derives the expected successor using `joinedAt` and player ID, prepares the
+  final-state wait before triggering leave, awaits the acknowledgement and
+  prepared state together, and checks that the former controller is removed,
+  exactly one expected controller remains, and the unrelated player stays
+  ordinary.
+- Removed the test's arbitrary post-event sleep. Room-state and room-error waits
+  now remove their listeners and timers on success, structured error,
+  disconnect, predicate failure, or their bounded diagnostic timeout. The
+  succession test verifies that its display listener count returns to baseline.
+- Changed no application source or server behavior. No timeout increase, retry,
+  skipped assertion, forced exit, suite serialization, gameplay, deployment, or
+  Stage 4 work was added.
+
+### Reproduction and stress verification
+
+- Unchanged focused test — passed 20/20 normal runs.
+- Unchanged focused test under full server-suite discovery, fork-pool, and
+  file-parallel defaults — passed 20/20 runs.
+- Unchanged complete server suite — passed 10/10 runs.
+- Corrected focused test — passed 50/50 consecutive runs.
+- Corrected complete server suite — passed 10/10 consecutive runs, with 59
+  tests across 3 files each time.
+- Corrected full repository suite — passed 3/3 consecutive runs, with 249 tests
+  across 14 files each time.
+- No repetition emitted an open-handle or cleanup warning.
+
+### Full verification
+
+- `npm ci` — passed; installed 406 packages from the committed lockfile.
+- `npm run format:check` — passed; all matched files use Prettier formatting.
+- `npm run lint` — passed with no warnings or errors.
+- `npm run typecheck` — passed for client, server, game-engine, and shared
+  workspaces.
+- `npm test` — passed; 249 tests across 14 files:
+  - client: 35 tests across 3 files
+  - server: 59 tests across 3 files
+  - game engine: 135 tests across 5 files
+  - shared: 20 tests across 3 files
+- `npm run build` — passed; Vite transformed 158 modules, and server and
+  game-engine strict TypeScript build boundaries passed.
+- `npm audit --audit-level=high` — passed; 0 vulnerabilities.
+
 ## 2026-07-28 — Stage 3.1 GitHub Actions CI
 
 ### Work completed
