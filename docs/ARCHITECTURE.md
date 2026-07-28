@@ -1,7 +1,7 @@
 # Architecture
 
-This document describes the implemented Stage 2.5 lobby and the boundaries that
-later game stages must preserve.
+This document describes the completed Stage 2.5 lobby, the Stage 3 engine in
+review, and the boundaries later game stages must preserve.
 
 ## Runtime pieces
 
@@ -18,9 +18,14 @@ expiration, capacity, and cleanup.
 Zod schemas, state shapes, structured errors, acknowledgements, and typed
 Socket.IO event maps. Both client and server import the same contract.
 
-**Game-engine package (`packages/game-engine`):** Reserved for Stage 3. The
-lobby does not generate boards, validate paths, use a dictionary, or score
-words.
+**Game-engine package (`packages/game-engine`):** Pure TypeScript for immutable
+board validation, injected-random weighted generation, bounded rejection,
+row-major paths, adjacency, word normalization, exact path-word matching, and
+an injected dictionary. It has no runtime dependencies and does not import the
+lobby, browser, Socket.IO, or Node runtime APIs.
+
+The lobby does not import the engine. Stage 3 does not add boards, words,
+scores, or phases to the room store.
 
 ## Roles
 
@@ -311,9 +316,48 @@ result. A display-bound socket must never submit a player word.
 ## Generic board dimensions
 
 The retained board preview accepts a dimension and generates its cell count.
-Future engine data must likewise store a dimension and validate the tile count
-against it. Adjacency must derive rows and columns instead of assuming four
-columns or 16 tiles. Supported dimensions remain 4 × 4, 5 × 5, and 6 × 6.
+The Stage 3 engine now stores the dimension in every board and validates exactly
+`size × size` immutable tiles. Supported dimensions are 4 × 4, 5 × 5, and
+6 × 6.
+
+Canonical paths are arrays of row-major indexes. Adjacency derives row and
+column differences from `size`, accepts horizontal, vertical, and diagonal
+steps, and rejects tile reuse, row wrapping, and jumps. Tile tokens contain one
+to four uppercase ASCII letters, so a `QU` tile contributes two letters without
+changing path indexing.
+
+## Game-engine data flow
+
+```text
+caller-owned configuration
+  -> validate size, normalized weighted tokens, weights, RNG, retry bound
+  -> generate and freeze candidate board
+  -> optional bounded acceptance predicate
+  -> immutable Board or NO_ACCEPTABLE_BOARD
+
+candidate submission
+  -> validate and snapshot Board
+  -> normalize ASCII submitted word
+  -> enforce minimum normalized letter length
+  -> validate traced row-major path
+  -> reconstruct complete tile-token word
+  -> require exact word/path equality
+  -> query injected WordDictionary
+  -> structured success or candidate-safe failure
+```
+
+Player-controlled validation returns discriminated results. Programmer mistakes
+in generation configuration throw a documented `EngineConfigurationError`.
+Path validation is linear in path length and dictionary membership is an
+effectively constant-time Set lookup.
+
+Every random board requires an injected source whose values are finite and in
+`[0, 1)`. The engine never falls back to `Math.random()`. Acceptance retries are
+iterative and explicitly limited to at most 1,000.
+
+The engine defines neither a default letter distribution nor a production
+dictionary. The recommended Stage 4 dictionary export and its licence
+conditions are in `DICTIONARY_EVALUATION.md`.
 
 ## Why no database or Redis
 
@@ -332,4 +376,4 @@ Words process on port `6532`. That process will serve the built client, health
 API, Socket.IO, game engine, and an openly licensed dictionary.
 
 Container packaging, static serving, tunnel configuration, and image publishing
-are not implemented in Stage 2.5.
+are not implemented in Stage 3.

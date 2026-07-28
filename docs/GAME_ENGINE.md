@@ -1,0 +1,152 @@
+# Game engine
+
+Stage 3 adds a tested rules foundation without starting live gameplay.
+`@words/game-engine` is a zero-runtime-dependency TypeScript workspace package.
+It does not know about rooms, sockets, players, displays, controllers, timers,
+scores, browsers, or persistence.
+
+## Boundary
+
+The engine accepts plain values and returns plain immutable values or
+discriminated results. It can be imported by a server, client-side tests, or
+another JavaScript runtime. Its core functions use no DOM or Node-specific
+runtime API.
+
+The current lobby does not import this package. In Stage 4, the server—not a
+browser—must generate and retain each official board, authorize each player
+submission, call path and dictionary validation, and calculate any later
+result.
+
+## Canonical board and path
+
+```ts
+type BoardSize = 4 | 5 | 6;
+
+interface Board {
+  readonly size: BoardSize;
+  readonly tiles: readonly string[];
+}
+
+type TilePath = readonly number[];
+```
+
+Boards contain exactly `size × size` tiles. Indexes are row-major:
+
+```text
+0  1  2  3
+4  5  6  7
+8  9 10 11
+12 13 14 15
+```
+
+Tile tokens contain one to four uppercase ASCII letters. This represents
+ordinary `A` through `Z` tiles and keeps room for `QU` without pretending that
+tile count always equals word-letter count.
+
+`validateBoard` rejects unsupported sizes, incorrect counts, lowercase or
+punctuated canonical tokens, empty tokens, and oversized tokens. A successful
+validation snapshots and freezes the board, so later caller mutation cannot
+change engine state.
+
+## Coordinates and adjacency
+
+`coordinateToIndex` and `indexToCoordinate` explicitly convert between
+row/column coordinates and canonical indexes. `getAdjacentIndices` derives
+neighbours from the board size rather than assuming four columns.
+
+Two indexes are adjacent when their rows differ by at most one and their
+columns differ by at most one, excluding the same cell. Horizontal, vertical,
+and all four diagonal directions are accepted. Numeric neighbours across a row
+boundary, such as `3` and `4` on a 4 × 4 board, are not spatial neighbours.
+
+## Path validation
+
+`validatePath` and `readPath` return a structured result. Validation:
+
+1. validates and snapshots the board;
+2. requires a non-empty array no longer than the tile count;
+3. verifies that every entry is an in-range integer before tile access;
+4. uses a Set to reject tile reuse anywhere in the path;
+5. checks each consecutive pair for spatial adjacency;
+6. concatenates complete tile tokens.
+
+The two scans are linear in path length. No recursion or player-controlled
+nested work is used. A successful result contains the path’s word and a frozen
+path copy. A candidate failure contains a bounded code and, where useful, the
+path position and tile index.
+
+## Randomness and generation
+
+`generateBoard` requires an injected `RandomSource` whose `next()` method
+returns a finite number in `[0, 1)`. There is no `Math.random()` default. This
+keeps tests deterministic and gives Stage 4 an explicit boundary for
+server-owned cryptographic randomness.
+
+Callers supply weighted token entries. Tokens are ASCII-normalized once and
+must be unique after normalization. Every weight and their total must be
+finite and greater than zero. Each positive weight must advance the cumulative
+total at JavaScript number precision, so no token can have an unreachable
+interval. Selection uses cumulative weighted boundaries and generates exactly
+16, 25, or 36 tiles.
+
+An optional `acceptBoard` predicate supports a small quality gate. Generation
+uses an iterative, caller-bounded retry count from 1 through 1,000. If every
+candidate is rejected, it returns `NO_ACCEPTABLE_BOARD`; it cannot retry
+forever. A predicate exception is a programmer error and propagates unchanged;
+the engine does not silently treat it as a rejected board.
+
+Stage 3 does not define a production letter distribution or a permanent board
+quality policy. Those require a documented, independently reviewable
+derivation and play testing.
+
+## Words and dictionary
+
+`normalizeWord` trims outer whitespace, requires only ASCII letters, converts
+case to uppercase, and limits words to 64 letters. It rejects punctuation,
+apostrophes, hyphens, internal spaces, digits, control or formatting
+characters, accented characters, and Unicode case-expansion characters rather
+than silently deleting or transliterating them.
+
+`validateWordPath` requires the normalized submitted word to meet the
+configurable minimum (three by default), exactly match the supplied path’s
+tokens, and exist in an injected synchronous `WordDictionary`. Word length is
+normalized character count, not tile count: three tiles `QU`, `I`, `Z` form the
+four-letter word `QUIZ`.
+
+The Set-backed dictionary constructor normalizes and deduplicates an input list
+without exposing the Set. Malformed entries return their input position and a
+normalization code. Core lookup performs no filesystem or network work.
+
+## Resource limits
+
+- board sizes are limited to 4, 5, and 6;
+- tile tokens are limited to four ASCII letters;
+- paths cannot exceed the board’s tile count;
+- submitted words are limited to 64 letters;
+- generation attempts are limited to 1,000;
+- weights, totals, and random outputs must be finite;
+- path validation is linear and Set lookup is effectively constant-time;
+- caller-owned arrays are never mutated.
+
+These package limits complement, but do not replace, Stage 4 network payload
+size limits, authorization, phase checks, submission rate limits, and deadline
+enforcement.
+
+## Known limitations and Stage 4 boundary
+
+Stage 3 has no production dictionary data, default letter weights, gameplay
+events, round state, deadline, score, duplicate handling, touch interface, or
+live board. It does not infer a path from a word.
+
+Stage 4 should:
+
+1. reproduce the pinned size-60 American-plus-Canadian dictionary export in
+   [`DICTIONARY_EVALUATION.md`](DICTIONARY_EVALUATION.md), retain its notice,
+   audit the resulting play vocabulary, and load it once on the server;
+2. choose and document a non-proprietary weighted letter distribution and
+   bounded board-quality policy;
+3. add strict shared network schemas for traced index paths and words;
+4. make the server own the board, deadline, validation, and scoring;
+5. keep the display passive and reject display-bound submissions;
+6. add synchronized rounds and reconnection only after those authority
+   boundaries are tested.

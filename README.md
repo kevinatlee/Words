@@ -7,9 +7,10 @@ shared-screen browser creates and presents a temporary room. Phone players join
 without accounts, and the first player becomes the initial game host
 (controller).
 
-This repository is at **Stage 2.5: controller delegation and automatic
-succession**. The secure lobby and its game-host authority controls work
-locally; gameplay and production deployment do not.
+**Stage 2.5 is complete. Stage 3 is in review.** The secure lobby and its
+game-host authority controls work locally, and a separate game-engine package
+now provides tested board, path, word, and dictionary primitives. Live gameplay
+and production deployment do not exist yet.
 
 ## What works today
 
@@ -33,13 +34,22 @@ locally; gameplay and production deployment do not.
 - `GET /api/health` reports the service and Stage 2.5 version.
 - Shared strict Zod schemas validate every inbound lobby payload.
 - The Stage 1 visual identity and local board-setting previews remain.
+- `@words/game-engine` validates immutable 4 × 4, 5 × 5, and 6 × 6 boards
+  using row-major tile-index paths.
+- The engine performs deterministic injected-random weighted generation,
+  bounded board rejection, eight-direction adjacency, tile-reuse checks, `QU`
+  token reading, ASCII word normalization, exact word/path matching, and
+  injected Set-backed dictionary lookup.
+- A pinned, reproducible, openly licensed dictionary export is recommended for
+  Stage 4; no external word data is bundled in Stage 3.
 
 ## What is not implemented
 
-Stage 2.5 does not implement gameplay, board generation, touch tracing,
-dictionaries, word validation, scoring, timers, round starts, scannable QR codes,
-arbitrary or random controller election, persistence, container packaging,
-image publishing, server installation, or tunnel configuration.
+Stage 3 does not connect the engine to the lobby. There are no gameplay socket
+events, live boards, touch tracing, synchronized rounds, word-submission
+networking, scoring, duplicate handling, timers, round starts, production
+dictionary data, scannable QR codes, persistence, container packaging, image
+publishing, server installation, or tunnel configuration.
 
 `Start Round` remains disabled. Settings in the lobby are local interface
 previews and are not server actions yet.
@@ -140,7 +150,7 @@ npm run format        # Format source and documentation
 npm run format:check  # Check formatting without changing files
 npm run lint          # Check code quality
 npm run typecheck     # Check strict TypeScript in every workspace
-npm test              # Run shared, server, and client tests once
+npm test              # Run shared, engine, server, and client tests once
 npm run build         # Build the client and verify the server build boundary
 npm audit --audit-level=high
 ```
@@ -224,9 +234,11 @@ The server broadcasts:
 - `player:connected`
 - `player:disconnected`
 
-All payloads, state, acknowledgements, and error codes are defined centrally in
-`packages/shared/src/lobby.ts`. See
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the complete Stage 2.5 flow.
+All lobby payloads, state, acknowledgements, and error codes are defined
+centrally in `packages/shared/src/lobby.ts`. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the complete Stage 2.5 flow
+and [`docs/GAME_ENGINE.md`](docs/GAME_ENGINE.md) for the intentionally separate
+Stage 3 engine boundary.
 
 ## Repository structure
 
@@ -237,7 +249,7 @@ All payloads, state, acknowledgements, and error codes are defined centrally in
 │   └── server/       # Express, Socket.IO, room store, and server tests
 ├── packages/
 │   ├── shared/       # Product config, Zod schemas, event and state contracts
-│   └── game-engine/  # Reserved for Stage 3
+│   └── game-engine/  # Pure board, generation, path, word, and dictionary rules
 ├── docs/             # Product, architecture, security, and deployment status
 ├── data/             # Reserved for a future licensed dictionary
 ├── tests/            # Reserved for future cross-package integration tests
@@ -269,14 +281,18 @@ cannot recreate the display.
 
 ## Next stage
 
-The recommended Stage 3 is a framework-independent, thoroughly tested game
-engine: generic 4 × 4, 5 × 5, and 6 × 6 board generation and path validation,
-plus evaluation and licensing documentation for an English dictionary. It
-should not yet add synchronized rounds, scoring, persistence, or production
-deployment.
+After Stage 3 is reviewed and merged, the recommended Stage 4 is server-owned
+synchronized gameplay. It should reproduce the pinned ESDB size-60
+American-plus-Canadian dictionary export, select and document a
+non-proprietary letter distribution, add strict shared submission contracts,
+and integrate authoritative boards, deadlines, word validation, scoring,
+duplicate handling, results, and round-aware reconnect behavior. The display
+must stay passive and unable to submit words.
 
 ## License
 
 Words source code is available under the [MIT License](LICENSE). Third-party
-packages retain their own licenses. No dictionary or third-party visual asset
-is bundled in Stage 2.5.
+packages retain their own licenses. Stage 3 commits no external dictionary or
+third-party visual asset. Dictionary candidates, exact source versions,
+licence conditions, measurements, and the Stage 4 recommendation are recorded
+in [`docs/DICTIONARY_EVALUATION.md`](docs/DICTIONARY_EVALUATION.md).
