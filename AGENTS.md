@@ -15,10 +15,28 @@ and explain important choices in plain language.
 ## Product and architecture guardrails
 
 - Keep the server authoritative. Never trust client-provided scores, timers,
-  host authority, room ownership, dictionary results, word paths, settings, or
-  round results.
+  controller authority, room ownership, dictionary results, word paths,
+  settings, or round results.
 - Define network payloads centrally in the shared package and validate future
   network payloads at runtime with Zod.
+- Keep lobby payload schemas strict. Never accept a client-provided controller
+  flag or ID, player ID, display session ID, reconnect expiry, or room code
+  during display creation.
+- Keep the shared display and game host separate. The display is never a
+  player, never counts toward capacity, and never receives player authority.
+- Keep display and player reconnect credentials role-specific. Neither
+  credential may be accepted as the other role.
+- Keep room, player, socket-attempt, and expired-code collections bounded.
+- Reconnect tokens must be random, server-issued, short-lived, rotated after a
+  successful reconnect, absent from URLs and logs, and treated as secrets.
+- Preserve the Stage 2 maximum of eight phone players per room, excluding the
+  display.
+- Controller authority must always reference a player ID when players exist.
+- Do not add automatic controller election. A disconnected controller retains
+  `controllerPlayerId`; delegation requires an explicit, authorized future
+  action.
+- Do not close a room solely because the display socket or controller player
+  socket disconnects.
 - Support 4 × 4, 5 × 5, and 6 × 6 grids generically. Never assume a grid has
   exactly 16 tiles.
 - Preserve port `6532` as the default production port.
@@ -55,7 +73,8 @@ Review every change for:
 
 - client-trusted state
 - authorization mistakes
-- improper host transfer
+- display/player role confusion
+- improper controller transfer
 - unauthorized settings changes
 - room-code enumeration
 - injection through player names

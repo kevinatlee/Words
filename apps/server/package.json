@@ -1,0 +1,25 @@
+{
+  "name": "@words/server",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "build": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@words/shared": "*",
+    "express": "^5.1.0",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/supertest": "^6.0.3",
+    "socket.io-client": "^4.8.1",
+    "supertest": "^7.1.4",
+    "tsx": "^4.20.6"
+  }
+}

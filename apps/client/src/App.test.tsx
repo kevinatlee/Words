@@ -1,70 +1,462 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type {
+  ConnectionStatus,
+  DisplayActionResponse,
+  LeaveSessionResponse,
+  PlayerActionResponse,
+  PlayerState,
+  RoomError,
+  RoomState,
+} from '@words/shared';
 
 import { App } from './App';
+import type { LobbyClient } from './lobby-client';
+import type { LobbySessionStore, StoredLobbySession } from './session-store';
 
-describe('Stage 1 routes', () => {
-  it('renders the role selection at the root route', () => {
-    render(<App routePath="/" />);
+const controllerPlayer: PlayerState = {
+  id: '00000000-0000-4000-8000-000000000001',
+  displayName: 'Silver Owl',
+  connected: true,
+  joinedAt: '2026-07-27T20:01:00.000Z',
+  isController: true,
+};
+
+const ordinaryPlayer: PlayerState = {
+  id: '00000000-0000-4000-8000-000000000002',
+  displayName: '<Bright Fox>',
+  connected: true,
+  joinedAt: '2026-07-27T20:02:00.000Z',
+  isController: false,
+};
+
+function createRoom(players: PlayerState[] = []): RoomState {
+  return {
+    code: 'ABC234',
+    phase: 'LOBBY',
+    createdAt: '2026-07-27T20:00:00.000Z',
+    lastActivityAt: '2026-07-27T20:02:00.000Z',
+    expiresAt: '2026-07-27T22:02:00.000Z',
+    maxPlayers: 8,
+    display: {
+      connected: true,
+      createdAt: '2026-07-27T20:00:00.000Z',
+    },
+    controllerPlayerId: players[0]?.id ?? null,
+    players,
+    settings: {
+      gridSize: 4,
+      roundDurationSeconds: 180,
+      scoringMode: 'traditional',
+    },
+  };
+}
+
+const displaySuccess: DisplayActionResponse = {
+  ok: true,
+  room: createRoom(),
+  session: {
+    displaySessionId: '00000000-0000-4000-8000-000000000100',
+    displayReconnectToken: 'a'.repeat(43),
+  },
+};
+
+const controllerSuccess: PlayerActionResponse = {
+  ok: true,
+  room: createRoom([controllerPlayer]),
+  session: {
+    playerId: controllerPlayer.id,
+    playerReconnectToken: 'b'.repeat(43),
+  },
+};
+
+const ordinarySuccess: PlayerActionResponse = {
+  ok: true,
+  room: createRoom([controllerPlayer, ordinaryPlayer]),
+  session: {
+    playerId: ordinaryPlayer.id,
+    playerReconnectToken: 'c'.repeat(43),
+  },
+};
+
+function createFakeClient(overrides: Partial<LobbyClient> = {}): LobbyClient {
+  return {
+    getConnectionStatus: () => 'connected' as ConnectionStatus,
+    createDisplay: vi.fn(
+      async (): Promise<DisplayActionResponse> => displaySuccess,
+    ),
+    reconnectDisplay: vi.fn(
+      async (): Promise<DisplayActionResponse> => displaySuccess,
+    ),
+    leaveDisplay: vi.fn(async (): Promise<LeaveSessionResponse> => ({
+      ok: true,
+    })),
+    joinPlayer: vi.fn(
+      async (): Promise<PlayerActionResponse> => ordinarySuccess,
+    ),
+    reconnectPlayer: vi.fn(
+      async (): Promise<PlayerActionResponse> => ordinarySuccess,
+    ),
+    leavePlayer: vi.fn(async (): Promise<LeaveSessionResponse> => ({
+      ok: true,
+    })),
+    onRoomState: () => () => undefined,
+    onRoomError: () => () => undefined,
+    onConnectionStatus: () => () => undefined,
+    ...overrides,
+  };
+}
+
+function createFakeSessionStore(
+  stored: StoredLobbySession | null = null,
+): LobbySessionStore {
+  return {
+    save: vi.fn(),
+    load: vi.fn(() => stored),
+    clear: vi.fn(),
+  };
+}
+
+describe('Stage 2 display and player lobby routes', () => {
+  beforeEach(() => {
+    window.history.replaceState({}, '', '/');
+  });
+
+  it('links the root page to separate display and player flows', () => {
+    render(
+      <App
+        routePath="/"
+        client={createFakeClient()}
+        sessionStore={createFakeSessionStore()}
+      />,
+    );
 
     expect(
-      screen.getByRole('heading', { name: 'Words', level: 1 }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Host a Game/i })).toHaveAttribute(
-      'href',
-      '/host',
-    );
+      screen.getByRole('link', { name: /Open Shared Display/i }),
+    ).toHaveAttribute('href', '/display');
     expect(screen.getByRole('link', { name: /Join a Game/i })).toHaveAttribute(
       'href',
-      '/play/demo',
+      '/join',
     );
   });
 
-  it('renders the host prototype with disabled server actions', () => {
-    render(<App routePath="/host" />);
-
-    expect(
-      screen.getByRole('heading', { name: 'Set the table for a round.' }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Make Host' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Start Round' })).toBeDisabled();
-    expect(screen.getByText(/Multiplayer, QR joining/i)).toBeInTheDocument();
-  });
-
-  it('lets prototype grid controls update the generic board', async () => {
+  it('creates a display session without creating or counting a player', async () => {
     const user = userEvent.setup();
-    render(<App routePath="/host" />);
+    const client = createFakeClient();
 
-    await user.click(screen.getByRole('button', { name: '5 × 5' }));
+    render(
+      <App
+        routePath="/display"
+        client={client}
+        sessionStore={createFakeSessionStore()}
+      />,
+    );
 
+    await user.click(
+      screen.getByRole('button', { name: 'Create Room Display' }),
+    );
+
+    expect(client.createDisplay).toHaveBeenCalledWith({});
     expect(
-      screen.getByRole('heading', { name: '5 × 5 letter grid' }),
+      await screen.findByRole('heading', {
+        name: 'Shared display is ready.',
+      }),
     ).toBeInTheDocument();
+    expect(screen.getByText('0 / 8')).toBeInTheDocument();
     expect(
-      screen.getByRole('grid', {
-        name: '5 by 5 demonstration letter grid',
-      }),
-    ).toHaveStyle({ '--grid-size': '5' });
-    expect(
-      screen.getAllByRole('gridcell', {
-        hidden: true,
-      }),
-    ).toHaveLength(25);
+      screen.getByText(/Waiting for the first player/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/\(you\)/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start Round' })).toBeDisabled();
   });
 
-  it('renders the phone-oriented player prototype accessibly', () => {
-    render(<App routePath="/play/demo" />);
+  it('shows the first joining phone player as the game host', async () => {
+    const user = userEvent.setup();
+    const client = createFakeClient({
+      joinPlayer: vi.fn(
+        async (): Promise<PlayerActionResponse> => controllerSuccess,
+      ),
+    });
+
+    render(
+      <App
+        routePath="/join"
+        client={client}
+        sessionStore={createFakeSessionStore()}
+      />,
+    );
+
+    await user.type(
+      screen.getByRole('textbox', { name: 'Room code' }),
+      'abc234',
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: 'Display name' }),
+      'Silver Owl',
+    );
+    await user.click(screen.getByRole('button', { name: 'Join Room' }));
+
+    expect(client.joinPlayer).toHaveBeenCalledWith({
+      roomCode: 'abc234',
+      displayName: 'Silver Owl',
+    });
+    expect(
+      await screen.findByRole('heading', {
+        name: 'You’re the game host.',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Silver Owl (you)')).toBeInTheDocument();
+    expect(screen.getByText('Controller')).toBeInTheDocument();
+  });
+
+  it('shows later phone players without granting controller authority', async () => {
+    const user = userEvent.setup();
+    const client = createFakeClient();
+    const { container } = render(
+      <App
+        routePath="/join"
+        client={client}
+        sessionStore={createFakeSessionStore()}
+      />,
+    );
+
+    await user.type(
+      screen.getByRole('textbox', { name: 'Room code' }),
+      'ABC234',
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: 'Display name' }),
+      '<Bright Fox>',
+    );
+    await user.click(screen.getByRole('button', { name: 'Join Room' }));
 
     expect(
-      screen.getByRole('grid', { name: 'Four by four touch board prototype' }),
+      await screen.findByRole('heading', { name: 'You’re in the room.' }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Submit Word' })).toBeDisabled();
-    expect(screen.getByText(/This phone view is static/i)).toBeInTheDocument();
+    expect(screen.getByText('<Bright Fox> (you)')).toBeInTheDocument();
+    expect(screen.getByText('Silver Owl')).toBeInTheDocument();
+    expect(container.querySelector('b')).toBeNull();
+  });
+
+  it('shows understandable structured errors', async () => {
+    const user = userEvent.setup();
+    const error: RoomError = {
+      code: 'ROOM_NOT_FOUND',
+      message: 'No active room uses that code.',
+    };
+    const client = createFakeClient({
+      joinPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+        ok: false,
+        error,
+      })),
+    });
+
+    render(
+      <App
+        routePath="/join"
+        client={client}
+        sessionStore={createFakeSessionStore()}
+      />,
+    );
+
+    await user.type(
+      screen.getByRole('textbox', { name: 'Room code' }),
+      'ZZZ999',
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: 'Display name' }),
+      'Silver Owl',
+    );
+    await user.click(screen.getByRole('button', { name: 'Join Room' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'No active room uses that code.',
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('ROOM_NOT_FOUND');
+  });
+
+  it('uses a stored display credential to reconnect the display role', async () => {
+    const stored: StoredLobbySession = {
+      role: 'display',
+      roomCode: 'ABC234',
+      displaySessionId: displaySuccess.session.displaySessionId,
+      displayReconnectToken: 'd'.repeat(43),
+    };
+    const client = createFakeClient();
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore(stored)}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(client.reconnectDisplay).toHaveBeenCalledWith({
+        roomCode: 'ABC234',
+        displayReconnectToken: stored.displayReconnectToken,
+      });
+    });
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Shared display is ready.',
+      }),
+    ).toBeInTheDocument();
+    expect(client.reconnectPlayer).not.toHaveBeenCalled();
+  });
+
+  it('uses a stored player credential to reconnect the player role', async () => {
+    const stored: StoredLobbySession = {
+      role: 'player',
+      roomCode: 'ABC234',
+      playerId: ordinaryPlayer.id,
+      playerReconnectToken: 'e'.repeat(43),
+      displayName: ordinaryPlayer.displayName,
+    };
+    const client = createFakeClient();
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore(stored)}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(client.reconnectPlayer).toHaveBeenCalledWith({
+        roomCode: 'ABC234',
+        playerReconnectToken: stored.playerReconnectToken,
+      });
+    });
+    expect(
+      await screen.findByRole('heading', { name: 'You’re in the room.' }),
+    ).toBeInTheDocument();
+    expect(client.reconnectDisplay).not.toHaveBeenCalled();
+  });
+
+  it('renders live player updates on the shared display', async () => {
+    let reportRoomState: ((room: RoomState) => void) | undefined;
+    const client = createFakeClient({
+      onRoomState: (listener) => {
+        reportRoomState = listener;
+        return () => undefined;
+      },
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'display',
+          roomCode: 'ABC234',
+          displaySessionId: displaySuccess.session.displaySessionId,
+          displayReconnectToken: 'f'.repeat(43),
+        })}
+      />,
+    );
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Shared display is ready.',
+      }),
+    ).toBeInTheDocument();
+
+    act(() => {
+      reportRoomState?.(createRoom([controllerPlayer, ordinaryPlayer]));
+    });
+
+    expect(await screen.findByText('Silver Owl')).toBeInTheDocument();
+    expect(screen.getByText('<Bright Fox>')).toBeInTheDocument();
+    expect(screen.getByText('2 / 8')).toBeInTheDocument();
+  });
+
+  it('shows display and controller disconnect state without closing the lobby', async () => {
+    const offlineController = {
+      ...controllerPlayer,
+      connected: false,
+    };
+    const room = createRoom([offlineController, ordinaryPlayer]);
+    room.display.connected = false;
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+        ...ordinarySuccess,
+        room,
+      })),
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: ordinaryPlayer.id,
+          playerReconnectToken: 'g'.repeat(43),
+          displayName: ordinaryPlayer.displayName,
+        })}
+      />,
+    );
+
+    expect(await screen.findByText('Display offline')).toBeInTheDocument();
+    expect(screen.getByText('Controller offline')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'You’re in the room.' }),
+    ).toBeInTheDocument();
+  });
+
+  it('clears stale browser credentials when a session resumes elsewhere', async () => {
+    const stored: StoredLobbySession = {
+      role: 'display',
+      roomCode: 'ABC234',
+      displaySessionId: displaySuccess.session.displaySessionId,
+      displayReconnectToken: 'h'.repeat(43),
+    };
+    const store = createFakeSessionStore(stored);
+    let reportRoomError: ((error: RoomError) => void) | undefined;
+    const client = createFakeClient({
+      onRoomError: (listener) => {
+        reportRoomError = listener;
+        return () => undefined;
+      },
+    });
+
+    render(
+      <App routePath="/room/ABC234" client={client} sessionStore={store} />,
+    );
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Shared display is ready.',
+      }),
+    ).toBeInTheDocument();
+
+    act(() => {
+      reportRoomError?.({
+        code: 'RECONNECT_FAILED',
+        message: 'This temporary session resumed elsewhere.',
+      });
+    });
+
+    expect(
+      await screen.findByRole('heading', { name: 'Join the room.' }),
+    ).toBeInTheDocument();
+    expect(store.clear).toHaveBeenCalledWith(
+      expect.objectContaining({ role: 'display' }),
+    );
   });
 
   it('renders a useful not-found page', () => {
-    render(<App routePath="/missing" />);
+    render(
+      <App
+        routePath="/missing"
+        client={createFakeClient()}
+        sessionStore={createFakeSessionStore()}
+      />,
+    );
 
     expect(
       screen.getByRole('heading', {

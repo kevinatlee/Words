@@ -64,19 +64,22 @@ body {
 }
 
 button,
-select {
+select,
+input {
   font: inherit;
 }
 
 button,
 a,
-select {
+select,
+input {
   -webkit-tap-highlight-color: transparent;
 }
 
 button:focus-visible,
 a:focus-visible,
-select:focus-visible {
+select:focus-visible,
+input:focus-visible {
   outline: 3px solid var(--sun);
   outline-offset: 4px;
 }
@@ -191,7 +194,8 @@ button:disabled {
   white-space: nowrap;
 }
 
-.status-label--host {
+.status-label--controller,
+.status-label--display {
   border-color: rgba(112, 231, 162, 0.4);
   background: rgba(112, 231, 162, 0.12);
   color: var(--mint);
@@ -412,7 +416,7 @@ button:disabled {
   transform: translateY(-0.25rem);
 }
 
-.role-card--host {
+.role-card--display {
   background: var(--mint-strong);
 }
 
@@ -453,14 +457,14 @@ button:disabled {
   line-height: 0.8;
 }
 
-/* Shared host components */
+/* Shared room components */
 
-.host-page,
+.room-page,
 .player-page {
   padding-block: clamp(2.5rem, 5vw, 5rem);
 }
 
-.host-intro {
+.room-intro {
   display: flex;
   align-items: end;
   justify-content: space-between;
@@ -468,7 +472,7 @@ button:disabled {
   margin-bottom: 1.5rem;
 }
 
-.host-intro h1,
+.room-intro h1,
 .player-page__intro h1,
 .not-found h1 {
   max-width: 48rem;
@@ -478,7 +482,7 @@ button:disabled {
   line-height: 0.95;
 }
 
-.host-intro p,
+.room-intro p,
 .player-page__intro p,
 .not-found p {
   max-width: 45rem;
@@ -516,15 +520,15 @@ button:disabled {
   font-size: 0.72rem;
 }
 
-.host-dashboard {
+.room-dashboard {
   display: grid;
   margin-top: 1.25rem;
   grid-template-columns: minmax(16rem, 0.7fr) minmax(32rem, 1.3fr);
   gap: 1.25rem;
 }
 
-.host-dashboard__lobby,
-.host-dashboard__game {
+.room-dashboard__lobby,
+.room-dashboard__preview {
   display: grid;
   align-content: start;
   gap: 1.25rem;
@@ -612,7 +616,7 @@ button:disabled {
 }
 
 .player-list__item,
-.phone-host {
+.phone-controller {
   display: flex;
   min-height: 4rem;
   align-items: center;
@@ -639,8 +643,12 @@ button:disabled {
   background: var(--mint);
 }
 
+.player-list__item--offline {
+  opacity: 0.62;
+}
+
 .player-list__identity,
-.phone-host > span:nth-child(2) {
+.phone-controller > span:nth-child(2) {
   display: flex;
   min-width: 0;
   flex: 1;
@@ -648,7 +656,7 @@ button:disabled {
 }
 
 .player-list__identity small,
-.phone-host small {
+.phone-controller small {
   margin-top: 0.15rem;
   color: var(--paper-muted);
   font-size: 0.74rem;
@@ -904,11 +912,11 @@ button:disabled {
   display: none;
 }
 
-.phone-host {
+.phone-controller {
   margin-block: 1rem;
 }
 
-.phone-host .player-avatar {
+.phone-controller .player-avatar {
   width: 2.25rem;
   background: var(--mint);
 }
@@ -1028,21 +1036,167 @@ button:disabled {
   margin-top: 1.5rem;
 }
 
+/* Stage 2 lobby */
+
+.form-page {
+  display: grid;
+  width: min(100%, 58rem);
+  margin-inline: auto;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.72fr);
+  gap: clamp(2rem, 6vw, 6rem);
+  align-items: center;
+  padding-block: clamp(3rem, 8vw, 8rem);
+}
+
+.form-page__intro h1,
+.loading-lobby h1 {
+  margin-bottom: 0.8rem;
+  font-size: clamp(2.75rem, 6vw, 5.75rem);
+  letter-spacing: -0.065em;
+  line-height: 0.94;
+}
+
+.form-page__intro p,
+.loading-lobby p {
+  max-width: 38rem;
+  margin-bottom: 0;
+  color: var(--paper-muted);
+  font-size: 1.05rem;
+  line-height: 1.65;
+}
+
+.lobby-form {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.lobby-form label {
+  margin-top: 0.35rem;
+  color: var(--paper-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lobby-form input {
+  width: 100%;
+  min-height: 3.5rem;
+  padding-inline: 0.95rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--ink-950);
+  color: var(--paper);
+}
+
+.lobby-form input::placeholder {
+  color: rgba(199, 200, 194, 0.58);
+}
+
+.lobby-form .button {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.lobby-error {
+  display: grid;
+  gap: 0.2rem;
+  width: min(100%, 58rem);
+  margin: 1rem auto;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(255, 129, 109, 0.42);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 129, 109, 0.1);
+  color: var(--paper);
+}
+
+.lobby-error span {
+  color: var(--paper-muted);
+  line-height: 1.5;
+}
+
+.lobby-error small {
+  color: var(--coral);
+}
+
+.lobby-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.connection-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--paper-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.connection-status::before {
+  width: 0.55rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--coral);
+  content: '';
+}
+
+.connection-status--connected::before {
+  background: var(--mint-strong);
+}
+
+.connection-status--connecting::before {
+  background: var(--sun);
+}
+
+.text-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--paper-muted);
+  cursor: pointer;
+  font-weight: 750;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 0.3rem;
+}
+
+.share-panel h2 {
+  margin-bottom: 0.6rem;
+  font-size: clamp(1.6rem, 3vw, 2.35rem);
+  letter-spacing: 0.05em;
+}
+
+.share-panel p {
+  margin-bottom: 0;
+  color: var(--paper-muted);
+  line-height: 1.6;
+}
+
+.loading-lobby {
+  display: grid;
+  min-height: 60vh;
+  place-content: center;
+}
+
 @media (max-width: 62rem) {
   .role-hero {
     grid-template-columns: minmax(0, 1fr) minmax(14rem, 0.55fr);
     gap: 2rem;
   }
 
-  .host-dashboard {
+  .room-dashboard {
     grid-template-columns: 1fr;
   }
 
-  .host-dashboard__lobby {
+  .room-dashboard__lobby {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .host-dashboard__lobby .qr-placeholder {
+  .room-dashboard__lobby .qr-placeholder {
     grid-row: span 2;
   }
 }
@@ -1075,6 +1229,12 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .form-page {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    padding-block: 3rem;
+  }
+
   .role-hero__copy {
     position: relative;
     z-index: 1;
@@ -1092,20 +1252,20 @@ button:disabled {
     min-height: 8.5rem;
   }
 
-  .host-intro {
+  .room-intro {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .host-intro .room-code {
+  .room-intro .room-code {
     width: 100%;
   }
 
-  .host-dashboard__lobby {
+  .room-dashboard__lobby {
     grid-template-columns: 1fr;
   }
 
-  .host-dashboard__lobby .qr-placeholder {
+  .room-dashboard__lobby .qr-placeholder {
     grid-row: auto;
   }
 

@@ -1,72 +1,184 @@
 # Security requirements
 
-Stage 1 contains no functional multiplayer server. Its screens use mock data
-and disabled server actions, so none of the controls establish real authority.
-The requirements below apply when networking is added.
+Stage 2 introduces a real network boundary. This document separates implemented
+lobby controls from protections still required before public deployment and
+gameplay.
 
-## Authority and room access
+## Implemented authority controls
 
-- The server owns room membership, settings, phase, board, deadline, paths,
-  dictionary results, scores, results, and host authority.
-- A client request may never supply an authoritative score, time, role, room
-  ownership, path verdict, setting, or result.
-- Host authority should use a separate unpredictable session credential, not
-  knowledge of the visible room code.
-- For host delegation, the server must authenticate the sender as the current
-  host, verify the target belongs to the same room, update state atomically, and
-  notify every connected client.
-- Settings changes and round starts must be authorized and valid for the room’s
-  current state.
+- The server creates room codes, display IDs, player IDs, reconnect tokens,
+  room state, and controller authority.
+- Display creation accepts a strict empty object. It does not accept a room
+  code, name, player ID, display ID, or controller claim.
+- Player join accepts only room code and display name. It does not accept a
+  controller flag or controller player ID.
+- The first player receives controller authority from the server.
+- `controllerPlayerId` must reference exactly one player whenever players
+  exist. It is `null` only when the room has no players.
+- The display session is never inserted into the player collection and never
+  counts toward the eight-player maximum.
+- Each connected socket is bound to at most one server-created role session:
+  `display` or `player`.
+- Display and player reconnect tokens are stored in separate server indexes.
+  Neither token can restore or impersonate the other role.
+- Display or controller disconnect does not directly close the room.
+- Stage 2 never automatically elects a replacement controller.
+- Public room state excludes socket IDs, token values, and private token
+  indexes.
 
-## Inputs and payloads
+Future game state—board, deadline, settings, paths, word decisions, scores, and
+results—must follow the same server-authority rule. In particular, a
+display-bound socket must never submit a player word.
 
-- Define payloads centrally and validate every incoming Socket.IO payload with
-  Zod at runtime.
-- Reject unknown fields where practical, malformed values, and messages over
-  documented size limits.
-- Normalize and sanitize nicknames for safe text display. Set a short character
-  limit and reject control characters. React escaping is helpful but is not a
-  substitute for input rules.
-- Validate room codes using one canonical format.
-- Reconstruct words from server-owned boards and validated paths rather than
-  trusting submitted word text.
-- Permit only allowlisted grid sizes, durations, and modes.
+## Implemented input and output controls
 
-## Abuse and denial of service
+- All lobby request payloads use shared strict Zod schemas at runtime.
+- Unknown fields and malformed values are rejected.
+- Socket.IO messages are capped at 16 KiB.
+- Room codes use one canonical six-character format. Typed spaces and hyphens
+  are removed, and letters are normalized to uppercase.
+- Player display names normalize whitespace, allow 2–24 characters, and reject
+  Unicode control and formatting characters.
+- Duplicate player names are rejected within a room without regard to case.
+- React renders names as text. Markup-like names are tested to remain plain
+  content rather than executable HTML.
+- Error responses use a fixed set of public codes and bounded messages.
+- Express disables its identifying `X-Powered-By` response header.
 
-- Use cryptographically random room codes with enough combinations.
-- Rate-limit create and join attempts to reduce room-code guessing and resource
-  exhaustion.
-- Throttle word submissions per session and bound the path length.
-- Bound players per room, rooms per process, nickname length, and event size.
-- Expire abandoned lobbies and completed rooms, and clean up timers and socket
-  references to prevent memory leaks.
-- Avoid responses that make room-code enumeration unnecessarily easy.
-- Validate allowed browser origins in production while supporting the intended
-  public URL.
+Validation is not treated as authorization. The room store still decides
+whether a validated action is allowed for the socket and current role.
 
-## Reconnection
+## Implemented resource and abuse bounds
 
-Temporary reconnection tokens should be random, scoped to one room and player,
-expire quickly, and be replaceable after use. Reconnection and disconnection
-updates must avoid races that duplicate participants or accidentally transfer
-authority. Tokens must not be logged or placed in public URLs.
+- Room codes use cryptographic randomness from a 32-character alphabet, giving
+  32⁶ possible values.
+- Code allocation checks active-room collisions and stops after a bounded
+  number of attempts.
+- A room accepts at most eight phone players; the one display is separate.
+- The process accepts at most 500 rooms by default, with a bounded
+  configuration range.
+- Create, join, and reconnect attempts are limited to 20 per 10 seconds for one
+  socket.
+- Socket.IO payloads are capped at 16 KiB.
+- Room lifetime defaults to a sliding two hours.
+- Disconnect grace defaults to 60 seconds.
+- Cleanup runs every 30 seconds by default and removes expired rooms, ordinary
+  players, token mappings, socket references, and expired-code tombstones.
+- A controller record retained after credential expiry is still bounded by the
+  eight-player cap and room lifetime.
+- Environment-provided numeric limits are range-checked and fall back to safe
+  defaults when invalid.
+
+These controls reduce accidental exhaustion and simple abuse. They are not a
+complete public anti-abuse system.
+
+## Role-specific reconnect credentials
+
+Reconnect tokens contain 32 cryptographically random bytes encoded with a
+URL-safe alphabet. They are random secrets, not encoded claims.
+
+The server issues different credential shapes:
+
+- displays receive `displaySessionId` and `displayReconnectToken`;
+- players receive `playerId` and `playerReconnectToken`.
+
+Each token is indexed only in the matching role map and scoped to one room and
+session ID. Tokens are not placed in URLs or logged by application code.
+
+A successful reconnect invalidates the presented token and issues a new one. A
+disconnect starts that role’s short grace period. Cleanup invalidates the
+credential after the deadline.
+
+If a valid credential is reused while its previous socket exists, the new
+socket supersedes it. The old socket loses its room binding and receives a
+structured error. This prevents two active sockets from silently sharing one
+role during a refresh race. Stale-tab cleanup compares the failed token before
+removing shared browser storage, so it cannot delete the replacement tab’s
+newly rotated credential.
+
+Browser storage is appropriate for this temporary, account-free Stage 2
+session, but it is accessible to JavaScript on the same origin. A future
+cross-site scripting flaw could expose it, so dependencies, text rendering, and
+future HTML features still require review.
+
+## Disconnect and controller behavior
+
+Disconnect is presence loss, not room ownership loss:
+
+- the display going offline does not remove players;
+- the controller going offline does not close the room;
+- controller authority is not transferred automatically;
+- a disconnected display or player may restore only its own role during grace;
+- an ordinary player is removed after grace;
+- if a controller’s grace expires while other players remain, its token is
+  invalidated but its offline player record and `controllerPlayerId` remain;
+- room TTL remains the final bound.
+
+The offline-controller behavior is an intentional Stage 2 safety choice.
+Controller recovery after credential expiry requires a future, explicitly
+authorized delegation design. Silently choosing another connected player would
+be an authorization change.
+
+## Origin and transport policy
+
+Socket.IO currently allows the two standard local Vite origins and the
+configured public base URL. The Vite server proxies `/api` and `/socket.io` in
+development.
+
+Public deployment must provide HTTPS at `https://words.atlee.io`, verify
+WebSocket forwarding, and narrow the production origin policy to actual
+deployment needs. Reconnect tokens are application credentials and must never
+be sent over unencrypted public HTTP.
+
+## Known Stage 2 limits
+
+- Throttling is per socket, not per IP, subnet, device, or room code.
+- A client can reconnect to obtain a new socket and a fresh request window.
+- Room-not-found and recently expired responses are distinguishable, which may
+  help code enumeration.
+- An offline controller whose token expired cannot delegate control in Stage 2;
+  the room remains bounded but control is unavailable until future policy or
+  expiry.
+- There is no reverse-proxy request limit, network firewall policy, or
+  production monitoring in this repository.
+- Temporary credentials have no account identity, revocation interface, or
+  durable audit record.
+- The in-memory process is a single availability boundary; restarting it closes
+  every room.
+
+Before public deployment, add layered IP-aware limits at a trusted boundary,
+review enumeration behavior, verify proxy IP handling, add safe operational
+metrics, and test the exact origin and TLS configuration.
+
+## Future gameplay requirements
+
+When gameplay is added, the server must:
+
+- permit only allowlisted grid sizes, durations, and scoring modes
+- authorize settings and round starts against `controllerPlayerId`
+- require controller delegation to name an existing player ID and come from the
+  current controller socket
+- never change the display session during controller delegation
+- reject word submissions from display-bound sockets
+- generate and retain the official board
+- validate path bounds, adjacency, tile reuse, and maximum path length
+- reconstruct the submitted word from the server board
+- evaluate an approved licensed dictionary
+- enforce the server deadline and phase
+- rate-limit submissions per player and room
+- calculate scores and duplicate handling from accepted server data
+- add a regression test for each engine or authorization bug
+
+No gameplay event may trust a client-provided score, time, controller role,
+board, dictionary result, settings object, or round result.
 
 ## Secrets and operations
 
-- Never commit passwords, API tokens, Cloudflare credentials, tunnel tokens,
-  private keys, registry tokens, personal server addresses, or `.env` files.
+- Never commit passwords, API tokens, tunnel credentials, private keys,
+  registry tokens, personal server addresses, or real `.env` files.
 - Supply future secrets through the deployment environment.
+- Do not log reconnect tokens or future word/session credentials.
 - Keep dependencies updated through reviewable changes.
-- Run the future container as a non-root user with only the required port and
+- Run the future container as a non-root user with only required port and
   filesystem access.
 - Record the license and attribution for every dictionary and bundled asset.
-
-## Decisions still required
-
-- Exact room-code alphabet, length, and join throttles
-- Host-disconnect policy
-- Reconnection-token lifetime and rotation
-- Production origin allowlist during local and tunnel access
-- Per-IP and per-session rate limits
-- Audit logging that is useful without retaining personal data

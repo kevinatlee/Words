@@ -7,11 +7,15 @@ describe('product configuration', () => {
   it('keeps public identity and production values centralized', () => {
     expect(productConfig).toMatchObject({
       productName: 'Words',
+      version: '0.2.0',
       publicUrl: 'https://words.atlee.io',
       productionPort: 6532,
       defaultGridSize: 4,
       defaultRoundDurationSeconds: 180,
       defaultScoringMode: 'traditional',
+      maxPlayers: 8,
+      reconnectGraceSeconds: 60,
+      roomTtlMinutes: 120,
     });
   });
 

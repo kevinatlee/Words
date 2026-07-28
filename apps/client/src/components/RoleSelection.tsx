@@ -33,20 +33,20 @@ export function RoleSelection() {
         </div>
       </div>
 
-      <div className="role-actions" aria-label="Choose a prototype view">
-        <a className="role-card role-card--host" href="/host">
+      <div className="role-actions" aria-label="Choose how to enter a lobby">
+        <a className="role-card role-card--display" href="/display">
           <span className="role-card__number" aria-hidden="true">
             01
           </span>
           <span>
-            <small>For the shared screen</small>
-            <strong>Host a Game</strong>
+            <small>For the TV or shared screen</small>
+            <strong>Open Shared Display</strong>
           </span>
           <span className="role-card__arrow" aria-hidden="true">
             ↗
           </span>
         </a>
-        <a className="role-card role-card--player" href="/play/demo">
+        <a className="role-card role-card--player" href="/join">
           <span className="role-card__number" aria-hidden="true">
             02
           </span>
@@ -61,8 +61,8 @@ export function RoleSelection() {
       </div>
 
       <PrototypeNotice>
-        These links open static previews. Creating and joining real rooms comes
-        in a later stage.
+        Room creation and joining are live. Gameplay, scoring, and round starts
+        are still intentionally unavailable.
       </PrototypeNotice>
     </section>
   );

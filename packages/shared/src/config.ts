@@ -1,5 +1,6 @@
 export const productConfig = {
   productName: 'Words',
+  version: '0.2.0',
   description: 'A self-hosted real-time letter-grid party game.',
   publicUrl: 'https://words.atlee.io',
   productionPort: 6532,
@@ -8,6 +9,10 @@ export const productConfig = {
   defaultGridSize: 4,
   defaultRoundDurationSeconds: 180,
   defaultScoringMode: 'traditional',
+  maxPlayers: 8,
+  roomCodeLength: 6,
+  reconnectGraceSeconds: 60,
+  roomTtlMinutes: 120,
 } as const;
 
 export type GridSize = (typeof productConfig.supportedGridSizes)[number];
