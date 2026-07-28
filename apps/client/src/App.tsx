@@ -276,6 +276,34 @@ export function App({
     navigate('/');
   };
 
+  const transferController = async (
+    targetPlayerId: string,
+  ): Promise<RoomError | null> => {
+    const response = await client.transferController({ targetPlayerId });
+
+    if (!response.ok) {
+      return response.error;
+    }
+
+    setRoom(response.room);
+    setRoomError(null);
+    return null;
+  };
+
+  const recoverController = async (
+    targetPlayerId: string,
+  ): Promise<RoomError | null> => {
+    const response = await client.recoverController({ targetPlayerId });
+
+    if (!response.ok) {
+      return response.error;
+    }
+
+    setRoom(response.room);
+    setRoomError(null);
+    return null;
+  };
+
   let page: ReactNode;
   let pageClassName: string;
   const routeRoomCode = roomCodeFromPath(currentPath);
@@ -305,6 +333,8 @@ export function App({
             }
             connectionStatus={connectionStatus}
             onLeave={leaveSession}
+            onTransferController={transferController}
+            onRecoverController={recoverController}
           />
         </>
       );

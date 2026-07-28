@@ -8,11 +8,14 @@ import {
   normalizeRoomCode,
   reconnectDisplayInputSchema,
   reconnectPlayerInputSchema,
+  recoverControllerInputSchema,
   roomCodeSchema,
   roomStateSchema,
+  transferControllerInputSchema,
 } from './lobby';
 
 const controllerPlayerId = '00000000-0000-4000-8000-000000000001';
+const ordinaryPlayerId = '00000000-0000-4000-8000-000000000002';
 
 function roomStateFixture() {
   return {
@@ -26,6 +29,7 @@ function roomStateFixture() {
       connected: true,
       createdAt: '2026-07-27T20:00:00.000Z',
     },
+    controllerStatus: 'assigned',
     controllerPlayerId,
     players: [
       {
@@ -97,6 +101,29 @@ describe('lobby contracts', () => {
     ).toBe(false);
   });
 
+  it('accepts only a target player ID for transfer and recovery', () => {
+    const input = { targetPlayerId: ordinaryPlayerId };
+
+    expect(transferControllerInputSchema.parse(input)).toEqual(input);
+    expect(recoverControllerInputSchema.parse(input)).toEqual(input);
+    expect(
+      transferControllerInputSchema.safeParse({
+        ...input,
+        requesterPlayerId: controllerPlayerId,
+      }).success,
+    ).toBe(false);
+    expect(
+      recoverControllerInputSchema.safeParse({
+        targetPlayerId: 'not-a-player-id',
+      }).success,
+    ).toBe(false);
+    expect(
+      transferControllerInputSchema.safeParse({
+        targetPlayerId: 'a'.repeat(1_000),
+      }).success,
+    ).toBe(false);
+  });
+
   it('keeps display and player reconnect payloads distinct', () => {
     const token = 'a'.repeat(43);
 
@@ -129,6 +156,7 @@ describe('lobby contracts', () => {
   it('accepts an empty room with a display session and no controller', () => {
     const state = roomStateSchema.parse({
       ...roomStateFixture(),
+      controllerStatus: 'none',
       controllerPlayerId: null,
       players: [],
     });
@@ -158,6 +186,50 @@ describe('lobby contracts', () => {
             isController: false,
           },
         ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('represents controller recovery without assigning hidden authority', () => {
+    const fixture = roomStateFixture();
+    const recoveryState = roomStateSchema.parse({
+      ...fixture,
+      controllerStatus: 'recovery-required',
+      controllerPlayerId: null,
+      players: fixture.players.map((player) => ({
+        ...player,
+        connected: false,
+        isController: false,
+      })),
+    });
+
+    expect(recoveryState.controllerStatus).toBe('recovery-required');
+    expect(recoveryState.controllerPlayerId).toBeNull();
+    expect(recoveryState.players.every((player) => !player.isController)).toBe(
+      true,
+    );
+  });
+
+  it('rejects controller status and player-ID mismatches', () => {
+    const fixture = roomStateFixture();
+
+    expect(
+      roomStateSchema.safeParse({
+        ...fixture,
+        controllerStatus: 'recovery-required',
+      }).success,
+    ).toBe(false);
+    expect(
+      roomStateSchema.safeParse({
+        ...fixture,
+        controllerStatus: 'none',
+        controllerPlayerId: null,
+      }).success,
+    ).toBe(false);
+    expect(
+      roomStateSchema.safeParse({
+        ...fixture,
+        controllerPlayerId: '00000000-0000-4000-8000-000000000100',
       }).success,
     ).toBe(false);
   });

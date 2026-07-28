@@ -3,6 +3,83 @@
 Future meaningful work must add a new chronological entry. Record what changed,
 why, what remains open, and the exact verification results.
 
+## 2026-07-27 — Stage 2.5 controller delegation and recovery
+
+### Work completed
+
+- Added explicit `none`, `assigned`, and `recovery-required` controller states
+  to the shared room contract and server store.
+- Added strict `controller:transfer` and `controller:recover` requests whose
+  only client field is `targetPlayerId`.
+- Authorized normal transfer only for the currently connected controller and
+  recovery only for the connected display after controller reconnect grace has
+  expired.
+- Required every target to be a connected player in the same room. Transfer
+  and recovery preserve the display session, player membership, and reconnect
+  credentials.
+- Removed an expired or explicitly departed controller without silently
+  electing a replacement. Remaining players instead enter
+  `recovery-required`.
+- Normalized the empty-room transition to `controllerStatus: none` when the
+  last player leaves during recovery, with a regression for the invariant.
+- Added role-specific Game Host controls and status text. Round settings remain
+  previews and `Start Round` remains disabled.
+- Updated product, architecture, security, contributor, server, and event
+  documentation for the Stage 2.5 model.
+
+### Security and race decisions
+
+- Ordinary players, displays using the normal transfer event, stale former
+  controllers, unbound sockets, and malformed claims cannot transfer authority.
+- Players cannot use the display recovery event. The display cannot recover
+  while the controller is connected or still inside reconnect grace.
+- Store mutations authorize against the current socket binding. Competing
+  stale transfers and duplicate recoveries produce one final controller.
+- Controller reconnect during grace wins normally. After grace, the expired
+  token is invalidated before display recovery, so the former controller can
+  return only by joining as an ordinary player.
+
+### Regression coverage
+
+- shared controller-state invariants and strict action schemas
+- authorized transfer with authoritative broadcasts
+- ordinary, display, stale, self, missing, offline, and cross-room rejection
+- deterministic simultaneous transfer and duplicate-recovery outcomes
+- recovery blocked while a controller is connected or within grace
+- expired-token invalidation and ordinary rejoin after recovery
+- display and player refresh races without stale-socket disconnect corruption
+- role-specific transfer and recovery controls with visible structured errors
+
+### Verification
+
+- `npm install` — passed; 409 packages audited and 0 vulnerabilities found
+- `npm run dev` — passed; Vite served the client on `5173` and the Words server
+  listened on `6532`
+- `npm run format:check` — passed; all matched files use Prettier formatting
+- `npm run lint` — passed with no warnings or errors
+- `npm run typecheck` — passed for client, server, and shared workspaces
+- `npm test` — passed; 95 tests across 8 files:
+  - client: 26 tests across 3 files
+  - server: 52 tests across 3 files
+  - shared: 17 tests across 2 files
+- `npm run build` — passed; Vite transformed 159 modules and the server build
+  boundary passed strict TypeScript
+- `npm audit --audit-level=high` — passed; 0 vulnerabilities
+- Manual four-tab check — passed with one display and three phone players
+- Normal transfer — passed; the first player moved authority to the second,
+  every tab updated, the former controller lost controls, and the new
+  controller gained them
+- Recovery grace — passed; the display showed the controller offline without
+  recovery controls until the configured test grace expired
+- Display recovery — passed; the display assigned the third connected player,
+  the former controller rejoined as an ordinary player, and `Start Round`
+  remained disabled
+- Display disconnect — passed; all three player views kept the same controller
+  authority
+- Browser console check — passed with no warnings or errors in the final
+  display, controller, or ordinary-player tabs
+- Screenshots — captured under `docs/screenshots/`
+
 ## 2026-07-27 — Stage 2 final lifecycle review
 
 ### Medium review finding

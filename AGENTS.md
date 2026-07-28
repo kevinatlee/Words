@@ -31,10 +31,15 @@ and explain important choices in plain language.
   successful reconnect, absent from URLs and logs, and treated as secrets.
 - Preserve the Stage 2 maximum of eight phone players per room, excluding the
   display.
-- Controller authority must always reference a player ID when players exist.
+- Controller state must be explicit: `none` for zero players, `assigned` with
+  exactly one matching player ID, or `recovery-required` with remaining players
+  and no controller ID.
 - Do not add automatic controller election. A disconnected controller retains
-  `controllerPlayerId`; delegation requires an explicit, authorized future
-  action.
+  authority during reconnect grace. After grace, only an authenticated display
+  action may recover authority to a connected player.
+- Normal controller transfer must come from the currently connected
+  controller and name an existing connected player in the same room. It changes
+  only controller authority, never display identity or player membership.
 - Do not close a room solely because the display socket or controller player
   socket disconnects.
 - Support 4 × 4, 5 × 5, and 6 × 6 grids generically. Never assume a grid has

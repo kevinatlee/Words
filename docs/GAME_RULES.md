@@ -67,7 +67,7 @@ letter, or use a custom table.
 
 By default, a word submitted by more than one player will score zero for every
 player who submitted it. Future configuration may allow shared words to receive
-normal or reduced points. Stage 2 does not score duplicates.
+normal or reduced points. Stage 2.5 does not score duplicates.
 
 ## Unresolved rules
 

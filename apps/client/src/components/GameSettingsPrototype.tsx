@@ -22,7 +22,7 @@ export function GameSettingsPrototype({
     <section className="panel settings-panel" aria-labelledby="settings-title">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">Stage 2 preview</span>
+          <span className="eyebrow">Stage 2.5 preview</span>
           <h2 id="settings-title">Round setup</h2>
         </div>
         <span className="status-label">Not networked</span>

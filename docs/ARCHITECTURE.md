@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the implemented Stage 2 lobby and the boundaries that
+This document describes the implemented Stage 2.5 lobby and the boundaries that
 later game stages must preserve.
 
 ## Runtime pieces
@@ -11,7 +11,8 @@ never the source of truth for membership or controller authority.
 
 **Node.js server (`apps/server`):** Runs Express and Socket.IO in one process.
 It owns active rooms, display sessions, players, `controllerPlayerId`,
-role-specific reconnect credentials, expiration, capacity, and cleanup.
+`controllerStatus`, role-specific reconnect credentials, authorization,
+expiration, capacity, and cleanup.
 
 **Shared package (`packages/shared`):** Defines product configuration, strict
 Zod schemas, state shapes, structured errors, acknowledgements, and typed
@@ -28,12 +29,19 @@ Room
 ├── one display session
 │   └── TV/shared-screen presentation; not a player
 └── zero to eight player sessions
-    └── exactly one controllerPlayerId once any player exists
+    └── zero or one controller player, described by controllerStatus
 ```
 
 The controller is a participating phone player. The first player receives the
-role from the server. Future delegation will change only
-`controllerPlayerId`; it must not replace or modify the display session.
+role from the server. An authorized transfer or recovery changes only
+`controllerPlayerId` and `controllerStatus`; it does not replace or modify the
+display session or player membership.
+
+The valid controller states are:
+
+- `none`: zero players and `controllerPlayerId = null`
+- `assigned`: exactly one player matches `controllerPlayerId`
+- `recovery-required`: players remain and `controllerPlayerId = null`
 
 The display is excluded from player capacity and cannot use player
 credentials. Future word-submission handlers must reject display-bound sockets.
@@ -57,7 +65,7 @@ Vite client on :5173
                             in-memory RoomStore
 ```
 
-The Vite proxy means the browser connects to its current origin. The Stage 2
+The Vite proxy means the browser connects to its current origin. The Stage 2.5
 production build does not yet serve the React build from Express.
 
 ## Health endpoint
@@ -68,7 +76,7 @@ production build does not yet serve the React build from Express.
 {
   "status": "ok",
   "service": "Words",
-  "version": "0.2.0"
+  "version": "0.2.5"
 }
 ```
 
@@ -95,6 +103,13 @@ Player events:
 | `player:join`      | `roomCode`, `displayName`          | Create a player session      |
 | `player:reconnect` | `roomCode`, `playerReconnectToken` | Restore one player role      |
 | `player:leave`     | none                               | Leave the player socket room |
+
+Controller events:
+
+| Event                 | Client fields    | Authorized caller and purpose                      |
+| --------------------- | ---------------- | -------------------------------------------------- |
+| `controller:transfer` | `targetPlayerId` | Current controller assigns a connected player      |
+| `controller:recover`  | `targetPlayerId` | Display assigns after controller grace has expired |
 
 The server emits:
 
@@ -148,6 +163,41 @@ player:join { roomCode, displayName }
 No join payload can contain a controller claim. The room store, not player
 order supplied by the browser, decides initial authority.
 
+## Controller transfer flow
+
+```text
+controller:transfer { targetPlayerId }
+  -> strict validation and per-socket request limit
+  -> require a player-bound socket for the current controller
+  -> require a different, connected target in the same room
+  -> atomically replace controllerPlayerId
+  -> preserve controllerStatus = assigned
+  -> acknowledge and broadcast authoritative room state
+```
+
+An ordinary player, the display, a stale former controller, an unbound socket,
+and a disconnected or cross-room target are rejected with structured errors.
+The payload cannot include a requester ID, controller claim, role, or room
+state.
+
+## Controller recovery flow
+
+```text
+controller:recover { targetPlayerId }
+  -> strict validation and per-socket request limit
+  -> require the currently bound display socket
+  -> reject while a controller is connected or within reconnect grace
+  -> require controllerStatus = recovery-required
+  -> require a connected target in the same room
+  -> atomically set controllerPlayerId and controllerStatus = assigned
+  -> acknowledge and broadcast authoritative room state
+```
+
+Cleanup enters `recovery-required` only after invalidating and removing the
+expired controller session. An old controller credential therefore cannot
+regain authority after display recovery. That person may join again as a new
+ordinary player.
+
 ## In-memory room store
 
 Rooms are keyed by normalized room code. Each internal room holds:
@@ -156,6 +206,7 @@ Rooms are keyed by normalized room code. Each internal room holds:
 - creation, activity, and expiration timestamps
 - one internal display session
 - `controllerPlayerId`
+- `controllerStatus`
 - a bounded map of zero to eight players
 - read-only default settings
 
@@ -207,31 +258,33 @@ socket a room-lifetime switch:
 
 - a display leave marks the display offline;
 - an ordinary player leave removes that player;
+- if the last player leaves during recovery, the room returns to
+  `controllerStatus = none`;
 - a sole controller leave removes that player and returns the room to zero
-  players with `controllerPlayerId = null`;
-- a controller leave while other players remain keeps that controller offline,
-  preserving authority without automatic transfer.
+  players with `controllerStatus = none`;
+- a controller leave while other players remain removes that player and enters
+  `recovery-required`.
 
 Periodic cleanup:
 
 - deletes any room whose sliding lifetime expired;
 - expires disconnected display credentials without removing present players;
 - removes ordinary players whose reconnect grace expired;
-- removes a sole disconnected controller after its grace period;
-- retains an offline controller record when other players remain, while
-  invalidating its expired credential;
+- removes a disconnected controller and invalidates its credential after grace;
+- enters `recovery-required` when other players remain, without electing one;
 - removes an abandoned room when it has no players and its disconnected display
   credential has expired;
 - clears token mappings and bounded expired-code tombstones.
 
-This Stage 2 model deliberately prefers an unavailable offline controller to an
-unauthorized automatic election. Future delegation can assign a new
-`controllerPlayerId` through a server-authorized controller action. Room TTL
-still bounds every such room.
+The store performs transfer, recovery, disconnect, reconnect, and cleanup
+mutations synchronously. Each action rechecks the current server binding and
+room state, so two requests from a formerly authorized socket cannot both win.
+A stale replaced socket cannot disconnect the newest valid socket. Room TTL
+still bounds every room, including one awaiting recovery.
 
 ## Server-authority boundary
 
-Browsers are controlled by users and can send invented events. Stage 2 trusts
+Browsers are controlled by users and can send invented events. Stage 2.5 trusts
 only data it validates and maps to a server-bound role session.
 
 Future stages must verify room membership, role, phase, controller player ID,
@@ -263,4 +316,4 @@ Words process on port `6532`. That process will serve the built client, health
 API, Socket.IO, game engine, and an openly licensed dictionary.
 
 Container packaging, static serving, tunnel configuration, and image publishing
-are not implemented in Stage 2.
+are not implemented in Stage 2.5.

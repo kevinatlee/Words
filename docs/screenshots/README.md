@@ -1,5 +1,18 @@
 # Browser verification screenshots
 
+## Stage 2.5
+
+These screenshots were captured from the local client after transferring and
+recovering Game Host authority with three phone players:
+
+- `stage-2-5-display.png`: shared display with the Stage 2.5 Game Host status
+  panel
+- `stage-2-5-controller.png`: the recovered player’s controller view with
+  connected-player transfer controls
+
+The room code and player names are temporary test data. No reconnect credential
+or personal information appears in either image.
+
 ## Stage 2
 
 These screenshots were captured from the local client and live lobby server

@@ -7,8 +7,9 @@ shared-screen browser creates and presents a temporary room. Phone players join
 without accounts, and the first player becomes the initial game host
 (controller).
 
-This repository is at **Stage 2: secure server-backed multiplayer lobby**. The
-lobby works locally; gameplay and production deployment do not.
+This repository is at **Stage 2.5: controller delegation and recovery**. The
+secure lobby and its game-host authority controls work locally; gameplay and
+production deployment do not.
 
 ## What works today
 
@@ -18,20 +19,24 @@ lobby works locally; gameplay and production deployment do not.
 - Zero to eight phone players can join by six-character room code at `/join`.
 - The first player becomes the server-assigned controller; later players join
   without gaining controller authority.
+- The connected game host can explicitly transfer authority to another
+  connected player.
+- If the game host misses reconnect grace, the display can explicitly assign a
+  connected replacement without becoming a player or controller.
 - Display and player presence update in real time.
 - Display and player tabs use separate, temporary reconnect credentials.
 - A display or controller disconnect does not immediately close the room.
 - Rooms and credentials live only in bounded server memory.
-- `GET /api/health` reports the service and Stage 2 version.
+- `GET /api/health` reports the service and Stage 2.5 version.
 - Shared strict Zod schemas validate every inbound lobby payload.
 - The Stage 1 visual identity and local board-setting previews remain.
 
 ## What is not implemented
 
-Stage 2 does not implement gameplay, board generation, touch tracing,
-dictionaries, word validation, scoring, timers, round starts, controller
-delegation, QR codes, automatic controller election, persistence, container
-packaging, image publishing, server installation, or tunnel configuration.
+Stage 2.5 does not implement gameplay, board generation, touch tracing,
+dictionaries, word validation, scoring, timers, round starts, QR codes,
+automatic controller election, persistence, container packaging, image
+publishing, server installation, or tunnel configuration.
 
 `Start Round` remains disabled. Settings in the lobby are local interface
 previews and are not server actions yet.
@@ -43,9 +48,13 @@ previews and are not server actions yet.
 - A **player session** belongs to one phone participant and can eventually
   submit words during gameplay.
 - The **controller** or **game host** is one player. The first player gets this
-  role from the server. Future stages may let that player delegate it.
+  role from the server. While connected, that player may delegate it to another
+  connected player.
 - Controller authority is stored as `controllerPlayerId`, which must reference
-  a player ID. A browser cannot submit or change it.
+  a player ID while assigned. A client cannot self-assign it.
+- The **recovery-required** state means players remain but no controller is
+  assigned. Only the authenticated display can assign a connected player in
+  this state.
 
 The server owns room membership, roles, settings, and expiration. No database,
 Redis instance, account provider, or paid service is used.
@@ -97,8 +106,10 @@ Try the lobby:
 3. Enter the room code and a temporary display name. This first player becomes
    the controller.
 4. Join from another phone tab and watch the shared display update.
-5. Disconnect the display or controller and confirm the room remains visible
-   to the other sessions.
+5. On the controller phone, transfer Game Host authority to the second player.
+6. Disconnect the new controller and confirm the room remains visible during
+   reconnect grace. After grace expires, the display can assign a connected
+   replacement.
 
 Stop both processes with `Control+C`.
 
@@ -166,11 +177,11 @@ period. It does not immediately close the room:
 
 - an ordinary player is removed after their grace period;
 - an expired display credential does not remove remaining players;
-- the controller remains the referenced player and is never automatically
-  replaced;
-- if the controller credential expires while other players remain, the
-  controller stays visible as offline until future delegation support or room
-  expiry;
+- the controller remains assigned while its reconnect grace is active;
+- if controller grace expires while other players remain, the expired player
+  and credential are removed and the room enters `recovery-required`;
+- the display may then explicitly assign a connected replacement;
+- no disconnect or cleanup path automatically chooses a controller;
 - a room closes on its bounded lifetime, or when it has no players and its
   disconnected display credential has expired.
 
@@ -188,6 +199,12 @@ Player requests:
 - `player:reconnect`
 - `player:leave`
 
+Controller requests:
+
+- `controller:transfer` — current connected controller to connected player
+- `controller:recover` — connected display to connected player, only while
+  recovery is required
+
 The server broadcasts:
 
 - `room:state`
@@ -199,7 +216,7 @@ The server broadcasts:
 
 All payloads, state, acknowledgements, and error codes are defined centrally in
 `packages/shared/src/lobby.ts`. See
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the complete Stage 2 flow.
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the complete Stage 2.5 flow.
 
 ## Repository structure
 
@@ -252,4 +269,4 @@ deployment.
 
 Words source code is available under the [MIT License](LICENSE). Third-party
 packages retain their own licenses. No dictionary or third-party visual asset
-is bundled in Stage 2.
+is bundled in Stage 2.5.

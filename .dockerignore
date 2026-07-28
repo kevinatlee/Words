@@ -1,4 +1,4 @@
-# Stage 2 does not include a Dockerfile. This list is ready for a future,
+# Stage 2.5 does not include a Dockerfile. This list is ready for a future,
 # documented container build without implying that deployment works today.
 node_modules
 dist

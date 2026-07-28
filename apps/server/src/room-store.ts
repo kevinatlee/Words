@@ -4,6 +4,7 @@ import {
   productConfig,
   roomCodeAlphabet,
   roomCodeSchema,
+  type ControllerStatus,
   type DisplaySessionCredentials,
   type DisplayState,
   type PlayerSessionCredentials,
@@ -39,6 +40,7 @@ type InternalRoom = {
   lastActivityAt: number;
   expiresAt: number;
   display: InternalDisplay;
+  controllerStatus: ControllerStatus;
   controllerPlayerId: string | null;
   players: Map<string, InternalPlayer>;
   settings: RoomSettings;
@@ -111,6 +113,10 @@ export type LeaveResult =
 export type CleanupResult = {
   deletedRoomCodes: string[];
   updatedRoomCodes: string[];
+};
+
+export type ControllerActionResult = {
+  room: RoomState;
 };
 
 export type RoomStoreOptions = {
@@ -186,6 +192,7 @@ export class RoomStore {
       lastActivityAt: now,
       expiresAt: now + this.options.roomTtlMs,
       display,
+      controllerStatus: 'none',
       controllerPlayerId: null,
       players: new Map(),
       settings: {
@@ -254,13 +261,153 @@ export class RoomStore {
       playerId: player.id,
     });
 
-    if (room.controllerPlayerId === null) {
+    if (
+      room.controllerStatus === 'none' &&
+      room.controllerPlayerId === null &&
+      room.players.size === 1
+    ) {
       room.controllerPlayerId = player.id;
+      room.controllerStatus = 'assigned';
     }
 
     this.touch(room, now);
 
     return this.createPlayerResult(room, player);
+  }
+
+  transferController(
+    session: BoundPlayerSession,
+    targetPlayerId: string,
+    socketId: string,
+  ): ControllerActionResult {
+    const room = this.requireActiveRoom(session.roomCode);
+    const requester = room.players.get(session.playerId);
+
+    if (!requester || !requester.connected || requester.socketId !== socketId) {
+      throw new RoomOperationError(
+        'UNAUTHORIZED',
+        'That player session is no longer authorized for this room.',
+      );
+    }
+
+    if (
+      room.controllerStatus !== 'assigned' ||
+      room.controllerPlayerId !== requester.id
+    ) {
+      throw new RoomOperationError(
+        'NOT_CONTROLLER',
+        'Only the current game host can transfer control.',
+      );
+    }
+
+    const target = room.players.get(targetPlayerId);
+    if (!target) {
+      throw new RoomOperationError(
+        'TARGET_PLAYER_NOT_FOUND',
+        'Choose a player who is currently in this room.',
+      );
+    }
+
+    if (target.id === requester.id) {
+      throw new RoomOperationError(
+        'TARGET_ALREADY_CONTROLLER',
+        'That player is already the game host.',
+      );
+    }
+
+    if (!target.connected || !target.socketId) {
+      throw new RoomOperationError(
+        'TARGET_PLAYER_OFFLINE',
+        'Choose a connected player to become the game host.',
+      );
+    }
+
+    room.controllerPlayerId = target.id;
+    room.controllerStatus = 'assigned';
+    this.touch(room, this.now());
+
+    return { room: this.toRoomState(room) };
+  }
+
+  recoverController(
+    session: BoundDisplaySession,
+    targetPlayerId: string,
+    socketId: string,
+  ): ControllerActionResult {
+    const room = this.requireActiveRoom(session.roomCode);
+    const display = room.display;
+
+    if (
+      display.id !== session.displaySessionId ||
+      !display.connected ||
+      display.socketId !== socketId
+    ) {
+      throw new RoomOperationError(
+        'UNAUTHORIZED',
+        'That display session is no longer authorized for this room.',
+      );
+    }
+
+    const now = this.now();
+    const controller =
+      room.controllerPlayerId === null
+        ? null
+        : room.players.get(room.controllerPlayerId);
+
+    if (room.controllerStatus === 'assigned' && controller?.connected) {
+      throw new RoomOperationError(
+        'CONTROLLER_STILL_ACTIVE',
+        'The current game host is still connected.',
+      );
+    }
+
+    if (
+      room.controllerStatus === 'assigned' &&
+      controller &&
+      controller.disconnectExpiresAt !== null &&
+      controller.disconnectExpiresAt > now
+    ) {
+      throw new RoomOperationError(
+        'CONTROLLER_RECOVERY_NOT_REQUIRED',
+        'Wait for the current game host’s reconnect grace period to end.',
+      );
+    }
+
+    if (
+      room.controllerStatus !== 'recovery-required' &&
+      room.controllerStatus !== 'assigned'
+    ) {
+      throw new RoomOperationError(
+        'CONTROLLER_RECOVERY_NOT_REQUIRED',
+        'This room does not currently need a game host assignment.',
+      );
+    }
+
+    const target = room.players.get(targetPlayerId);
+    if (!target) {
+      throw new RoomOperationError(
+        'TARGET_PLAYER_NOT_FOUND',
+        'Choose a player who is currently in this room.',
+      );
+    }
+
+    if (!target.connected || !target.socketId) {
+      throw new RoomOperationError(
+        'TARGET_PLAYER_OFFLINE',
+        'Choose a connected player to become the game host.',
+      );
+    }
+
+    if (controller && controller.id !== target.id) {
+      this.invalidatePlayerCredential(controller);
+      room.players.delete(controller.id);
+    }
+
+    room.controllerPlayerId = target.id;
+    room.controllerStatus = 'assigned';
+    this.touch(room, now);
+
+    return { room: this.toRoomState(room) };
   }
 
   reconnectDisplay(
@@ -451,22 +598,17 @@ export class RoomStore {
       connected: false,
     };
 
-    if (player.id === room.controllerPlayerId && room.players.size > 1) {
-      if (player.reconnectToken) {
-        this.playerSessions.delete(player.reconnectToken);
-      }
-      player.connected = false;
-      player.socketId = null;
-      player.reconnectToken = null;
-      player.disconnectExpiresAt = null;
-    } else {
-      if (player.reconnectToken) {
-        this.playerSessions.delete(player.reconnectToken);
-      }
-      room.players.delete(player.id);
-      if (player.id === room.controllerPlayerId) {
-        room.controllerPlayerId = null;
-      }
+    this.invalidatePlayerCredential(player);
+    room.players.delete(player.id);
+
+    if (player.id === room.controllerPlayerId) {
+      room.controllerPlayerId = null;
+      room.controllerStatus =
+        room.players.size === 0 ? 'none' : 'recovery-required';
+    }
+    if (room.players.size === 0) {
+      room.controllerPlayerId = null;
+      room.controllerStatus = 'none';
     }
 
     this.touch(room, now);
@@ -515,20 +657,19 @@ export class RoomStore {
       );
 
       for (const player of expiredPlayers) {
-        if (player.reconnectToken) {
-          this.playerSessions.delete(player.reconnectToken);
-        }
+        this.invalidatePlayerCredential(player);
+        room.players.delete(player.id);
 
-        if (player.id === room.controllerPlayerId && room.players.size > 1) {
-          player.reconnectToken = null;
-          player.disconnectExpiresAt = null;
-        } else {
-          room.players.delete(player.id);
-          if (player.id === room.controllerPlayerId) {
-            room.controllerPlayerId = null;
-          }
+        if (player.id === room.controllerPlayerId) {
+          room.controllerPlayerId = null;
+          room.controllerStatus =
+            room.players.size === 0 ? 'none' : 'recovery-required';
         }
         updatedRoomCodes.add(room.code);
+      }
+
+      if (room.players.size === 0 && room.controllerPlayerId === null) {
+        room.controllerStatus = 'none';
       }
 
       if (
@@ -702,6 +843,7 @@ export class RoomStore {
       expiresAt: new Date(room.expiresAt).toISOString(),
       maxPlayers: this.options.maxPlayers,
       display: this.toDisplayState(room.display),
+      controllerStatus: room.controllerStatus,
       controllerPlayerId: room.controllerPlayerId,
       players: [...room.players.values()]
         .sort((left, right) => left.joinedAt - right.joinedAt)
@@ -733,6 +875,16 @@ export class RoomStore {
   private touch(room: InternalRoom, now: number): void {
     room.lastActivityAt = now;
     room.expiresAt = now + this.options.roomTtlMs;
+  }
+
+  private invalidatePlayerCredential(player: InternalPlayer): void {
+    if (player.reconnectToken) {
+      this.playerSessions.delete(player.reconnectToken);
+    }
+    player.connected = false;
+    player.socketId = null;
+    player.reconnectToken = null;
+    player.disconnectExpiresAt = null;
   }
 
   private deleteRoom(

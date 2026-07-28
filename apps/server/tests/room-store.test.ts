@@ -61,6 +61,7 @@ describe('RoomStore display and player sessions', () => {
     expect(result.room.phase).toBe('LOBBY');
     expect(result.room.display).toMatchObject({ connected: true });
     expect(result.room.players).toHaveLength(0);
+    expect(result.room.controllerStatus).toBe('none');
     expect(result.room.controllerPlayerId).toBeNull();
     expect(result.session.displaySessionId).toMatch(
       /^00000000-0000-4000-8000-/,
@@ -105,6 +106,7 @@ describe('RoomStore display and player sessions', () => {
     );
 
     expect(first.room.players).toHaveLength(1);
+    expect(first.room.controllerStatus).toBe('assigned');
     expect(first.room.controllerPlayerId).toBe(first.session.playerId);
     expect(first.player).toMatchObject({
       id: first.session.playerId,
@@ -138,6 +140,273 @@ describe('RoomStore display and player sessions', () => {
       second.room.players.find((player) => player.id === first.session.playerId)
         ?.isController,
     ).toBe(true);
+  });
+
+  it('lets the current controller transfer authority to a connected player', () => {
+    const store = createStore();
+    const created = store.createDisplay('socket-display');
+    const controller = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-controller',
+    );
+    const target = store.joinPlayer(
+      created.room.code,
+      'Amber Kite',
+      'socket-target',
+    );
+
+    const transferred = store.transferController(
+      {
+        role: 'player',
+        roomCode: created.room.code,
+        playerId: controller.session.playerId,
+      },
+      target.session.playerId,
+      'socket-controller',
+    );
+
+    expect(transferred.room.controllerStatus).toBe('assigned');
+    expect(transferred.room.controllerPlayerId).toBe(target.session.playerId);
+    expect(
+      transferred.room.players.find(
+        (player) => player.id === controller.session.playerId,
+      )?.isController,
+    ).toBe(false);
+    expect(
+      transferred.room.players.find(
+        (player) => player.id === target.session.playerId,
+      )?.isController,
+    ).toBe(true);
+  });
+
+  it('rejects unauthorized, missing, offline, and same-player transfer targets', () => {
+    const store = createStore();
+    const created = store.createDisplay('socket-display');
+    const controller = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-controller',
+    );
+    const target = store.joinPlayer(
+      created.room.code,
+      'Amber Kite',
+      'socket-target',
+    );
+
+    expectRoomError(
+      () =>
+        store.transferController(
+          {
+            role: 'player',
+            roomCode: created.room.code,
+            playerId: target.session.playerId,
+          },
+          controller.session.playerId,
+          'socket-target',
+        ),
+      'NOT_CONTROLLER',
+    );
+    expectRoomError(
+      () =>
+        store.transferController(
+          {
+            role: 'player',
+            roomCode: created.room.code,
+            playerId: controller.session.playerId,
+          },
+          controller.session.playerId,
+          'socket-controller',
+        ),
+      'TARGET_ALREADY_CONTROLLER',
+    );
+    expectRoomError(
+      () =>
+        store.transferController(
+          {
+            role: 'player',
+            roomCode: created.room.code,
+            playerId: controller.session.playerId,
+          },
+          createUuid(999),
+          'socket-controller',
+        ),
+      'TARGET_PLAYER_NOT_FOUND',
+    );
+
+    store.disconnect(
+      {
+        role: 'player',
+        roomCode: created.room.code,
+        playerId: target.session.playerId,
+      },
+      'socket-target',
+    );
+    expectRoomError(
+      () =>
+        store.transferController(
+          {
+            role: 'player',
+            roomCode: created.room.code,
+            playerId: controller.session.playerId,
+          },
+          target.session.playerId,
+          'socket-controller',
+        ),
+      'TARGET_PLAYER_OFFLINE',
+    );
+
+    const reconnectedTarget = store.reconnectPlayer(
+      created.room.code,
+      target.session.playerReconnectToken,
+      'socket-target-returned',
+    );
+    const transferred = store.transferController(
+      {
+        role: 'player',
+        roomCode: created.room.code,
+        playerId: controller.session.playerId,
+      },
+      reconnectedTarget.session.playerId,
+      'socket-controller',
+    );
+    expect(transferred.room.controllerPlayerId).toBe(
+      reconnectedTarget.session.playerId,
+    );
+  });
+
+  it('makes simultaneous stale transfer requests resolve to one controller', () => {
+    const store = createStore();
+    const created = store.createDisplay('socket-display');
+    const controller = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-controller',
+    );
+    const second = store.joinPlayer(
+      created.room.code,
+      'Amber Kite',
+      'socket-second',
+    );
+    const third = store.joinPlayer(
+      created.room.code,
+      'Copper Lynx',
+      'socket-third',
+    );
+    const controllerSession = {
+      role: 'player' as const,
+      roomCode: created.room.code,
+      playerId: controller.session.playerId,
+    };
+
+    store.transferController(
+      controllerSession,
+      second.session.playerId,
+      'socket-controller',
+    );
+    expectRoomError(
+      () =>
+        store.transferController(
+          controllerSession,
+          third.session.playerId,
+          'socket-controller',
+        ),
+      'NOT_CONTROLLER',
+    );
+
+    const room = store.getRoomState(created.room.code);
+    expect(room?.controllerPlayerId).toBe(second.session.playerId);
+    expect(room?.players.filter((player) => player.isController)).toHaveLength(
+      1,
+    );
+  });
+
+  it('keeps transferred authority through old and new controller reconnects', () => {
+    const store = createStore();
+    const created = store.createDisplay('socket-display');
+    const oldController = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-old',
+    );
+    const newController = store.joinPlayer(
+      created.room.code,
+      'Amber Kite',
+      'socket-new',
+    );
+
+    store.transferController(
+      {
+        role: 'player',
+        roomCode: created.room.code,
+        playerId: oldController.session.playerId,
+      },
+      newController.session.playerId,
+      'socket-old',
+    );
+    store.disconnect(
+      {
+        role: 'player',
+        roomCode: created.room.code,
+        playerId: oldController.session.playerId,
+      },
+      'socket-old',
+    );
+    store.disconnect(
+      {
+        role: 'player',
+        roomCode: created.room.code,
+        playerId: newController.session.playerId,
+      },
+      'socket-new',
+    );
+
+    const oldReconnected = store.reconnectPlayer(
+      created.room.code,
+      oldController.session.playerReconnectToken,
+      'socket-old-returned',
+    );
+    const newReconnected = store.reconnectPlayer(
+      created.room.code,
+      newController.session.playerReconnectToken,
+      'socket-new-returned',
+    );
+
+    expect(oldReconnected.player.isController).toBe(false);
+    expect(newReconnected.player.isController).toBe(true);
+    expect(newReconnected.room.controllerPlayerId).toBe(
+      newController.session.playerId,
+    );
+  });
+
+  it('rejects cross-room controller targets', () => {
+    const store = createStore({ codes: ['ABC234', 'DEF567'] });
+    const firstRoom = store.createDisplay('socket-display-one');
+    const controller = store.joinPlayer(
+      firstRoom.room.code,
+      'Silver Owl',
+      'socket-controller',
+    );
+    const secondRoom = store.createDisplay('socket-display-two');
+    const otherRoomPlayer = store.joinPlayer(
+      secondRoom.room.code,
+      'Amber Kite',
+      'socket-other-room',
+    );
+
+    expectRoomError(
+      () =>
+        store.transferController(
+          {
+            role: 'player',
+            roomCode: firstRoom.room.code,
+            playerId: controller.session.playerId,
+          },
+          otherRoomPlayer.session.playerId,
+          'socket-controller',
+        ),
+      'TARGET_PLAYER_NOT_FOUND',
+    );
   });
 
   it('rejects missing rooms and normalized duplicate names', () => {
@@ -338,6 +607,7 @@ describe('RoomStore display and player sessions', () => {
     expect(result?.role).toBe('player');
     expect(store.roomCount).toBe(1);
     expect(store.getRoomState(created.room.code)).toMatchObject({
+      controllerStatus: 'assigned',
       controllerPlayerId: controller.session.playerId,
     });
     expect(
@@ -381,11 +651,12 @@ describe('RoomStore display and player sessions', () => {
     store.cleanupExpired();
     const room = store.getRoomState(created.room.code);
     expect(room?.players).toHaveLength(1);
+    expect(room?.controllerStatus).toBe('assigned');
     expect(room?.controllerPlayerId).toBe(controller.session.playerId);
     expect(room?.players[0]?.id).toBe(controller.session.playerId);
   });
 
-  it('retains an offline controller record without electing another player', () => {
+  it('enters recovery-required state after controller grace expires', () => {
     let now = Date.parse('2026-07-27T20:00:00.000Z');
     const store = createStore({
       now: () => now,
@@ -416,12 +687,14 @@ describe('RoomStore display and player sessions', () => {
 
     const room = store.getRoomState(created.room.code);
     expect(() => roomStateSchema.parse(room)).not.toThrow();
-    expect(room?.controllerPlayerId).toBe(controller.session.playerId);
-    expect(room?.players).toHaveLength(2);
-    expect(
-      room?.players.find((player) => player.id === ordinary.session.playerId)
-        ?.isController,
-    ).toBe(false);
+    expect(room?.controllerStatus).toBe('recovery-required');
+    expect(room?.controllerPlayerId).toBeNull();
+    expect(room?.players).toHaveLength(1);
+    expect(room?.players[0]).toMatchObject({
+      id: ordinary.session.playerId,
+      connected: true,
+      isController: false,
+    });
     expectRoomError(
       () =>
         store.reconnectPlayer(
@@ -430,6 +703,253 @@ describe('RoomStore display and player sessions', () => {
           'socket-controller-late',
         ),
       'RECONNECT_FAILED',
+    );
+  });
+
+  it('blocks display recovery during grace and preserves a timely reconnect', () => {
+    let now = Date.parse('2026-07-27T20:00:00.000Z');
+    const store = createStore({
+      now: () => now,
+      reconnectGraceMs: 60_000,
+    });
+    const created = store.createDisplay('socket-display');
+    const controller = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-controller',
+    );
+    const target = store.joinPlayer(
+      created.room.code,
+      'Amber Kite',
+      'socket-target',
+    );
+    store.disconnect(
+      {
+        role: 'player',
+        roomCode: created.room.code,
+        playerId: controller.session.playerId,
+      },
+      'socket-controller',
+    );
+
+    expectRoomError(
+      () =>
+        store.recoverController(
+          {
+            role: 'display',
+            roomCode: created.room.code,
+            displaySessionId: created.session.displaySessionId,
+          },
+          target.session.playerId,
+          'socket-display',
+        ),
+      'CONTROLLER_RECOVERY_NOT_REQUIRED',
+    );
+
+    now += 59_999;
+    const reconnected = store.reconnectPlayer(
+      created.room.code,
+      controller.session.playerReconnectToken,
+      'socket-controller-returned',
+    );
+    expect(reconnected.player.isController).toBe(true);
+    expect(reconnected.room.controllerStatus).toBe('assigned');
+  });
+
+  it('lets the authenticated display recover an expired controller', () => {
+    let now = Date.parse('2026-07-27T20:00:00.000Z');
+    const store = createStore({
+      now: () => now,
+      reconnectGraceMs: 60_000,
+    });
+    const created = store.createDisplay('socket-display');
+    const oldController = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-controller',
+    );
+    const target = store.joinPlayer(
+      created.room.code,
+      'Amber Kite',
+      'socket-target',
+    );
+    store.disconnect(
+      {
+        role: 'player',
+        roomCode: created.room.code,
+        playerId: oldController.session.playerId,
+      },
+      'socket-controller',
+    );
+    now += 60_000;
+    store.cleanupExpired();
+
+    const recovered = store.recoverController(
+      {
+        role: 'display',
+        roomCode: created.room.code,
+        displaySessionId: created.session.displaySessionId,
+      },
+      target.session.playerId,
+      'socket-display',
+    );
+
+    expect(recovered.room.controllerStatus).toBe('assigned');
+    expect(recovered.room.controllerPlayerId).toBe(target.session.playerId);
+    expect(recovered.room.players).toEqual([
+      expect.objectContaining({
+        id: target.session.playerId,
+        connected: true,
+        isController: true,
+      }),
+    ]);
+    expect(store.roomCount).toBe(1);
+    expectRoomError(
+      () =>
+        store.reconnectPlayer(
+          created.room.code,
+          oldController.session.playerReconnectToken,
+          'socket-controller-late',
+        ),
+      'RECONNECT_FAILED',
+    );
+
+    const rejoined = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-controller-rejoined',
+    );
+    expect(rejoined.player.isController).toBe(false);
+  });
+
+  it('rejects recovery from a stale display and resolves duplicate recovery once', () => {
+    let now = Date.parse('2026-07-27T20:00:00.000Z');
+    const store = createStore({
+      now: () => now,
+      reconnectGraceMs: 60_000,
+    });
+    const created = store.createDisplay('socket-display');
+    const controller = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-controller',
+    );
+    const second = store.joinPlayer(
+      created.room.code,
+      'Amber Kite',
+      'socket-second',
+    );
+    const third = store.joinPlayer(
+      created.room.code,
+      'Copper Lynx',
+      'socket-third',
+    );
+    store.disconnect(
+      {
+        role: 'player',
+        roomCode: created.room.code,
+        playerId: controller.session.playerId,
+      },
+      'socket-controller',
+    );
+    now += 60_000;
+    store.cleanupExpired();
+    const displaySession = {
+      role: 'display' as const,
+      roomCode: created.room.code,
+      displaySessionId: created.session.displaySessionId,
+    };
+
+    expectRoomError(
+      () =>
+        store.recoverController(
+          displaySession,
+          second.session.playerId,
+          'socket-stale-display',
+        ),
+      'UNAUTHORIZED',
+    );
+
+    store.recoverController(
+      displaySession,
+      second.session.playerId,
+      'socket-display',
+    );
+    expectRoomError(
+      () =>
+        store.recoverController(
+          displaySession,
+          third.session.playerId,
+          'socket-display',
+        ),
+      'CONTROLLER_STILL_ACTIVE',
+    );
+    expect(store.getRoomState(created.room.code)?.controllerPlayerId).toBe(
+      second.session.playerId,
+    );
+  });
+
+  it('cannot recover to an offline or cross-room player', () => {
+    const store = createStore({
+      codes: ['ABC234', 'DEF567'],
+      reconnectGraceMs: 60_000,
+    });
+    const created = store.createDisplay('socket-display');
+    const controller = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-controller',
+    );
+    const offlineTarget = store.joinPlayer(
+      created.room.code,
+      'Amber Kite',
+      'socket-offline',
+    );
+    const otherRoom = store.createDisplay('socket-display-two');
+    const otherTarget = store.joinPlayer(
+      otherRoom.room.code,
+      'Copper Lynx',
+      'socket-other',
+    );
+    store.leave(
+      {
+        role: 'player',
+        roomCode: created.room.code,
+        playerId: controller.session.playerId,
+      },
+      'socket-controller',
+    );
+    store.disconnect(
+      {
+        role: 'player',
+        roomCode: created.room.code,
+        playerId: offlineTarget.session.playerId,
+      },
+      'socket-offline',
+    );
+    const displaySession = {
+      role: 'display' as const,
+      roomCode: created.room.code,
+      displaySessionId: created.session.displaySessionId,
+    };
+
+    expectRoomError(
+      () =>
+        store.recoverController(
+          displaySession,
+          otherTarget.session.playerId,
+          'socket-display',
+        ),
+      'TARGET_PLAYER_NOT_FOUND',
+    );
+    expectRoomError(
+      () =>
+        store.recoverController(
+          displaySession,
+          offlineTarget.session.playerId,
+          'socket-display',
+        ),
+      'TARGET_PLAYER_OFFLINE',
     );
   });
 
@@ -505,7 +1025,7 @@ describe('RoomStore display and player sessions', () => {
     expect(store.getRoomState(created.room.code)?.players).toHaveLength(1);
   });
 
-  it('does not close or transfer a populated room when its controller leaves', () => {
+  it('requires display recovery when a populated room controller leaves', () => {
     const store = createStore();
     const created = store.createDisplay('socket-display');
     const controller = store.joinPlayer(
@@ -530,12 +1050,51 @@ describe('RoomStore display and player sessions', () => {
 
     expect(result?.role).toBe('player');
     expect(store.roomCount).toBe(1);
-    expect(result?.room.controllerPlayerId).toBe(controller.session.playerId);
-    expect(
-      result?.room.players.find(
-        (player) => player.id === ordinary.session.playerId,
-      )?.isController,
-    ).toBe(false);
+    expect(result?.room.controllerStatus).toBe('recovery-required');
+    expect(result?.room.controllerPlayerId).toBeNull();
+    expect(result?.room.players).toEqual([
+      expect.objectContaining({
+        id: ordinary.session.playerId,
+        isController: false,
+      }),
+    ]);
+  });
+
+  it('returns to no-controller state when the last recovery player leaves', () => {
+    const store = createStore();
+    const created = store.createDisplay('socket-display');
+    const controller = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-controller',
+    );
+    const ordinary = store.joinPlayer(
+      created.room.code,
+      'Amber Kite',
+      'socket-player',
+    );
+
+    store.leave(
+      {
+        role: 'player',
+        roomCode: created.room.code,
+        playerId: controller.session.playerId,
+      },
+      'socket-controller',
+    );
+    const result = store.leave(
+      {
+        role: 'player',
+        roomCode: created.room.code,
+        playerId: ordinary.session.playerId,
+      },
+      'socket-player',
+    );
+
+    expect(result?.room.controllerStatus).toBe('none');
+    expect(result?.room.controllerPlayerId).toBeNull();
+    expect(result?.room.players).toEqual([]);
+    expect(store.roomCount).toBe(1);
   });
 
   it('expires inactive rooms and clears both role credential indexes', () => {

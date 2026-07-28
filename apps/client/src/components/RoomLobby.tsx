@@ -3,11 +3,13 @@ import { useMemo, useState } from 'react';
 import {
   type ConnectionStatus,
   type GridSize,
+  type RoomError,
   type RoomState,
   type RoundDurationSeconds,
 } from '@words/shared';
 
 import { createDemoBoard } from '../utils/demoBoard';
+import { ControllerPanel } from './ControllerPanel';
 import { GameSettingsPrototype } from './GameSettingsPrototype';
 import { LetterGrid } from './LetterGrid';
 import { PlayerList } from './PlayerList';
@@ -20,6 +22,8 @@ type RoomLobbyProps = {
   currentPlayerId: string | null;
   connectionStatus: ConnectionStatus;
   onLeave: () => Promise<void>;
+  onTransferController: (targetPlayerId: string) => Promise<RoomError | null>;
+  onRecoverController: (targetPlayerId: string) => Promise<RoomError | null>;
 };
 
 export function RoomLobby({
@@ -28,6 +32,8 @@ export function RoomLobby({
   currentPlayerId,
   connectionStatus,
   onLeave,
+  onTransferController,
+  onRecoverController,
 }: RoomLobbyProps) {
   const [gridSize, setGridSize] = useState<GridSize>(room.settings.gridSize);
   const [duration, setDuration] = useState<RoundDurationSeconds>(
@@ -51,7 +57,9 @@ export function RoomLobby({
     ? 'Share the code and keep this screen visible while phone players join.'
     : currentPlayer?.isController
       ? 'You play normally and will control lobby settings and round starts in a later stage.'
-      : `Waiting with ${controller?.displayName ?? 'the game host'} for a future round.`;
+      : room.controllerStatus === 'recovery-required'
+        ? 'Waiting for the Shared Display to assign a new Game Host.'
+        : `Waiting with ${controller?.displayName ?? 'the Game Host'} for a future round.`;
 
   return (
     <div className="room-page">
@@ -84,8 +92,8 @@ export function RoomLobby({
       </div>
 
       <PrototypeNotice>
-        The lobby is live. Controller settings, delegation, gameplay, and round
-        starts are intentionally not implemented in Stage 2.
+        The lobby and Game Host assignment are live. Gameplay and round starts
+        remain intentionally unavailable in Stage 2.5.
       </PrototypeNotice>
 
       <div className="room-dashboard">
@@ -113,6 +121,13 @@ export function RoomLobby({
             players={room.players}
             maxPlayers={room.maxPlayers}
             currentPlayerId={currentPlayerId}
+          />
+          <ControllerPanel
+            room={room}
+            sessionRole={sessionRole}
+            currentPlayerId={currentPlayerId}
+            onTransfer={onTransferController}
+            onRecover={onRecoverController}
           />
         </div>
 

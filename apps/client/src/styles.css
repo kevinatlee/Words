@@ -639,7 +639,7 @@ button:disabled {
   font-weight: 900;
 }
 
-.player-list__item:first-child .player-avatar {
+.player-list__item--controller .player-avatar {
   background: var(--mint);
 }
 
@@ -690,6 +690,34 @@ button:disabled {
   color: var(--paper-muted);
   font-size: 0.78rem;
   line-height: 1.5;
+}
+
+.controller-panel__status {
+  color: var(--paper-muted);
+  line-height: 1.6;
+}
+
+.controller-actions {
+  margin-top: 1.25rem;
+}
+
+.controller-actions label {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: var(--paper-muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.controller-panel .lobby-error,
+.controller-success {
+  margin-top: 1rem;
+}
+
+.controller-success {
+  margin-bottom: 0;
+  color: var(--mint);
+  font-weight: 750;
 }
 
 .choice-group {
@@ -1036,7 +1064,7 @@ button:disabled {
   margin-top: 1.5rem;
 }
 
-/* Stage 2 lobby */
+/* Stage 2.5 lobby */
 
 .form-page {
   display: grid;

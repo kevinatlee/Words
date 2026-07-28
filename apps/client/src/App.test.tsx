@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
   ConnectionStatus,
+  ControllerActionResponse,
   DisplayActionResponse,
   LeaveSessionResponse,
   PlayerActionResponse,
@@ -32,7 +33,12 @@ const ordinaryPlayer: PlayerState = {
   isController: false,
 };
 
-function createRoom(players: PlayerState[] = []): RoomState {
+function createRoom(
+  players: PlayerState[] = [],
+  controllerStatus: RoomState['controllerStatus'] = players.length
+    ? 'assigned'
+    : 'none',
+): RoomState {
   return {
     code: 'ABC234',
     phase: 'LOBBY',
@@ -44,7 +50,11 @@ function createRoom(players: PlayerState[] = []): RoomState {
       connected: true,
       createdAt: '2026-07-27T20:00:00.000Z',
     },
-    controllerPlayerId: players[0]?.id ?? null,
+    controllerStatus,
+    controllerPlayerId:
+      controllerStatus === 'assigned'
+        ? (players.find((player) => player.isController)?.id ?? null)
+        : null,
     players,
     settings: {
       gridSize: 4,
@@ -81,6 +91,21 @@ const ordinarySuccess: PlayerActionResponse = {
   },
 };
 
+const transferredRoom = createRoom([
+  { ...controllerPlayer, isController: false },
+  { ...ordinaryPlayer, isController: true },
+]);
+
+const controllerWithPlayersSuccess: PlayerActionResponse = {
+  ...controllerSuccess,
+  room: createRoom([controllerPlayer, ordinaryPlayer]),
+};
+
+const recoveryRequiredRoom = createRoom(
+  [{ ...ordinaryPlayer, isController: false }],
+  'recovery-required',
+);
+
 function createFakeClient(overrides: Partial<LobbyClient> = {}): LobbyClient {
   return {
     getConnectionStatus: () => 'connected' as ConnectionStatus,
@@ -102,6 +127,14 @@ function createFakeClient(overrides: Partial<LobbyClient> = {}): LobbyClient {
     leavePlayer: vi.fn(async (): Promise<LeaveSessionResponse> => ({
       ok: true,
     })),
+    transferController: vi.fn(async (): Promise<ControllerActionResponse> => ({
+      ok: true,
+      room: transferredRoom,
+    })),
+    recoverController: vi.fn(async (): Promise<ControllerActionResponse> => ({
+      ok: true,
+      room: transferredRoom,
+    })),
     onRoomState: () => () => undefined,
     onRoomError: () => () => undefined,
     onConnectionStatus: () => () => undefined,
@@ -119,7 +152,7 @@ function createFakeSessionStore(
   };
 }
 
-describe('Stage 2 display and player lobby routes', () => {
+describe('Stage 2.5 display and player lobby routes', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/');
   });
@@ -169,6 +202,9 @@ describe('Stage 2 display and player lobby routes', () => {
       screen.getByText(/Waiting for the first player/i),
     ).toBeInTheDocument();
     expect(screen.queryByText(/\(you\)/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Assign Game Host' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start Round' })).toBeDisabled();
   });
 
@@ -208,7 +244,7 @@ describe('Stage 2 display and player lobby routes', () => {
       }),
     ).toBeInTheDocument();
     expect(screen.getByText('Silver Owl (you)')).toBeInTheDocument();
-    expect(screen.getByText('Controller')).toBeInTheDocument();
+    expect(screen.getAllByText('Game Host').length).toBeGreaterThan(0);
   });
 
   it('shows later phone players without granting controller authority', async () => {
@@ -238,6 +274,171 @@ describe('Stage 2 display and player lobby routes', () => {
     expect(screen.getByText('<Bright Fox> (you)')).toBeInTheDocument();
     expect(screen.getByText('Silver Owl')).toBeInTheDocument();
     expect(container.querySelector('b')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Make Game Host' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('lets the current game host transfer control to a connected player', async () => {
+    const user = userEvent.setup();
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(
+        async (): Promise<PlayerActionResponse> => controllerWithPlayersSuccess,
+      ),
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'j'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'You’re the game host.',
+      }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Make Game Host' }));
+
+    expect(client.transferController).toHaveBeenCalledWith({
+      targetPlayerId: ordinaryPlayer.id,
+    });
+    expect(
+      await screen.findByText('Game Host control moved to <Bright Fox>.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'You’re in the room.' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Make Game Host' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start Round' })).toBeDisabled();
+  });
+
+  it('shows transfer errors without changing controller controls', async () => {
+    const user = userEvent.setup();
+    const error: RoomError = {
+      code: 'TARGET_PLAYER_OFFLINE',
+      message: 'Choose a connected player to become the game host.',
+    };
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(
+        async (): Promise<PlayerActionResponse> => controllerWithPlayersSuccess,
+      ),
+      transferController: vi.fn(
+        async (): Promise<ControllerActionResponse> => ({
+          ok: false,
+          error,
+        }),
+      ),
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'k'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Make Game Host' }),
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(error.message);
+    expect(screen.getByRole('alert')).toHaveTextContent(error.code);
+    expect(
+      screen.getByRole('button', { name: 'Make Game Host' }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows display recovery controls only when assignment is required', async () => {
+    const user = userEvent.setup();
+    const client = createFakeClient({
+      reconnectDisplay: vi.fn(async (): Promise<DisplayActionResponse> => ({
+        ...displaySuccess,
+        room: recoveryRequiredRoom,
+      })),
+      recoverController: vi.fn(async (): Promise<ControllerActionResponse> => ({
+        ok: true,
+        room: createRoom([{ ...ordinaryPlayer, isController: true }]),
+      })),
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'display',
+          roomCode: 'ABC234',
+          displaySessionId: displaySuccess.session.displaySessionId,
+          displayReconnectToken: 'l'.repeat(43),
+        })}
+      />,
+    );
+
+    expect(await screen.findByText('Assignment required')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Game Host assignment is required/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Make Game Host' }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Assign Game Host' }));
+    expect(client.recoverController).toHaveBeenCalledWith({
+      targetPlayerId: ordinaryPlayer.id,
+    });
+    expect(
+      await screen.findByText('<Bright Fox> is now the Game Host.'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows recovery-required state to players without display controls', async () => {
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+        ...ordinarySuccess,
+        room: recoveryRequiredRoom,
+      })),
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: ordinaryPlayer.id,
+          playerReconnectToken: 'm'.repeat(43),
+          displayName: ordinaryPlayer.displayName,
+        })}
+      />,
+    );
+
+    expect(
+      await screen.findByText(
+        /The Shared Display can choose a connected player/i,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Assign Game Host' }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows understandable structured errors', async () => {
@@ -403,7 +604,7 @@ describe('Stage 2 display and player lobby routes', () => {
     );
 
     expect(await screen.findByText('Display offline')).toBeInTheDocument();
-    expect(screen.getByText('Controller offline')).toBeInTheDocument();
+    expect(screen.getAllByText('Game Host offline')).toHaveLength(2);
     expect(
       screen.getByRole('heading', { name: 'You’re in the room.' }),
     ).toBeInTheDocument();
