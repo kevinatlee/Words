@@ -43,6 +43,7 @@ const equalDistribution: readonly WeightedTile[] = [
   { token: 'A', weight: 1 },
   { token: 'B', weight: 1 },
 ];
+const IMMEDIATELY_BELOW_ONE = 1 - Number.EPSILON / 2;
 
 describe('weighted board generation', () => {
   it('rejects an unsupported generation size', () => {
@@ -98,7 +99,7 @@ describe('weighted board generation', () => {
       { token: 'A', weight: 1 },
       { token: 'B', weight: 3 },
     ];
-    const values = [0, 0.249_999, 0.25, 0.999_999];
+    const values = [0, 0.249_999, 0.25, IMMEDIATELY_BELOW_ONE];
     const sequence = Array.from(
       { length: 16 },
       (_, index) => values[index % 4]!,
@@ -204,6 +205,34 @@ describe('weighted board generation', () => {
     );
   });
 
+  it('rejects a positive weight that cannot advance the cumulative total', () => {
+    expectConfigurationError(
+      () =>
+        generateBoard({
+          size: 4,
+          distribution: [
+            { token: 'A', weight: Number.MAX_VALUE },
+            { token: 'B', weight: Number.MIN_VALUE },
+          ],
+          random: constantRandom(0),
+        }),
+      'INVALID_TOTAL_WEIGHT',
+    );
+  });
+
+  it('maps the value immediately below one to the final interval after rounding', () => {
+    const result = generateBoard({
+      size: 4,
+      distribution: [{ token: 'A', weight: Number.MIN_VALUE }],
+      random: constantRandom(IMMEDIATELY_BELOW_ONE),
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.board.tiles).toEqual(Array(16).fill('A'));
+    }
+  });
+
   it.each(['', 'A!', 'ABCDE', 'ß'])(
     'rejects invalid configured token %s',
     (token) => {
@@ -262,6 +291,30 @@ describe('weighted board generation', () => {
 
     expect(result.success).toBe(true);
     expect(boardWasFrozen).toBe(true);
+  });
+
+  it('propagates an acceptance-predicate exception unchanged', () => {
+    const predicateError = new Error('Acceptance predicate failed.');
+    let caughtError: unknown;
+    let calls = 0;
+
+    try {
+      generateBoard({
+        size: 4,
+        distribution: equalDistribution,
+        random: constantRandom(0),
+        maxAttempts: 3,
+        acceptBoard() {
+          calls += 1;
+          throw predicateError;
+        },
+      });
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toBe(predicateError);
+    expect(calls).toBe(1);
   });
 
   it('returns a structured failure after bounded rejection', () => {

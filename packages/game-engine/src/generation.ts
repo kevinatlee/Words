@@ -158,11 +158,12 @@ function prepareDistribution(
       );
     }
 
+    const previousTotalWeight = totalWeight;
     totalWeight += entry.weight;
-    if (!Number.isFinite(totalWeight) || totalWeight <= 0) {
+    if (!Number.isFinite(totalWeight) || totalWeight <= previousTotalWeight) {
       throw new EngineConfigurationError(
         'INVALID_TOTAL_WEIGHT',
-        'The total distribution weight must be finite and greater than zero.',
+        'Every distribution weight must increase the finite cumulative total.',
       );
     }
 
@@ -188,10 +189,19 @@ function selectWeightedTile(
   randomValue: number,
 ): TileToken {
   const target = randomValue * totalWeight;
-  for (const entry of distribution) {
+  for (let index = 0; index < distribution.length - 1; index += 1) {
+    const entry = distribution[index];
+    if (entry === undefined) {
+      break;
+    }
     if (target < entry.upperBoundary) {
       return entry.token;
     }
+  }
+
+  const finalEntry = distribution.at(-1);
+  if (finalEntry !== undefined) {
+    return finalEntry.token;
   }
 
   throw new EngineConfigurationError(

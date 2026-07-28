@@ -3,6 +3,59 @@
 Future meaningful work must add a new chronological entry. Record what changed,
 why, what remains open, and the exact verification results.
 
+## 2026-07-28 — Stage 3 focused final review corrections
+
+### Findings corrected
+
+- Made weighted selection total for every valid random value in `[0, 1)`, even
+  when floating-point multiplication rounds the target to the final cumulative
+  boundary.
+- Rejected individually positive finite weights that do not advance the
+  cumulative total at JavaScript number precision, because such a weight would
+  create an unreachable tile interval.
+- Documented and tested that an unexpected acceptance-predicate exception is a
+  programmer error that propagates unchanged rather than becoming an ordinary
+  rejected-board or exhaustion result.
+- Expanded adjacency regression coverage to reject both directions of every
+  numeric row-wrap boundary on 4 × 4, 5 × 5, and 6 × 6 boards.
+- Kept the fixes inside the isolated game-engine package and its documentation.
+  No lobby integration, production dictionary data, gameplay networking, QR
+  rendering, or Stage 4 work was added.
+
+### Provenance review
+
+- Confirmed official tag `rel-2026.02.25` resolves to pinned commit
+  `7e99edab8e32f9f9ea2b15f249ca8d4d67237410`.
+- Reproduced the documented size-60 American/Canadian export at 79,370 words
+  and 757,056 uncompressed bytes from that exact source.
+- Confirmed the applicable ESDB/SCOWL generated-list notice and its separate
+  Australian, greater-than-80, and database-result branches.
+- Rechecked the original ENABLE 2K archive SHA-256 and public-domain
+  declaration. Its word data still matched the pinned mirror byte-for-byte
+  after only CRLF-to-LF normalization.
+- Left one Low documentation note for Stage 4: record the exact metadata-free
+  gzip command when adding the real export, because gzip header metadata changes
+  the compressed byte count without changing the word data.
+
+### Verification
+
+- `npm install` — passed; dependencies were already up to date.
+- `npm run format:check` — passed; all matched files use Prettier formatting.
+- `npm run lint` — passed with no warnings or errors.
+- `npm run typecheck` — passed for client, server, game-engine, and shared
+  workspaces.
+- `npm test` — passed; 249 tests across 14 files:
+  - client: 35 tests across 3 files
+  - server: 59 tests across 3 files
+  - game engine: 135 tests across 5 files
+  - shared: 20 tests across 3 files
+- `npm run build` — passed; Vite transformed 158 modules, and server and
+  game-engine strict TypeScript build boundaries passed.
+- `npm audit --audit-level=high` — passed; 0 vulnerabilities.
+- `npm run dev` — passed; Vite started on `http://localhost:5173` and the Words
+  server started on `http://localhost:6532`, then both ports were released
+  after shutdown.
+
 ## 2026-07-28 — Stage 3 game-engine foundation
 
 ### Work completed

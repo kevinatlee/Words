@@ -153,10 +153,24 @@ describe('adjacency helpers', () => {
     expect(areAdjacent(4, 0, 8)).toBe(false);
   });
 
-  it('rejects row wrapping despite adjacent numeric indexes', () => {
-    expect(areAdjacent(4, 3, 4)).toBe(false);
-    expect(getAdjacentIndices(4, 3)).not.toContain(4);
-  });
+  it.each([4, 5, 6] as const)(
+    'rejects every numeric row-wrap boundary for size %d',
+    (size) => {
+      for (let row = 1; row < size; row += 1) {
+        const previousRowEnd = row * size - 1;
+        const nextRowStart = row * size;
+
+        expect(areAdjacent(size, previousRowEnd, nextRowStart)).toBe(false);
+        expect(areAdjacent(size, nextRowStart, previousRowEnd)).toBe(false);
+        expect(getAdjacentIndices(size, previousRowEnd)).not.toContain(
+          nextRowStart,
+        );
+        expect(getAdjacentIndices(size, nextRowStart)).not.toContain(
+          previousRowEnd,
+        );
+      }
+    },
+  );
 
   it.each([4, 5, 6] as const)(
     'returns only reciprocal in-bounds neighbours for size %d',

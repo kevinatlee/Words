@@ -97,11 +97,16 @@ const result = generateBoard({
 Every random value must be finite and in `[0, 1)`. The engine never calls
 `Math.random()` or supplies an invisible fallback. Distribution tokens are
 normalized once, checked for normalized duplicates, and copied without
-mutating the caller’s array.
+mutating the caller’s array. Every positive weight must also advance the
+cumulative total at JavaScript number precision; a weight that would create an
+unreachable interval is rejected as an invalid total.
 
 An optional acceptance predicate can reject low-quality boards. Attempts use a
 loop with an explicit maximum; exhaustion returns
 `{ success: false, code: 'NO_ACCEPTABLE_BOARD', attempts }`.
+Returning `false` consumes one attempt. If the predicate throws, that exception
+is a programmer error and propagates unchanged rather than being converted to
+an ordinary rejection or exhaustion result.
 
 Stage 3 deliberately supplies no default letter distribution. A production
 profile needs a documented, non-proprietary derivation and is a Stage 4

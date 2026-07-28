@@ -84,13 +84,16 @@ server-owned cryptographic randomness.
 
 Callers supply weighted token entries. Tokens are ASCII-normalized once and
 must be unique after normalization. Every weight and their total must be
-finite and greater than zero. Selection uses cumulative weighted boundaries
-and generates exactly 16, 25, or 36 tiles.
+finite and greater than zero. Each positive weight must advance the cumulative
+total at JavaScript number precision, so no token can have an unreachable
+interval. Selection uses cumulative weighted boundaries and generates exactly
+16, 25, or 36 tiles.
 
 An optional `acceptBoard` predicate supports a small quality gate. Generation
 uses an iterative, caller-bounded retry count from 1 through 1,000. If every
 candidate is rejected, it returns `NO_ACCEPTABLE_BOARD`; it cannot retry
-forever.
+forever. A predicate exception is a programmer error and propagates unchanged;
+the engine does not silently treat it as a rejected board.
 
 Stage 3 does not define a production letter distribution or a permanent board
 quality policy. Those require a documented, independently reviewable
