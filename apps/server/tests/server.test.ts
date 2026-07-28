@@ -25,6 +25,8 @@ import { createWordsServer, type WordsServer } from '../src/server.js';
 
 type TestClient = ClientSocket<ServerToClientEvents, ClientToServerEvents>;
 
+const socketEventTimeoutMs = 2_000;
+
 function emitCreateDisplay(
   client: TestClient,
   payload: CreateDisplayInput = {},
@@ -80,19 +82,72 @@ function nextRoomState(
   client: TestClient,
   predicate: (room: RoomState) => boolean,
 ): Promise<RoomState> {
-  return new Promise((resolve) => {
-    const listener = (room: RoomState) => {
-      if (predicate(room)) {
-        client.off('room:state', listener);
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      client.off('room:state', onRoomState);
+      client.off('room:error', onRoomError);
+      client.off('disconnect', onDisconnect);
+      clearTimeout(timeout);
+    };
+    const onRoomState = (room: RoomState) => {
+      let matches: boolean;
+      try {
+        matches = predicate(room);
+      } catch (error) {
+        cleanup();
+        reject(error);
+        return;
+      }
+
+      if (matches) {
+        cleanup();
         resolve(room);
       }
     };
-    client.on('room:state', listener);
+    const onRoomError = (error: RoomError) => {
+      cleanup();
+      reject(
+        new Error(`Room-state wait received ${error.code}: ${error.message}`),
+      );
+    };
+    const onDisconnect = () => {
+      cleanup();
+      reject(new Error('Socket disconnected while waiting for room state.'));
+    };
+
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Timed out waiting for the expected room state.'));
+    }, socketEventTimeoutMs);
+    client.on('room:state', onRoomState);
+    client.once('room:error', onRoomError);
+    client.once('disconnect', onDisconnect);
   });
 }
 
 function nextRoomError(client: TestClient): Promise<RoomError> {
-  return new Promise((resolve) => client.once('room:error', resolve));
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      client.off('room:error', onRoomError);
+      client.off('disconnect', onDisconnect);
+      clearTimeout(timeout);
+    };
+    const onRoomError = (error: RoomError) => {
+      cleanup();
+      resolve(error);
+    };
+    const onDisconnect = () => {
+      cleanup();
+      reject(new Error('Socket disconnected while waiting for a room error.'));
+    };
+
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Timed out waiting for the expected room error.'));
+    }, socketEventTimeoutMs);
+    client.once('room:error', onRoomError);
+    client.once('disconnect', onDisconnect);
+  });
 }
 
 describe('Words Stage 2.5 server', () => {
@@ -540,35 +595,61 @@ describe('Words Stage 2.5 server', () => {
       throw new Error('Player join failed in test setup.');
     }
 
-    const observedTransitions: RoomState[] = [];
-    const observeSuccession = (room: RoomState) => {
-      if (room.controllerPlayerId === secondJoined.session.playerId) {
-        observedTransitions.push(room);
-      }
-    };
-    second.on('room:state', observeSuccession);
+    const eligiblePlayers = thirdJoined.room.players
+      .filter((player) => player.id !== controllerJoined.session.playerId)
+      .sort(
+        (left, right) =>
+          Date.parse(left.joinedAt) - Date.parse(right.joinedAt) ||
+          left.id.localeCompare(right.id),
+      );
+    const expectedSuccessor = eligiblePlayers[0];
+    const unrelatedPlayer = eligiblePlayers[1];
+    if (!expectedSuccessor || !unrelatedPlayer) {
+      throw new Error('Successor setup failed in test.');
+    }
+
+    const roomStateListenersBefore = display.listeners('room:state').length;
     const successionUpdate = nextRoomState(
       display,
-      (room) => room.controllerPlayerId === secondJoined.session.playerId,
+      (room) =>
+        room.controllerStatus === 'assigned' &&
+        !room.players.some(
+          (player) => player.id === controllerJoined.session.playerId,
+        ),
     );
-    expect(await emitLeavePlayer(controller)).toEqual({ ok: true });
-    const updatedRoom = await successionUpdate;
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    second.off('room:state', observeSuccession);
+    expect(display.listeners('room:state')).toHaveLength(
+      roomStateListenersBefore + 1,
+    );
 
+    const leaveResponse = emitLeavePlayer(controller);
+    const [response, updatedRoom] = await Promise.all([
+      leaveResponse,
+      successionUpdate,
+    ]);
+
+    expect(response).toEqual({ ok: true });
+    expect(display.listeners('room:state')).toHaveLength(
+      roomStateListenersBefore,
+    );
     expect(updatedRoom.controllerStatus).toBe('assigned');
-    expect(updatedRoom.controllerPlayerId).toBe(secondJoined.session.playerId);
+    expect(updatedRoom.controllerPlayerId).toBe(expectedSuccessor.id);
+    expect(updatedRoom.players.filter((player) => player.isController)).toEqual(
+      [expect.objectContaining({ id: expectedSuccessor.id })],
+    );
     expect(
-      updatedRoom.players.find(
-        (player) => player.id === secondJoined.session.playerId,
+      updatedRoom.players.some(
+        (player) => player.id === controllerJoined.session.playerId,
       ),
+    ).toBe(false);
+    expect(
+      updatedRoom.players.find((player) => player.id === expectedSuccessor.id),
     ).toMatchObject({ connected: true, isController: true });
     expect(
-      updatedRoom.players.find(
-        (player) => player.id === thirdJoined.session.playerId,
-      ),
+      updatedRoom.players.find((player) => player.id === unrelatedPlayer.id),
     ).toMatchObject({ connected: true, isController: false });
-    expect(observedTransitions).toHaveLength(1);
+    expect(server.roomStore.getRoomState(created.room.code)).toEqual(
+      updatedRoom,
+    );
     expect(server.roomStore.roomCount).toBe(1);
   });
 

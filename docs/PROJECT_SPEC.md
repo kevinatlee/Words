@@ -40,7 +40,7 @@ Creating the room does not grant the display player membership or controller
 authority. The display never selects or approves a controller. Changing the
 controller must never change the display session.
 
-## Current scope: Stage 3 in review
+## Current scope: Stage 3 complete, Stage 3.1 CI in review
 
 Stage 2.5 is complete. It extends the secure, server-backed lobby with explicit
 game-host delegation and deterministic automatic succession:
@@ -82,6 +82,12 @@ Stage 3 adds a separate framework-independent `@words/game-engine` package:
 
 The package has no runtime dependencies and is not imported by the lobby,
 server, or client. Stage 3 does not add gameplay events or live round state.
+
+Stage 3.1 adds a read-only GitHub Actions workflow that independently repeats
+the locked dependency install, formatting, lint, type checking, tests, build,
+dependency audit, and repository-cleanliness check. It runs for pull requests
+to `main`, pushes to `main`, and manual dispatch. Hosted CI supplements local
+review and does not add application or deployment behavior.
 
 ## Stage 2.5 room model
 
@@ -191,13 +197,14 @@ Planned rules remain:
 Traditional scoring gives 1 point for 3–4 letters, 2 for 5, 3 for 6, 5 for 7,
 and 11 for 8 or more. These rules are documentation only in Stage 2.5.
 
-## Non-goals for Stage 3
+## Non-goals for Stages 3 and 3.1
 
-Stage 3 does not include touch tracing, a live board, production dictionary
-data, a default letter distribution, gameplay network events, room game state,
-scoring, duplicate handling, timers, synchronized rounds, scannable QR images,
-arbitrary or random controller election, persistence, production container
-packaging, image publishing, server installation, or tunnel configuration.
+Stages 3 and 3.1 do not include touch tracing, a live board, production
+dictionary data, a default letter distribution, gameplay network events, room
+game state, scoring, duplicate handling, timers, synchronized rounds, scannable
+QR images, arbitrary or random controller election, persistence, deployment
+automation, production container packaging, image publishing, server
+installation, or tunnel configuration.
 
 The product also has no database, Redis, accounts, external authentication,
 microservices, paid APIs, analytics, advertisements, payments, unlocks, or
@@ -226,13 +233,15 @@ details are future deployment work, not a claim about Stage 2.
    contracts, reconnection, expiration, and authorization tests.
 3. **Stage 2.5 — complete:** explicit controller delegation, deterministic
    reconnect-grace succession, role-specific controls, and race coverage.
-4. **Stage 3 — in review:** framework-independent board generation, path and
+4. **Stage 3 — complete:** framework-independent board generation, path and
    word validation for 4 × 4, 5 × 5, and 6 × 6 grids, plus a pinned,
    licence-reviewed dictionary recommendation.
-5. **Stage 4:** synchronized rounds, submissions, validation, scoring,
+5. **Stage 3.1 — in review:** read-only GitHub-hosted locked-install, quality,
+   test, build, audit, and repository-cleanliness checks.
+6. **Stage 4:** synchronized rounds, submissions, validation, scoring,
    duplicate handling, results, and round-aware reconnection.
-6. **Stage 5:** production hardening, one-container build, automated checks and
-   image publishing, server configuration, and tunnel documentation.
+7. **Stage 5:** production hardening, one-container build, image publishing,
+   server configuration, and tunnel documentation.
 
 Each stage should remain independently reviewable and must not imply that later
 stages are ready.

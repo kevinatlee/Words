@@ -1,10 +1,13 @@
 # Future deployment
 
-Production deployment is **not implemented in Stage 3**. The repository
-contains a working Node.js lobby server, health endpoint, and an isolated game
-engine, but it does not contain production packaging, a published image,
-server configuration, tunnel configuration, or production static-file
-serving.
+Production deployment is **not implemented through Stage 3.1**. The repository
+contains a working Node.js lobby server, health endpoint, an isolated game
+engine, and read-only CI checks, but it does not contain production packaging,
+a deployment workflow, a published image, server configuration, tunnel
+configuration, or production static-file serving.
+
+The Stage 3.1 CI workflow verifies source and dependencies only. It has no write
+permission and cannot publish, release, or deploy anything.
 
 ## Implemented runtime values
 
@@ -95,7 +98,7 @@ database, Redis, or reverse-proxy container is currently planned.
 - create a multi-stage Dockerfile and non-root runtime user
 - add an image-level health check for `/api/health`
 - decide and document graceful shutdown behavior
-- add GitHub Actions checks and image publishing
+- add a separately reviewed image-publishing workflow
 - define GHCR permissions, tags, and update policy
 - create and test an Unraid template
 - verify Cloudflare Tunnel WebSocket behavior and production origin checks
