@@ -161,6 +161,97 @@ describe('Words Stage 2.5 server', () => {
     expect(response.session).not.toHaveProperty('playerId');
   });
 
+  it('keeps two display browser profiles and their players isolated through reconnects', async () => {
+    const firstDisplay = await connectClient();
+    const firstCreated = await emitCreateDisplay(firstDisplay);
+    const secondDisplay = await connectClient();
+    const secondCreated = await emitCreateDisplay(secondDisplay);
+    if (!firstCreated.ok || !secondCreated.ok) {
+      throw new Error('Display creation failed in test setup.');
+    }
+
+    expect(firstCreated.room.code).not.toBe(secondCreated.room.code);
+    expect(firstCreated.session.displaySessionId).not.toBe(
+      secondCreated.session.displaySessionId,
+    );
+    expect(firstCreated.session.displayReconnectToken).not.toBe(
+      secondCreated.session.displayReconnectToken,
+    );
+
+    const firstPlayer = await connectClient();
+    const joinedFirstRoom = await emitJoinPlayer(firstPlayer, {
+      roomCode: firstCreated.room.code,
+      displayName: 'Silver Owl',
+    });
+    expect(joinedFirstRoom).toMatchObject({ ok: true });
+    expect(
+      server.roomStore.getRoomState(firstCreated.room.code)?.players,
+    ).toHaveLength(1);
+    expect(
+      server.roomStore.getRoomState(secondCreated.room.code)?.players,
+    ).toHaveLength(0);
+
+    firstDisplay.disconnect();
+    expect(
+      server.roomStore.getRoomState(secondCreated.room.code),
+    ).toMatchObject({
+      display: { connected: true },
+      players: [],
+    });
+
+    const refreshedFirstDisplay = await connectClient();
+    const firstReconnected = await emitReconnectDisplay(refreshedFirstDisplay, {
+      roomCode: firstCreated.room.code,
+      displayReconnectToken: firstCreated.session.displayReconnectToken,
+    });
+    expect(firstReconnected).toMatchObject({
+      ok: true,
+      room: {
+        code: firstCreated.room.code,
+        players: [expect.objectContaining({ displayName: 'Silver Owl' })],
+      },
+      session: {
+        displaySessionId: firstCreated.session.displaySessionId,
+      },
+    });
+    expect(
+      server.roomStore.getRoomState(secondCreated.room.code),
+    ).toMatchObject({
+      display: { connected: true },
+      players: [],
+    });
+
+    secondDisplay.disconnect();
+    expect(server.roomStore.getRoomState(firstCreated.room.code)).toMatchObject(
+      {
+        display: { connected: true },
+        players: [expect.objectContaining({ displayName: 'Silver Owl' })],
+      },
+    );
+
+    const refreshedSecondDisplay = await connectClient();
+    const secondReconnected = await emitReconnectDisplay(
+      refreshedSecondDisplay,
+      {
+        roomCode: secondCreated.room.code,
+        displayReconnectToken: secondCreated.session.displayReconnectToken,
+      },
+    );
+    expect(secondReconnected).toMatchObject({
+      ok: true,
+      room: {
+        code: secondCreated.room.code,
+        players: [],
+      },
+      session: {
+        displaySessionId: secondCreated.session.displaySessionId,
+      },
+    });
+    expect(
+      server.roomStore.getRoomState(firstCreated.room.code)?.players,
+    ).toHaveLength(1);
+  });
+
   it('rejects client attempts to self-assign controller authority', async () => {
     const display = await connectClient();
     const created = await emitCreateDisplay(display);

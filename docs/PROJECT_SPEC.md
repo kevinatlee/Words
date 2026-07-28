@@ -45,7 +45,8 @@ controller must never change the display session.
 Stage 2.5 extends the secure, server-backed lobby with explicit game-host
 delegation and deterministic automatic succession:
 
-- a display creates a temporary room without a display name
+- opening `/` reconnects that browser profile’s display or creates one
+  temporary room without a display name or button press
 - the server generates a six-character room code and display credential
 - zero to eight phone players join by code and display name
 - the first joining player becomes `controllerPlayerId`
@@ -60,11 +61,11 @@ delegation and deterministic automatic succession:
 - display or controller disconnect does not immediately close the room
 - an Express health endpoint reports server availability
 
-The client routes are `/`, `/display`, `/join`, `/room/:roomCode`, and the
-retained static preview at `/play/demo`. `/host` remains only as a legacy alias
-for `/display`. The Node server listens on port `6532` by default. During
-development Vite listens on `5173` and proxies API and Socket.IO traffic to the
-Node server.
+The client routes are `/`, `/join`, `/join/:roomCode`, `/room/:roomCode`, and
+the retained static preview at `/play/demo`. `/display` and `/host` are
+compatibility aliases for the automatic root display flow. The Node server
+listens on port `6532` by default. During development Vite listens on `5173` and
+proxies API and Socket.IO traffic to the Node server.
 
 ## Stage 2.5 room model
 
@@ -140,8 +141,15 @@ The server issues random, server-owned credentials in distinct shapes:
 - `playerId` and `playerReconnectToken`
 
 The browser keeps the credential in a role-specific local-storage entry and a
-per-tab session pointer in session storage. Refreshing reconnects the existing
-role instead of creating another player or changing roles.
+per-tab session pointer in session storage. A token-free, profile-local display
+pointer lets `/` discover its own stored display credential. Root startup always
+tries that reconnect first; only a missing, expired, or invalid credential
+causes exactly one replacement room to be created. Refreshing therefore
+reconnects the existing role instead of duplicating rooms, players, or sockets.
+
+The display shows an exact `/join/<CODE>` URL built from the current browser
+origin, which naturally becomes `https://words.atlee.io/join/<CODE>` at the
+intended public origin. The code is normalized before the link is built.
 
 Each successful reconnect rotates the credential. Tokens are scoped to one
 role and room, do not appear in URLs or logs, and become unusable after the
@@ -170,7 +178,7 @@ and 11 for 8 or more. These rules are documentation only in Stage 2.5.
 ## Non-goals for Stage 2.5
 
 Stage 2.5 does not include board generation, touch tracing, dictionaries, word
-validation, scoring, timers, synchronized rounds, QR codes, arbitrary or random
+validation, scoring, timers, synchronized rounds, scannable QR images, arbitrary or random
 controller election, persistence, production container packaging, image
 publishing, server installation, or tunnel configuration.
 

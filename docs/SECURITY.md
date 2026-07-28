@@ -108,6 +108,13 @@ session, but it is accessible to JavaScript on the same origin. A future
 cross-site scripting flaw could expose it, so dependencies, text rendering, and
 future HTML features still require review.
 
+The automatic root display flow stores a separate profile-local pointer
+containing only the display role, room code, and display session ID. It never
+contains the reconnect token. Root startup validates the referenced
+role-specific credential and reconnects it before creating a room. Invalid
+display state clears only that display credential; it cannot consume a player
+credential or affect another browser profile’s room.
+
 ## Disconnect and controller behavior
 
 Disconnect is presence loss, not room ownership loss:

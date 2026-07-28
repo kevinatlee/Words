@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 
 import {
+  buildJoinUrl,
   type ConnectionStatus,
   type GridSize,
   type RoomError,
@@ -15,6 +16,14 @@ import { LetterGrid } from './LetterGrid';
 import { PlayerList } from './PlayerList';
 import { PrototypeNotice } from './PrototypeNotice';
 import { RoomCode } from './RoomCode';
+
+const placeholderCells = Array.from(
+  { length: 49 },
+  (_, index) =>
+    index % 3 === 0 ||
+    index % 7 === 0 ||
+    (index > 8 && index < 20 && index % 2 === 0),
+);
 
 type RoomLobbyProps = {
   room: RoomState;
@@ -45,6 +54,7 @@ export function RoomLobby({
   );
   const letters = useMemo(() => createDemoBoard(gridSize), [gridSize]);
   const isDisplay = sessionRole === 'display';
+  const joinUrl = buildJoinUrl(window.location.origin, room.code);
 
   const heading = isDisplay
     ? 'Shared display is ready.'
@@ -78,13 +88,15 @@ export function RoomLobby({
               ? 'Reconnecting…'
               : 'Disconnected'}
         </span>
-        <button
-          className="text-button"
-          type="button"
-          onClick={() => void onLeave()}
-        >
-          Leave room
-        </button>
+        {!isDisplay && (
+          <button
+            className="text-button"
+            type="button"
+            onClick={() => void onLeave()}
+          >
+            Leave room
+          </button>
+        )}
       </div>
 
       <PrototypeNotice>
@@ -109,10 +121,35 @@ export function RoomLobby({
               </span>
             </div>
             <p>
-              Players open the join page and enter {room.code}. QR joining comes
-              in a later stage.
+              Players can open{' '}
+              <a className="join-url" href={joinUrl}>
+                {joinUrl}
+              </a>{' '}
+              to join this room.
             </p>
           </section>
+          {isDisplay && (
+            <section
+              className="qr-placeholder"
+              aria-label="QR code placeholder"
+            >
+              <span className="qr-placeholder__pattern" aria-hidden="true">
+                {placeholderCells.map((filled, index) => (
+                  <span
+                    className={
+                      filled ? 'qr-placeholder__cell--filled' : undefined
+                    }
+                    key={index}
+                  />
+                ))}
+              </span>
+              <strong>Scan-to-join area</strong>
+              <small>
+                The exact join link is ready. A scannable QR image is deferred
+                to the next UI stage.
+              </small>
+            </section>
+          )}
           <PlayerList
             players={room.players}
             maxPlayers={room.maxPlayers}
@@ -129,6 +166,7 @@ export function RoomLobby({
           <GameSettingsPrototype
             gridSize={gridSize}
             duration={duration}
+            disabled={isDisplay}
             onGridSizeChange={setGridSize}
             onDurationChange={setDuration}
           />

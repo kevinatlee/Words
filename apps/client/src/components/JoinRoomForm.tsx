@@ -6,11 +6,13 @@ import { LobbyError } from './LobbyError';
 
 type JoinRoomFormProps = {
   initialRoomCode?: string;
+  roomCodeLocked?: boolean;
   onJoin: (roomCode: string, displayName: string) => Promise<RoomError | null>;
 };
 
 export function JoinRoomForm({
   initialRoomCode = '',
+  roomCodeLocked = false,
   onJoin,
 }: JoinRoomFormProps) {
   const [roomCode, setRoomCode] = useState(initialRoomCode);
@@ -50,6 +52,7 @@ export function JoinRoomForm({
           value={roomCode}
           onChange={(event) => setRoomCode(event.target.value)}
           placeholder="ABC234"
+          readOnly={roomCodeLocked}
           required
         />
 

@@ -3,6 +3,80 @@
 Future meaningful work must add a new chronological entry. Record what changed,
 why, what remains open, and the exact verification results.
 
+## 2026-07-28 — Stage 2.5 automatic display entry and room isolation
+
+### Critical product-flow finding
+
+The Stage 2.5 client still treated `/` as a role-selection page and required a
+person at the shared screen to open `/display` and press a creation button. That
+contradicted the passive-display model and made the normal TV flow depend on
+unnecessary display interaction.
+
+### Work completed
+
+- Made `/` the canonical display route. It reconnects the browser profile’s
+  valid display credential first and otherwise creates exactly one temporary
+  room automatically.
+- Added a token-free profile-local display pointer. Stale or expired display
+  state clears only the matching role credential before one replacement room is
+  created; genuine server failures show a manual retry.
+- Guarded root startup against Strict Mode effect repetition and stale-socket
+  replacement loops.
+- Changed `/display` and `/host` into compatibility aliases for `/`.
+- Added `/join/:roomCode` with a normalized, locked room code while retaining
+  `/join` as the manual-code fallback.
+- Added a shared join-URL helper that uses the current origin locally and
+  produces `https://words.atlee.io/join/<CODE>` at the configured public origin.
+- Kept the display passive by removing creation, role-selection, leave, and
+  local settings interactions. `Start Round` remains disabled.
+- Added the exact join URL and a clearly labeled placeholder for a future
+  scannable QR image without introducing a production dependency.
+- Updated the README, product specification, architecture, security notes, and
+  pull-request description.
+
+### Isolation and regression coverage
+
+- root automatic creation and reconnect-first behavior
+- invalid credential fallback and genuine-failure retry
+- Strict Mode duplicate-effect protection
+- `/display` and `/host` compatibility aliases
+- room-specific and manual player join routes
+- normalized local and production join URLs
+- passive display controls and deferred QR area
+- profile-local display storage and refresh recovery
+- two server-backed display rooms with distinct codes, session IDs, and tokens
+- player membership isolation across rooms
+- independent display disconnect and reconnect behavior
+- existing controller transfer and automatic succession coverage
+
+### Verification
+
+- `npm run format:check` — passed; all matched files use Prettier formatting
+- `npm run lint` — passed with no warnings or errors
+- `npm run typecheck` — passed for client, server, and shared workspaces
+- `npm test` — passed; 114 tests across 9 files:
+  - client: 35 tests across 3 files
+  - server: 59 tests across 3 files
+  - shared: 20 tests across 3 files
+- `npm run build` — passed; Vite transformed 158 modules and the server build
+  boundary passed strict TypeScript
+- `npm audit --audit-level=high` — passed; 0 vulnerabilities
+- Manual two-context isolation check — passed using storage-isolated
+  `localhost` and `127.0.0.1` browser origins
+- Automatic root entry — passed; each context created a room without a
+  role-selection or creation control, using distinct codes `73Y62C` and
+  `MWDULJ`
+- Player isolation — passed; `Silver Owl` appeared only in `73Y62C`, while
+  `MWDULJ` remained at zero players
+- Refresh isolation — passed; both displays returned to their original room
+  code and retained their own player state
+- Independent lifecycle — passed; closing and reopening the first display
+  restored `73Y62C` without changing the connected `MWDULJ` display
+- Succession regression — passed; after a second player joined `73Y62C`, the
+  controller explicitly left and `Amber Kite` became Game Host automatically
+- Browser console check — passed with no warnings or errors in either display
+  or player context
+
 ## 2026-07-27 — Stage 2.5 passive-display succession correction
 
 ### Critical review finding

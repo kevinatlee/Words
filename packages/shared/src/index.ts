@@ -5,6 +5,7 @@ export {
   type ScoringMode,
 } from './config';
 export { formatRoundDuration } from './duration';
+export { buildJoinUrl } from './join-url';
 export {
   createDisplayInputSchema,
   controllerActionResponseSchema,

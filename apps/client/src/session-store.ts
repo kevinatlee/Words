@@ -26,10 +26,18 @@ export type StoredLobbySession = StoredDisplaySession | StoredPlayerSession;
 export type LobbySessionStore = {
   save: (session: StoredLobbySession) => void;
   load: (roomCode: string) => StoredLobbySession | null;
+  loadDisplay: () => StoredDisplaySession | null;
   clear: (session: StoredLobbySession | null) => void;
 };
 
 const activeSessionKey = 'words:active-lobby-session';
+const activeDisplayKey = 'words:active-display-session';
+
+type StoredSessionPointer = {
+  role: StoredLobbySession['role'];
+  roomCode: string;
+  sessionId: string;
+};
 
 function sessionId(session: StoredLobbySession): string {
   return session.role === 'display'
@@ -60,6 +68,107 @@ function storedCredentialMatchesSession(
   }
 }
 
+function parsePointer(pointerText: string | null): StoredSessionPointer | null {
+  if (!pointerText) {
+    return null;
+  }
+
+  try {
+    const pointer = JSON.parse(pointerText) as {
+      role?: unknown;
+      roomCode?: unknown;
+      sessionId?: unknown;
+    };
+
+    if (
+      (pointer.role !== 'display' && pointer.role !== 'player') ||
+      typeof pointer.roomCode !== 'string' ||
+      typeof pointer.sessionId !== 'string'
+    ) {
+      return null;
+    }
+
+    return {
+      role: pointer.role,
+      roomCode: pointer.roomCode,
+      sessionId: pointer.sessionId,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function loadFromPointer(
+  localStorage: Storage,
+  pointer: StoredSessionPointer,
+): StoredLobbySession | null {
+  try {
+    const credentialsText = localStorage.getItem(
+      reconnectStorageKey(pointer.role, pointer.roomCode, pointer.sessionId),
+    );
+    if (!credentialsText) {
+      return null;
+    }
+
+    const credentials = JSON.parse(credentialsText) as Record<string, unknown>;
+
+    if (pointer.role === 'display') {
+      const reconnect = reconnectDisplayInputSchema.safeParse({
+        roomCode: pointer.roomCode,
+        displayReconnectToken: credentials.displayReconnectToken,
+      });
+      const session = displaySessionCredentialsSchema.safeParse({
+        displaySessionId: pointer.sessionId,
+        displayReconnectToken: credentials.displayReconnectToken,
+      });
+
+      if (!reconnect.success || !session.success) {
+        return null;
+      }
+
+      return {
+        role: 'display',
+        roomCode: reconnect.data.roomCode,
+        ...session.data,
+      };
+    }
+
+    const reconnect = reconnectPlayerInputSchema.safeParse({
+      roomCode: pointer.roomCode,
+      playerReconnectToken: credentials.playerReconnectToken,
+    });
+    const session = playerSessionCredentialsSchema.safeParse({
+      playerId: pointer.sessionId,
+      playerReconnectToken: credentials.playerReconnectToken,
+    });
+    const displayName = displayNameSchema.safeParse(credentials.displayName);
+
+    if (!reconnect.success || !session.success || !displayName.success) {
+      return null;
+    }
+
+    return {
+      role: 'player',
+      roomCode: reconnect.data.roomCode,
+      ...session.data,
+      displayName: displayName.data,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function pointerMatchesSession(
+  pointer: StoredSessionPointer | null,
+  session: StoredLobbySession,
+): boolean {
+  return (
+    pointer?.role === session.role &&
+    pointer.roomCode === session.roomCode &&
+    pointer.sessionId === sessionId(session)
+  );
+}
+
 export function createLobbySessionStore(
   localStorage: Storage,
   sessionStorage: Storage,
@@ -81,6 +190,16 @@ export function createLobbySessionStore(
         reconnectStorageKey(session.role, session.roomCode, id),
         JSON.stringify(credentials),
       );
+      if (session.role === 'display') {
+        localStorage.setItem(
+          activeDisplayKey,
+          JSON.stringify({
+            role: session.role,
+            roomCode: session.roomCode,
+            sessionId: id,
+          }),
+        );
+      }
       sessionStorage.setItem(
         activeSessionKey,
         JSON.stringify({
@@ -91,85 +210,31 @@ export function createLobbySessionStore(
       );
     },
     load: (roomCode) => {
-      try {
-        const pointerText = sessionStorage.getItem(activeSessionKey);
-        if (!pointerText) {
-          return null;
-        }
-
-        const pointer = JSON.parse(pointerText) as {
-          role?: unknown;
-          roomCode?: unknown;
-          sessionId?: unknown;
-        };
-        if (
-          pointer.roomCode !== roomCode ||
-          (pointer.role !== 'display' && pointer.role !== 'player') ||
-          typeof pointer.sessionId !== 'string'
-        ) {
-          return null;
-        }
-
-        const credentialsText = localStorage.getItem(
-          reconnectStorageKey(pointer.role, roomCode, pointer.sessionId),
-        );
-        if (!credentialsText) {
-          return null;
-        }
-
-        const credentials = JSON.parse(credentialsText) as Record<
-          string,
-          unknown
-        >;
-
-        if (pointer.role === 'display') {
-          const reconnect = reconnectDisplayInputSchema.safeParse({
-            roomCode,
-            displayReconnectToken: credentials.displayReconnectToken,
-          });
-          const session = displaySessionCredentialsSchema.safeParse({
-            displaySessionId: pointer.sessionId,
-            displayReconnectToken: credentials.displayReconnectToken,
-          });
-
-          if (!reconnect.success || !session.success) {
-            return null;
-          }
-
-          return {
-            role: 'display',
-            roomCode: reconnect.data.roomCode,
-            ...session.data,
-          };
-        }
-
-        const reconnect = reconnectPlayerInputSchema.safeParse({
-          roomCode,
-          playerReconnectToken: credentials.playerReconnectToken,
-        });
-        const session = playerSessionCredentialsSchema.safeParse({
-          playerId: pointer.sessionId,
-          playerReconnectToken: credentials.playerReconnectToken,
-        });
-        const displayName = displayNameSchema.safeParse(
-          credentials.displayName,
-        );
-
-        if (!reconnect.success || !session.success || !displayName.success) {
-          return null;
-        }
-
-        return {
-          role: 'player',
-          roomCode: reconnect.data.roomCode,
-          ...session.data,
-          displayName: displayName.data,
-        };
-      } catch {
+      const pointer = parsePointer(sessionStorage.getItem(activeSessionKey));
+      if (!pointer || pointer.roomCode !== roomCode) {
         return null;
       }
+
+      return loadFromPointer(localStorage, pointer);
+    },
+    loadDisplay: () => {
+      const pointer = parsePointer(localStorage.getItem(activeDisplayKey));
+      if (!pointer || pointer.role !== 'display') {
+        localStorage.removeItem(activeDisplayKey);
+        return null;
+      }
+
+      const storedSession = loadFromPointer(localStorage, pointer);
+      if (storedSession?.role !== 'display') {
+        localStorage.removeItem(activeDisplayKey);
+        return null;
+      }
+
+      return storedSession;
     },
     clear: (session) => {
+      let removedCredential = false;
+
       if (session) {
         const credentialKey = reconnectStorageKey(
           session.role,
@@ -183,6 +248,18 @@ export function createLobbySessionStore(
           storedCredentialMatchesSession(credentialText, session)
         ) {
           localStorage.removeItem(credentialKey);
+          removedCredential = true;
+        }
+
+        if (
+          session.role === 'display' &&
+          removedCredential &&
+          pointerMatchesSession(
+            parsePointer(localStorage.getItem(activeDisplayKey)),
+            session,
+          )
+        ) {
+          localStorage.removeItem(activeDisplayKey);
         }
       }
       sessionStorage.removeItem(activeSessionKey);

@@ -1204,6 +1204,17 @@ button:disabled {
   line-height: 1.6;
 }
 
+.join-url {
+  color: var(--mint);
+  overflow-wrap: anywhere;
+  text-underline-offset: 0.2rem;
+}
+
+.loading-lobby .button {
+  width: fit-content;
+  margin-top: 1.25rem;
+}
+
 .loading-lobby {
   display: grid;
   min-height: 60vh;

@@ -13,10 +13,12 @@ locally; gameplay and production deployment do not.
 
 ## What works today
 
-- A TV or shared screen can create a display session at `/display`.
+- Opening `/` on a TV or shared screen automatically reconnects its existing
+  display session or creates one temporary room.
 - The display receives a server-generated room code and is never counted as a
   player.
-- Zero to eight phone players can join by six-character room code at `/join`.
+- Zero to eight phone players can join through the room-specific
+  `/join/:roomCode` link or enter a six-character code manually at `/join`.
 - The first player becomes the server-assigned controller; later players join
   without gaining controller authority.
 - The connected game host can explicitly transfer authority to another
@@ -35,7 +37,7 @@ locally; gameplay and production deployment do not.
 ## What is not implemented
 
 Stage 2.5 does not implement gameplay, board generation, touch tracing,
-dictionaries, word validation, scoring, timers, round starts, QR codes,
+dictionaries, word validation, scoring, timers, round starts, scannable QR codes,
 arbitrary or random controller election, persistence, container packaging,
 image publishing, server installation, or tunnel configuration.
 
@@ -101,26 +103,30 @@ Vite proxies `/api` and `/socket.io` to the Node server.
 
 Try the lobby:
 
-1. Open `http://localhost:5173/display` on the shared-screen tab and create a
-   room.
-2. Open `http://localhost:5173/join` in a phone-sized tab or another device.
-3. Enter the room code and a temporary display name. This first player becomes
-   the controller.
+1. Open `http://localhost:5173/` on the shared-screen browser. The room appears
+   automatically without a role-selection or creation step.
+2. Open the displayed `/join/:roomCode` link in a phone-sized tab or another
+   device. `/join` remains available for manually entering a code.
+3. Enter a temporary display name. This first player becomes the controller.
 4. Join from another phone tab and watch the shared display update.
 5. On the controller phone, transfer Game Host authority to the second player.
 6. Disconnect the new controller and confirm the room remains visible during
    reconnect grace. After grace expires, confirm the server automatically
    promotes the earliest-joined connected player without display action.
+7. As an isolation check, open `/` in a second browser profile. Confirm it gets a
+   different code, remains empty when players join the first room, and refreshes
+   back into only its own room.
 
 Stop both processes with `Control+C`.
 
 ## Routes and API
 
-- `/` — choose the shared display or phone-player flow
-- `/display` — create a display session and temporary room
-- `/host` — legacy alias for `/display`
+- `/` — automatically reconnect or create the passive shared display
+- `/display` — compatibility alias for `/`
+- `/host` — legacy compatibility alias for `/`
 - `/join` — join as a phone player by room code
-- `/room/:roomCode` — live lobby or role-specific reconnect flow
+- `/join/:roomCode` — room-specific phone join form with the code prefilled
+- `/room/:roomCode` — live player lobby or player reconnect flow
 - `/play/demo` — retained static Stage 1 round preview
 - `GET http://localhost:6532/api/health` — server health
 
@@ -171,7 +177,10 @@ React renders it as text.
 The server issues different credential shapes for display and player sessions.
 Each successful reconnect rotates the applicable token. Credentials are stored
 under role-specific local-storage keys, are absent from URLs and logs, and
-cannot be used to reconnect as the other role.
+cannot be used to reconnect as the other role. Each browser profile also keeps a
+token-free pointer to its active display credential so `/` can reconnect that
+display before creating a replacement. Separate browser profiles therefore
+create and retain separate rooms.
 
 A disconnect marks that display or player offline and starts a 60-second grace
 period. It does not immediately close the room:

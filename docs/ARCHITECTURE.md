@@ -131,19 +131,26 @@ either token.
 ## Display creation flow
 
 ```text
-display:create {}
-  -> per-socket request limit
-  -> strict empty-object validation
-  -> allocate server room code
-  -> create display session and credential
-  -> controllerPlayerId = null
-  -> players = []
-  -> bind socket as role: display
-  -> acknowledge room + display credential
+browser opens /
+  -> load profile-local active display pointer
+  -> if credential exists: display:reconnect
+     -> success rotates credential and restores the same room
+     -> invalid/expired/missing room clears only that stale credential
+  -> if no usable credential: display:create {}
+     -> per-socket request limit
+     -> strict empty-object validation
+     -> allocate server room code
+     -> create display session and credential
+     -> controllerPlayerId = null
+     -> players = []
+     -> bind socket as role: display
+     -> acknowledge room + display credential
 ```
 
 Room creation accepts no name, room code, player ID, or role field. The display
-is never inserted into the player map.
+is never inserted into the player map. One guarded startup attempt prevents
+React development checks or rerenders from creating duplicate rooms. Genuine
+server or transport failures show an explicit retry instead of looping.
 
 ## Player join flow
 
@@ -234,12 +241,20 @@ words:reconnect:player:<roomCode>:<playerId>
 ```
 
 The current tab stores a role, room code, and session-ID pointer in session
-storage. This lets tabs on one origin represent different players or the
-display without overwriting the active identity for another tab.
+storage. The browser profile also stores
+`words:active-display-session`, a token-free pointer to the display credential
+that belongs to that profile. This lets `/` find and reconnect its display while
+separate browser profiles continue to own separate display rooms.
 
-On `/room/:code`, the client validates the stored credential shape and calls
-only the matching reconnect event. A successful reconnect rotates and replaces
+On `/`, the client validates the display pointer and calls only
+`display:reconnect`. On `/room/:code`, it validates the per-tab player pointer
+and calls only `player:reconnect`. A successful reconnect rotates and replaces
 that role’s token.
+
+The display’s join link is built centrally as `/join/<normalizedCode>` using
+the current browser origin. `/join/:roomCode` locks the prefilled code while
+`/join` remains the manual-entry fallback. `/display` and `/host` canonicalize
+to `/`.
 
 If a valid token is presented while the previous socket still exists—for
 example, during a fast refresh—the new socket replaces the old socket binding.
