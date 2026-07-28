@@ -1,13 +1,27 @@
 import {
-  reconnectRoomInputSchema,
-  sessionCredentialsSchema,
-  type SessionCredentials,
+  displayNameSchema,
+  displaySessionCredentialsSchema,
+  playerSessionCredentialsSchema,
+  reconnectDisplayInputSchema,
+  reconnectPlayerInputSchema,
 } from '@words/shared';
 
-export type StoredLobbySession = SessionCredentials & {
+export type StoredDisplaySession = {
+  role: 'display';
   roomCode: string;
+  displaySessionId: string;
+  displayReconnectToken: string;
+};
+
+export type StoredPlayerSession = {
+  role: 'player';
+  roomCode: string;
+  playerId: string;
+  playerReconnectToken: string;
   displayName: string;
 };
+
+export type StoredLobbySession = StoredDisplaySession | StoredPlayerSession;
 
 export type LobbySessionStore = {
   save: (session: StoredLobbySession) => void;
@@ -17,8 +31,18 @@ export type LobbySessionStore = {
 
 const activeSessionKey = 'words:active-lobby-session';
 
-function reconnectStorageKey(roomCode: string, playerId: string): string {
-  return `words:reconnect:${roomCode}:${playerId}`;
+function sessionId(session: StoredLobbySession): string {
+  return session.role === 'display'
+    ? session.displaySessionId
+    : session.playerId;
+}
+
+function reconnectStorageKey(
+  role: StoredLobbySession['role'],
+  roomCode: string,
+  id: string,
+): string {
+  return `words:reconnect:${role}:${roomCode}:${id}`;
 }
 
 export function createLobbySessionStore(
@@ -27,18 +51,27 @@ export function createLobbySessionStore(
 ): LobbySessionStore {
   return {
     save: (session) => {
+      const id = sessionId(session);
+      const credentials =
+        session.role === 'display'
+          ? {
+              displayReconnectToken: session.displayReconnectToken,
+            }
+          : {
+              playerReconnectToken: session.playerReconnectToken,
+              displayName: session.displayName,
+            };
+
       localStorage.setItem(
-        reconnectStorageKey(session.roomCode, session.playerId),
-        JSON.stringify({
-          reconnectToken: session.reconnectToken,
-          displayName: session.displayName,
-        }),
+        reconnectStorageKey(session.role, session.roomCode, id),
+        JSON.stringify(credentials),
       );
       sessionStorage.setItem(
         activeSessionKey,
         JSON.stringify({
+          role: session.role,
           roomCode: session.roomCode,
-          playerId: session.playerId,
+          sessionId: id,
         }),
       );
     },
@@ -50,49 +83,72 @@ export function createLobbySessionStore(
         }
 
         const pointer = JSON.parse(pointerText) as {
+          role?: unknown;
           roomCode?: unknown;
-          playerId?: unknown;
+          sessionId?: unknown;
         };
         if (
           pointer.roomCode !== roomCode ||
-          typeof pointer.playerId !== 'string'
+          (pointer.role !== 'display' && pointer.role !== 'player') ||
+          typeof pointer.sessionId !== 'string'
         ) {
           return null;
         }
 
         const credentialsText = localStorage.getItem(
-          reconnectStorageKey(roomCode, pointer.playerId),
+          reconnectStorageKey(pointer.role, roomCode, pointer.sessionId),
         );
         if (!credentialsText) {
           return null;
         }
 
-        const credentials = JSON.parse(credentialsText) as {
-          reconnectToken?: unknown;
-          displayName?: unknown;
-        };
-        const parsedReconnect = reconnectRoomInputSchema.safeParse({
-          roomCode,
-          reconnectToken: credentials.reconnectToken,
-        });
-        const parsedSession = sessionCredentialsSchema.safeParse({
-          playerId: pointer.playerId,
-          reconnectToken: credentials.reconnectToken,
-        });
+        const credentials = JSON.parse(credentialsText) as Record<
+          string,
+          unknown
+        >;
 
-        if (
-          !parsedReconnect.success ||
-          !parsedSession.success ||
-          typeof credentials.displayName !== 'string'
-        ) {
+        if (pointer.role === 'display') {
+          const reconnect = reconnectDisplayInputSchema.safeParse({
+            roomCode,
+            displayReconnectToken: credentials.displayReconnectToken,
+          });
+          const session = displaySessionCredentialsSchema.safeParse({
+            displaySessionId: pointer.sessionId,
+            displayReconnectToken: credentials.displayReconnectToken,
+          });
+
+          if (!reconnect.success || !session.success) {
+            return null;
+          }
+
+          return {
+            role: 'display',
+            roomCode: reconnect.data.roomCode,
+            ...session.data,
+          };
+        }
+
+        const reconnect = reconnectPlayerInputSchema.safeParse({
+          roomCode,
+          playerReconnectToken: credentials.playerReconnectToken,
+        });
+        const session = playerSessionCredentialsSchema.safeParse({
+          playerId: pointer.sessionId,
+          playerReconnectToken: credentials.playerReconnectToken,
+        });
+        const displayName = displayNameSchema.safeParse(
+          credentials.displayName,
+        );
+
+        if (!reconnect.success || !session.success || !displayName.success) {
           return null;
         }
 
         return {
-          roomCode: parsedReconnect.data.roomCode,
-          playerId: parsedSession.data.playerId,
-          reconnectToken: parsedSession.data.reconnectToken,
-          displayName: credentials.displayName,
+          role: 'player',
+          roomCode: reconnect.data.roomCode,
+          ...session.data,
+          displayName: displayName.data,
         };
       } catch {
         return null;
@@ -101,7 +157,11 @@ export function createLobbySessionStore(
     clear: (session) => {
       if (session) {
         localStorage.removeItem(
-          reconnectStorageKey(session.roomCode, session.playerId),
+          reconnectStorageKey(
+            session.role,
+            session.roomCode,
+            sessionId(session),
+          ),
         );
       }
       sessionStorage.removeItem(activeSessionKey);

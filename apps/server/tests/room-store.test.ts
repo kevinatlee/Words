@@ -18,6 +18,7 @@ function createStore(
 ) {
   const codes = options.codes ?? ['ABC234'];
   let codeIndex = 0;
+  let displayIndex = 100;
   let playerIndex = 0;
   let tokenIndex = 0;
 
@@ -29,6 +30,7 @@ function createStore(
     ...(options.now ? { now: options.now } : {}),
     roomCodeGenerator: () =>
       codes[Math.min(codeIndex++, codes.length - 1)] ?? 'XYZ789',
+    displaySessionIdGenerator: () => createUuid(++displayIndex),
     playerIdGenerator: () => createUuid(++playerIndex),
     reconnectTokenGenerator: () =>
       `${String(++tokenIndex).padStart(3, '0')}${'t'.repeat(40)}`,
@@ -48,20 +50,20 @@ function expectRoomError(
   }
 }
 
-describe('RoomStore', () => {
-  it('creates a LOBBY room and assigns the creator as host', () => {
+describe('RoomStore display and player sessions', () => {
+  it('creates a LOBBY room with one display session and no player', () => {
     const store = createStore();
-    const result = store.createRoom('Game Host', 'socket-host');
+    const result = store.createDisplay('socket-display');
 
     expect(result.room.code).toBe('ABC234');
     expect(result.room.phase).toBe('LOBBY');
-    expect(result.room.players).toHaveLength(1);
-    expect(result.room.players[0]).toMatchObject({
-      id: result.session.playerId,
-      displayName: 'Game Host',
-      connected: true,
-      isHost: true,
-    });
+    expect(result.room.display).toMatchObject({ connected: true });
+    expect(result.room.players).toHaveLength(0);
+    expect(result.room.controllerPlayerId).toBeNull();
+    expect(result.session.displaySessionId).toMatch(
+      /^00000000-0000-4000-8000-/,
+    );
+    expect(result.session.displayReconnectToken).toHaveLength(43);
     expect(result.room.settings).toEqual({
       gridSize: 4,
       roundDurationSeconds: 180,
@@ -76,12 +78,8 @@ describe('RoomStore', () => {
       codes: ['ABC234', 'ABC234', 'DEF567'],
     });
 
-    expect(store.createRoom('Game Host', 'socket-one').room.code).toBe(
-      'ABC234',
-    );
-    expect(store.createRoom('Room Guide', 'socket-two').room.code).toBe(
-      'DEF567',
-    );
+    expect(store.createDisplay('socket-one').room.code).toBe('ABC234');
+    expect(store.createDisplay('socket-two').room.code).toBe('DEF567');
   });
 
   it('bounds the total number of in-memory rooms', () => {
@@ -90,29 +88,52 @@ describe('RoomStore', () => {
       maxRooms: 1,
     });
 
-    store.createRoom('Game Host', 'socket-one');
-    expectRoomError(
-      () => store.createRoom('Room Guide', 'socket-two'),
-      'SERVER_BUSY',
-    );
+    store.createDisplay('socket-one');
+    expectRoomError(() => store.createDisplay('socket-two'), 'SERVER_BUSY');
     expect(store.roomCount).toBe(1);
   });
 
-  it('joins a valid room without changing host authority', () => {
+  it('makes the first joining player the controller by server-assigned ID', () => {
     const store = createStore();
-    const created = store.createRoom('Game Host', 'socket-host');
-    const joined = store.joinRoom(
+    const created = store.createDisplay('socket-display');
+    const first = store.joinPlayer(
       created.room.code,
       'Silver Owl',
-      'socket-player',
+      'socket-first',
     );
 
-    expect(joined.room.players).toHaveLength(2);
-    expect(joined.player.isHost).toBe(false);
+    expect(first.room.players).toHaveLength(1);
+    expect(first.room.controllerPlayerId).toBe(first.session.playerId);
+    expect(first.player).toMatchObject({
+      id: first.session.playerId,
+      displayName: 'Silver Owl',
+      connected: true,
+      isController: true,
+    });
+    expect(first.session.playerReconnectToken).toHaveLength(43);
+    expect(first.session).not.toHaveProperty('displaySessionId');
+  });
+
+  it('joins another player without changing controller authority', () => {
+    const store = createStore();
+    const created = store.createDisplay('socket-display');
+    const first = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-first',
+    );
+    const second = store.joinPlayer(
+      created.room.code,
+      'Amber Kite',
+      'socket-second',
+    );
+
+    expect(second.room.players).toHaveLength(2);
+    expect(second.room.controllerPlayerId).toBe(first.session.playerId);
+    expect(second.player.isController).toBe(false);
     expect(
-      joined.room.players.find(
-        (player) => player.id === created.session.playerId,
-      )?.isHost,
+      second.room.players.find((player) => player.id === first.session.playerId)
+        ?.isController,
     ).toBe(true);
   });
 
@@ -120,37 +141,38 @@ describe('RoomStore', () => {
     const store = createStore();
 
     expectRoomError(
-      () => store.joinRoom('ZZZ999', 'Silver Owl', 'socket-player'),
+      () => store.joinPlayer('ZZZ999', 'Silver Owl', 'socket-player'),
       'ROOM_NOT_FOUND',
     );
 
-    const created = store.createRoom('Bright Fox', 'socket-host');
+    const created = store.createDisplay('socket-display');
+    store.joinPlayer(created.room.code, 'Bright Fox', 'socket-first');
     expectRoomError(
-      () => store.joinRoom(created.room.code, 'bright fox', 'socket-player'),
+      () => store.joinPlayer(created.room.code, 'bright fox', 'socket-second'),
       'INVALID_NAME',
     );
   });
 
-  it('enforces the configured eight-player room capacity', () => {
+  it('does not count the display toward the eight-player maximum', () => {
     const store = createStore({ maxPlayers: 8 });
-    const created = store.createRoom('Game Host', 'socket-host');
+    const created = store.createDisplay('socket-display');
 
-    for (let index = 1; index <= 7; index += 1) {
-      store.joinRoom(created.room.code, `Player ${index}`, `socket-${index}`);
+    for (let index = 1; index <= 8; index += 1) {
+      store.joinPlayer(created.room.code, `Player ${index}`, `socket-${index}`);
     }
 
     expect(store.getRoomState(created.room.code)?.players).toHaveLength(8);
     expectRoomError(
       () =>
-        store.joinRoom(created.room.code, 'Player 8', 'socket-over-capacity'),
+        store.joinPlayer(created.room.code, 'Player 9', 'socket-over-capacity'),
       'ROOM_FULL',
     );
   });
 
-  it('reconnects the same player, rotates the token, and avoids duplicates', () => {
+  it('reconnects the display role and rotates only its credential', () => {
     const store = createStore();
-    const created = store.createRoom('Game Host', 'socket-host');
-    const joined = store.joinRoom(
+    const created = store.createDisplay('socket-display');
+    const joined = store.joinPlayer(
       created.room.code,
       'Silver Owl',
       'socket-player',
@@ -158,73 +180,41 @@ describe('RoomStore', () => {
 
     store.disconnect(
       {
+        role: 'display',
         roomCode: created.room.code,
-        playerId: joined.session.playerId,
+        displaySessionId: created.session.displaySessionId,
       },
-      'socket-player',
+      'socket-display',
     );
-    const reconnected = store.reconnectRoom(
+    const reconnected = store.reconnectDisplay(
       created.room.code,
-      joined.session.reconnectToken,
-      'socket-player-new',
+      created.session.displayReconnectToken,
+      'socket-display-new',
     );
 
-    expect(reconnected.session.playerId).toBe(joined.session.playerId);
-    expect(reconnected.session.reconnectToken).not.toBe(
-      joined.session.reconnectToken,
+    expect(reconnected.session.displaySessionId).toBe(
+      created.session.displaySessionId,
     );
-    expect(reconnected.room.players).toHaveLength(2);
-    expect(reconnected.player.connected).toBe(true);
-    expect(reconnected.replacedSocketId).toBeNull();
+    expect(reconnected.session.displayReconnectToken).not.toBe(
+      created.session.displayReconnectToken,
+    );
+    expect(reconnected.room.display.connected).toBe(true);
+    expect(reconnected.room.players[0]?.id).toBe(joined.session.playerId);
     expectRoomError(
       () =>
-        store.reconnectRoom(
+        store.reconnectDisplay(
           created.room.code,
-          joined.session.reconnectToken,
+          created.session.displayReconnectToken,
           'socket-replay',
         ),
       'RECONNECT_FAILED',
     );
   });
 
-  it('supersedes a stale connected socket when its valid token is reused', () => {
+  it('reconnects the same player role without creating a duplicate', () => {
     const store = createStore();
-    const created = store.createRoom('Game Host', 'socket-host');
-
-    const reconnected = store.reconnectRoom(
-      created.room.code,
-      created.session.reconnectToken,
-      'socket-host-refreshed',
-    );
-
-    expect(reconnected.replacedSocketId).toBe('socket-host');
-    expect(reconnected.session.playerId).toBe(created.session.playerId);
-    expect(reconnected.room.players).toHaveLength(1);
-  });
-
-  it('rejects invalid reconnect credentials', () => {
-    const store = createStore();
-    const created = store.createRoom('Game Host', 'socket-host');
-
-    expectRoomError(
-      () =>
-        store.reconnectRoom(
-          created.room.code,
-          `${'x'.repeat(43)}`,
-          'socket-player',
-        ),
-      'RECONNECT_FAILED',
-    );
-  });
-
-  it('removes a disconnected player after the grace period', () => {
-    let now = Date.parse('2026-07-27T20:00:00.000Z');
-    const store = createStore({
-      now: () => now,
-      reconnectGraceMs: 60_000,
-    });
-    const created = store.createRoom('Game Host', 'socket-host');
-    const joined = store.joinRoom(
+    const created = store.createDisplay('socket-display');
+    const joined = store.joinPlayer(
       created.room.code,
       'Silver Owl',
       'socket-player',
@@ -232,8 +222,147 @@ describe('RoomStore', () => {
 
     store.disconnect(
       {
+        role: 'player',
         roomCode: created.room.code,
         playerId: joined.session.playerId,
+      },
+      'socket-player',
+    );
+    const reconnected = store.reconnectPlayer(
+      created.room.code,
+      joined.session.playerReconnectToken,
+      'socket-player-new',
+    );
+
+    expect(reconnected.session.playerId).toBe(joined.session.playerId);
+    expect(reconnected.session.playerReconnectToken).not.toBe(
+      joined.session.playerReconnectToken,
+    );
+    expect(reconnected.room.players).toHaveLength(1);
+    expect(reconnected.player.connected).toBe(true);
+    expect(reconnected.player.isController).toBe(true);
+  });
+
+  it('supersedes a stale connected socket when a valid credential is reused', () => {
+    const store = createStore();
+    const created = store.createDisplay('socket-display');
+
+    const reconnected = store.reconnectDisplay(
+      created.room.code,
+      created.session.displayReconnectToken,
+      'socket-display-refreshed',
+    );
+
+    expect(reconnected.replacedSocketId).toBe('socket-display');
+    expect(reconnected.room.players).toHaveLength(0);
+  });
+
+  it('never accepts display credentials as player credentials or vice versa', () => {
+    const store = createStore();
+    const created = store.createDisplay('socket-display');
+    const joined = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-player',
+    );
+
+    expectRoomError(
+      () =>
+        store.reconnectPlayer(
+          created.room.code,
+          created.session.displayReconnectToken,
+          'socket-impostor',
+        ),
+      'RECONNECT_FAILED',
+    );
+    expectRoomError(
+      () =>
+        store.reconnectDisplay(
+          created.room.code,
+          joined.session.playerReconnectToken,
+          'socket-impostor',
+        ),
+      'RECONNECT_FAILED',
+    );
+  });
+
+  it('keeps the room and players when the display disconnects', () => {
+    const store = createStore();
+    const created = store.createDisplay('socket-display');
+    const joined = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-player',
+    );
+
+    const result = store.disconnect(
+      {
+        role: 'display',
+        roomCode: created.room.code,
+        displaySessionId: created.session.displaySessionId,
+      },
+      'socket-display',
+    );
+
+    expect(result?.role).toBe('display');
+    expect(store.roomCount).toBe(1);
+    expect(store.getRoomState(created.room.code)).toMatchObject({
+      display: { connected: false },
+      controllerPlayerId: joined.session.playerId,
+    });
+    expect(store.getRoomState(created.room.code)?.players).toHaveLength(1);
+  });
+
+  it('keeps the room when the controller player disconnects', () => {
+    const store = createStore();
+    const created = store.createDisplay('socket-display');
+    const controller = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-controller',
+    );
+    store.joinPlayer(created.room.code, 'Amber Kite', 'socket-player');
+
+    const result = store.disconnect(
+      {
+        role: 'player',
+        roomCode: created.room.code,
+        playerId: controller.session.playerId,
+      },
+      'socket-controller',
+    );
+
+    expect(result?.role).toBe('player');
+    expect(store.roomCount).toBe(1);
+    expect(store.getRoomState(created.room.code)).toMatchObject({
+      controllerPlayerId: controller.session.playerId,
+    });
+    expect(
+      store
+        .getRoomState(created.room.code)
+        ?.players.find((player) => player.id === controller.session.playerId),
+    ).toMatchObject({ connected: false, isController: true });
+  });
+
+  it('removes an ordinary disconnected player after the grace period', () => {
+    let now = Date.parse('2026-07-27T20:00:00.000Z');
+    const store = createStore({
+      now: () => now,
+      reconnectGraceMs: 60_000,
+    });
+    const created = store.createDisplay('socket-display');
+    store.joinPlayer(created.room.code, 'Silver Owl', 'socket-controller');
+    const ordinary = store.joinPlayer(
+      created.room.code,
+      'Amber Kite',
+      'socket-player',
+    );
+
+    store.disconnect(
+      {
+        role: 'player',
+        roomCode: created.room.code,
+        playerId: ordinary.session.playerId,
       },
       'socket-player',
     );
@@ -246,73 +375,156 @@ describe('RoomStore', () => {
     expect(store.getRoomState(created.room.code)?.players).toHaveLength(1);
   });
 
-  it('expires an abandoned room when the host grace period ends', () => {
+  it('retains an offline controller record without electing another player', () => {
     let now = Date.parse('2026-07-27T20:00:00.000Z');
     const store = createStore({
       now: () => now,
       reconnectGraceMs: 60_000,
     });
-    const created = store.createRoom('Game Host', 'socket-host');
+    const created = store.createDisplay('socket-display');
+    const controller = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-controller',
+    );
+    const ordinary = store.joinPlayer(
+      created.room.code,
+      'Amber Kite',
+      'socket-player',
+    );
 
     store.disconnect(
       {
+        role: 'player',
         roomCode: created.room.code,
-        playerId: created.session.playerId,
+        playerId: controller.session.playerId,
       },
-      'socket-host',
+      'socket-controller',
+    );
+    now += 60_000;
+    store.cleanupExpired();
+
+    const room = store.getRoomState(created.room.code);
+    expect(room?.controllerPlayerId).toBe(controller.session.playerId);
+    expect(room?.players).toHaveLength(2);
+    expect(
+      room?.players.find((player) => player.id === ordinary.session.playerId)
+        ?.isController,
+    ).toBe(false);
+    expectRoomError(
+      () =>
+        store.reconnectPlayer(
+          created.room.code,
+          controller.session.playerReconnectToken,
+          'socket-controller-late',
+        ),
+      'RECONNECT_FAILED',
+    );
+  });
+
+  it('keeps players after the disconnected display grace period', () => {
+    let now = Date.parse('2026-07-27T20:00:00.000Z');
+    const store = createStore({
+      now: () => now,
+      reconnectGraceMs: 60_000,
+    });
+    const created = store.createDisplay('socket-display');
+    store.joinPlayer(created.room.code, 'Silver Owl', 'socket-controller');
+
+    store.disconnect(
+      {
+        role: 'display',
+        roomCode: created.room.code,
+        displaySessionId: created.session.displaySessionId,
+      },
+      'socket-display',
     );
     now += 60_000;
 
+    expect(store.cleanupExpired().deletedRoomCodes).toEqual([]);
+    expect(store.getRoomState(created.room.code)?.players).toHaveLength(1);
+    expect(store.getRoomState(created.room.code)?.display.connected).toBe(
+      false,
+    );
+  });
+
+  it('expires an abandoned room only after its display grace and no players', () => {
+    let now = Date.parse('2026-07-27T20:00:00.000Z');
+    const store = createStore({
+      now: () => now,
+      reconnectGraceMs: 60_000,
+    });
+    const created = store.createDisplay('socket-display');
+
+    store.disconnect(
+      {
+        role: 'display',
+        roomCode: created.room.code,
+        displaySessionId: created.session.displaySessionId,
+      },
+      'socket-display',
+    );
+    expect(store.cleanupExpired().deletedRoomCodes).toEqual([]);
+
+    now += 60_000;
     expect(store.cleanupExpired().deletedRoomCodes).toEqual(['ABC234']);
     expect(store.roomCount).toBe(0);
     expectRoomError(
-      () => store.joinRoom('ABC234', 'Silver Owl', 'socket-player'),
+      () => store.joinPlayer('ABC234', 'Silver Owl', 'socket-player'),
       'ROOM_EXPIRED',
     );
   });
 
-  it('deletes a room immediately when the host explicitly leaves', () => {
+  it('does not close a populated room when the display explicitly leaves', () => {
     const store = createStore();
-    const created = store.createRoom('Game Host', 'socket-host');
-    store.joinRoom(created.room.code, 'Silver Owl', 'socket-player');
+    const created = store.createDisplay('socket-display');
+    store.joinPlayer(created.room.code, 'Silver Owl', 'socket-controller');
 
     const result = store.leave(
       {
+        role: 'display',
         roomCode: created.room.code,
-        playerId: created.session.playerId,
+        displaySessionId: created.session.displaySessionId,
       },
-      'socket-host',
+      'socket-display',
     );
 
-    expect(result).toMatchObject({
-      roomCode: created.room.code,
-      deletedRoom: true,
-      room: null,
-    });
-    expect(store.roomCount).toBe(0);
+    expect(result?.role).toBe('display');
+    expect(store.roomCount).toBe(1);
+    expect(store.getRoomState(created.room.code)?.players).toHaveLength(1);
   });
 
-  it('removes a non-host player immediately when they leave', () => {
+  it('does not close or transfer a populated room when its controller leaves', () => {
     const store = createStore();
-    const created = store.createRoom('Game Host', 'socket-host');
-    const joined = store.joinRoom(
+    const created = store.createDisplay('socket-display');
+    const controller = store.joinPlayer(
       created.room.code,
       'Silver Owl',
+      'socket-controller',
+    );
+    const ordinary = store.joinPlayer(
+      created.room.code,
+      'Amber Kite',
       'socket-player',
     );
 
     const result = store.leave(
       {
+        role: 'player',
         roomCode: created.room.code,
-        playerId: joined.session.playerId,
+        playerId: controller.session.playerId,
       },
-      'socket-player',
+      'socket-controller',
     );
 
-    expect(result?.deletedRoom).toBe(false);
-    expect(result?.player.connected).toBe(false);
-    expect(result?.room?.players).toHaveLength(1);
+    expect(result?.role).toBe('player');
     expect(store.roomCount).toBe(1);
+    expect(result?.room.controllerPlayerId).toBe(controller.session.playerId);
+    expect(
+      result?.room.players.find(
+        (player) => player.id === ordinary.session.playerId,
+      )?.isController,
+    ).toBe(false);
   });
 
   it('expires inactive rooms after the configured TTL', () => {
@@ -321,17 +533,22 @@ describe('RoomStore', () => {
       now: () => now,
       roomTtlMs: 1_000,
     });
-    store.createRoom('Game Host', 'socket-host');
+    store.createDisplay('socket-display');
     now += 1_000;
 
     expect(store.cleanupExpired().deletedRoomCodes).toEqual(['ABC234']);
     expect(store.roomCount).toBe(0);
   });
 
-  it('keeps HTML-like display names as plain state data', () => {
+  it('keeps HTML-like display names as plain player state data', () => {
     const store = createStore();
-    const created = store.createRoom('<Game Host>', 'socket-host');
+    const created = store.createDisplay('socket-display');
+    const joined = store.joinPlayer(
+      created.room.code,
+      '<Bright Fox>',
+      'socket-player',
+    );
 
-    expect(created.player.displayName).toBe('<Game Host>');
+    expect(joined.player.displayName).toBe('<Bright Fox>');
   });
 });

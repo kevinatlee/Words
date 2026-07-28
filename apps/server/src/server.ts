@@ -1,18 +1,22 @@
 import { createServer as createHttpServer } from 'node:http';
 
 import {
-  createRoomInputSchema,
-  joinRoomInputSchema,
-  leaveRoomInputSchema,
+  createDisplayInputSchema,
+  joinPlayerInputSchema,
+  leaveSessionInputSchema,
   productConfig,
-  reconnectRoomInputSchema,
+  reconnectDisplayInputSchema,
+  reconnectPlayerInputSchema,
   type ClientToServerEvents,
-  type CreateRoomInput,
-  type JoinRoomInput,
-  type LeaveRoomAcknowledgement,
-  type LeaveRoomInput,
-  type ReconnectRoomInput,
-  type RoomActionAcknowledgement,
+  type CreateDisplayInput,
+  type DisplayActionAcknowledgement,
+  type JoinPlayerInput,
+  type LeaveSessionAcknowledgement,
+  type LeaveSessionInput,
+  type PlayerActionAcknowledgement,
+  type ReconnectDisplayInput,
+  type ReconnectPlayerInput,
+  type RoomActionFailure,
   type RoomError,
   type RoomErrorCode,
   type ServerToClientEvents,
@@ -38,6 +42,8 @@ type WordsSocket = Socket<
   Record<string, never>,
   SocketData
 >;
+
+type FailureAcknowledgement = (response: RoomActionFailure) => void;
 
 export type WordsServer = ReturnType<typeof createWordsServer>;
 
@@ -68,7 +74,7 @@ function toRoomError(error: unknown): RoomError {
 }
 
 function acknowledgeFailure(
-  acknowledge: RoomActionAcknowledgement,
+  acknowledge: FailureAcknowledgement,
   error: RoomError,
 ): void {
   acknowledge({ ok: false, error });
@@ -134,6 +140,27 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
     }
   };
 
+  const releaseReplacedSocket = (
+    replacedSocketId: string | null,
+    roomCode: string,
+  ): void => {
+    if (!replacedSocketId) {
+      return;
+    }
+
+    const replacedSocket = io.sockets.sockets.get(replacedSocketId);
+    if (!replacedSocket) {
+      return;
+    }
+
+    replacedSocket.emit('room:error', {
+      code: 'RECONNECT_FAILED',
+      message: 'This temporary session was resumed in another browser tab.',
+    });
+    delete replacedSocket.data.session;
+    void replacedSocket.leave(roomCode);
+  };
+
   app.disable('x-powered-by');
   app.get('/api/health', (_request, response) => {
     response.json({
@@ -144,9 +171,7 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
   });
 
   io.on('connection', (socket: WordsSocket) => {
-    const checkRateLimit = (
-      acknowledge: RoomActionAcknowledgement,
-    ): boolean => {
+    const checkRateLimit = (acknowledge: FailureAcknowledgement): boolean => {
       if (rateLimiter.allow(socket.id)) {
         return true;
       }
@@ -158,22 +183,31 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
       return false;
     };
 
+    const rejectBoundSocket = (
+      acknowledge: FailureAcknowledgement,
+    ): boolean => {
+      if (!socket.data.session) {
+        return false;
+      }
+
+      acknowledgeFailure(acknowledge, {
+        code: 'INVALID_PAYLOAD',
+        message: 'Leave the current room before opening another session.',
+      });
+      return true;
+    };
+
     socket.on(
-      'room:create',
-      (payload: CreateRoomInput, acknowledge: RoomActionAcknowledgement) => {
-        if (socket.data.session) {
-          acknowledgeFailure(acknowledge, {
-            code: 'INVALID_PAYLOAD',
-            message: 'Leave the current room before creating another one.',
-          });
+      'display:create',
+      (
+        payload: CreateDisplayInput,
+        acknowledge: DisplayActionAcknowledgement,
+      ) => {
+        if (rejectBoundSocket(acknowledge) || !checkRateLimit(acknowledge)) {
           return;
         }
 
-        if (!checkRateLimit(acknowledge)) {
-          return;
-        }
-
-        const parsed = createRoomInputSchema.safeParse(payload);
+        const parsed = createDisplayInputSchema.safeParse(payload);
         if (!parsed.success) {
           acknowledgeFailure(acknowledge, {
             code: 'INVALID_PAYLOAD',
@@ -183,13 +217,11 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
         }
 
         try {
-          const result = roomStore.createRoom(
-            parsed.data.displayName,
-            socket.id,
-          );
+          const result = roomStore.createDisplay(socket.id);
           socket.data.session = {
+            role: 'display',
             roomCode: result.room.code,
-            playerId: result.session.playerId,
+            displaySessionId: result.session.displaySessionId,
           };
           void socket.join(result.room.code);
           acknowledge({
@@ -205,21 +237,16 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
     );
 
     socket.on(
-      'room:join',
-      (payload: JoinRoomInput, acknowledge: RoomActionAcknowledgement) => {
-        if (socket.data.session) {
-          acknowledgeFailure(acknowledge, {
-            code: 'INVALID_PAYLOAD',
-            message: 'Leave the current room before joining another one.',
-          });
+      'display:reconnect',
+      (
+        payload: ReconnectDisplayInput,
+        acknowledge: DisplayActionAcknowledgement,
+      ) => {
+        if (rejectBoundSocket(acknowledge) || !checkRateLimit(acknowledge)) {
           return;
         }
 
-        if (!checkRateLimit(acknowledge)) {
-          return;
-        }
-
-        const parsed = joinRoomInputSchema.safeParse(payload);
+        const parsed = reconnectDisplayInputSchema.safeParse(payload);
         if (!parsed.success) {
           acknowledgeFailure(acknowledge, {
             code: 'INVALID_PAYLOAD',
@@ -229,12 +256,55 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
         }
 
         try {
-          const result = roomStore.joinRoom(
+          const result = roomStore.reconnectDisplay(
+            parsed.data.roomCode,
+            parsed.data.displayReconnectToken,
+            socket.id,
+          );
+          releaseReplacedSocket(result.replacedSocketId, result.room.code);
+          socket.data.session = {
+            role: 'display',
+            roomCode: result.room.code,
+            displaySessionId: result.session.displaySessionId,
+          };
+          void socket.join(result.room.code);
+          acknowledge({
+            ok: true,
+            room: result.room,
+            session: result.session,
+          });
+          socket.to(result.room.code).emit('display:connected', result.display);
+          io.to(result.room.code).emit('room:state', result.room);
+        } catch (error) {
+          acknowledgeFailure(acknowledge, toRoomError(error));
+        }
+      },
+    );
+
+    socket.on(
+      'player:join',
+      (payload: JoinPlayerInput, acknowledge: PlayerActionAcknowledgement) => {
+        if (rejectBoundSocket(acknowledge) || !checkRateLimit(acknowledge)) {
+          return;
+        }
+
+        const parsed = joinPlayerInputSchema.safeParse(payload);
+        if (!parsed.success) {
+          acknowledgeFailure(acknowledge, {
+            code: 'INVALID_PAYLOAD',
+            message: publicErrorMessages.INVALID_PAYLOAD,
+          });
+          return;
+        }
+
+        try {
+          const result = roomStore.joinPlayer(
             parsed.data.roomCode,
             parsed.data.displayName,
             socket.id,
           );
           socket.data.session = {
+            role: 'player',
             roomCode: result.room.code,
             playerId: result.session.playerId,
           };
@@ -253,21 +323,16 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
     );
 
     socket.on(
-      'room:reconnect',
-      (payload: ReconnectRoomInput, acknowledge: RoomActionAcknowledgement) => {
-        if (socket.data.session) {
-          acknowledgeFailure(acknowledge, {
-            code: 'INVALID_PAYLOAD',
-            message: 'This connection already belongs to a room.',
-          });
+      'player:reconnect',
+      (
+        payload: ReconnectPlayerInput,
+        acknowledge: PlayerActionAcknowledgement,
+      ) => {
+        if (rejectBoundSocket(acknowledge) || !checkRateLimit(acknowledge)) {
           return;
         }
 
-        if (!checkRateLimit(acknowledge)) {
-          return;
-        }
-
-        const parsed = reconnectRoomInputSchema.safeParse(payload);
+        const parsed = reconnectPlayerInputSchema.safeParse(payload);
         if (!parsed.success) {
           acknowledgeFailure(acknowledge, {
             code: 'INVALID_PAYLOAD',
@@ -277,31 +342,14 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
         }
 
         try {
-          const result = roomStore.reconnectRoom(
+          const result = roomStore.reconnectPlayer(
             parsed.data.roomCode,
-            parsed.data.reconnectToken,
+            parsed.data.playerReconnectToken,
             socket.id,
           );
-
-          if (
-            result.replacedSocketId &&
-            result.replacedSocketId !== socket.id
-          ) {
-            const replacedSocket = io.sockets.sockets.get(
-              result.replacedSocketId,
-            );
-            if (replacedSocket) {
-              replacedSocket.emit('room:error', {
-                code: 'RECONNECT_FAILED',
-                message:
-                  'This temporary session was resumed in another browser tab.',
-              });
-              delete replacedSocket.data.session;
-              void replacedSocket.leave(result.room.code);
-            }
-          }
-
+          releaseReplacedSocket(result.replacedSocketId, result.room.code);
           socket.data.session = {
+            role: 'player',
             roomCode: result.room.code,
             playerId: result.session.playerId,
           };
@@ -320,48 +368,70 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
     );
 
     socket.on(
-      'room:leave',
-      (payload: LeaveRoomInput, acknowledge: LeaveRoomAcknowledgement) => {
-        const parsed = leaveRoomInputSchema.safeParse(payload);
+      'display:leave',
+      (
+        payload: LeaveSessionInput,
+        acknowledge: LeaveSessionAcknowledgement,
+      ) => {
+        const parsed = leaveSessionInputSchema.safeParse(payload);
         const session = socket.data.session;
 
-        if (!parsed.success || !session) {
-          acknowledge({
-            ok: false,
-            error: {
-              code: 'INVALID_PAYLOAD',
-              message: publicErrorMessages.INVALID_PAYLOAD,
-            },
+        if (!parsed.success || !session || session.role !== 'display') {
+          acknowledgeFailure(acknowledge, {
+            code: 'INVALID_PAYLOAD',
+            message: publicErrorMessages.INVALID_PAYLOAD,
           });
           return;
         }
 
         const result = roomStore.leave(session, socket.id);
-        delete socket.data.session;
-        void socket.leave(session.roomCode);
-
-        if (!result) {
-          acknowledge({
-            ok: false,
-            error: {
-              code: 'RECONNECT_FAILED',
-              message: publicErrorMessages.RECONNECT_FAILED,
-            },
+        if (!result || result.role !== 'display') {
+          acknowledgeFailure(acknowledge, {
+            code: 'RECONNECT_FAILED',
+            message: publicErrorMessages.RECONNECT_FAILED,
           });
           return;
         }
 
+        delete socket.data.session;
+        void socket.leave(session.roomCode);
         acknowledge({ ok: true });
+        socket.to(result.roomCode).emit('display:disconnected', result.display);
+        io.to(result.roomCode).emit('room:state', result.room);
+      },
+    );
 
-        if (result.deletedRoom) {
-          closeConnectedRoom(result.roomCode, {
-            code: 'ROOM_EXPIRED',
-            message: 'The host left, so this temporary room has closed.',
+    socket.on(
+      'player:leave',
+      (
+        payload: LeaveSessionInput,
+        acknowledge: LeaveSessionAcknowledgement,
+      ) => {
+        const parsed = leaveSessionInputSchema.safeParse(payload);
+        const session = socket.data.session;
+
+        if (!parsed.success || !session || session.role !== 'player') {
+          acknowledgeFailure(acknowledge, {
+            code: 'INVALID_PAYLOAD',
+            message: publicErrorMessages.INVALID_PAYLOAD,
           });
-        } else if (result.room) {
-          socket.to(result.roomCode).emit('player:disconnected', result.player);
-          io.to(result.roomCode).emit('room:state', result.room);
+          return;
         }
+
+        const result = roomStore.leave(session, socket.id);
+        if (!result || result.role !== 'player') {
+          acknowledgeFailure(acknowledge, {
+            code: 'RECONNECT_FAILED',
+            message: publicErrorMessages.RECONNECT_FAILED,
+          });
+          return;
+        }
+
+        delete socket.data.session;
+        void socket.leave(session.roomCode);
+        acknowledge({ ok: true });
+        socket.to(result.roomCode).emit('player:disconnected', result.player);
+        io.to(result.roomCode).emit('room:state', result.room);
       },
     );
 
@@ -374,10 +444,18 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
       }
 
       const result = roomStore.disconnect(session, socket.id);
-      if (result) {
-        socket.to(session.roomCode).emit('player:disconnected', result.player);
-        io.to(session.roomCode).emit('room:state', result.room);
+      if (!result) {
+        return;
       }
+
+      if (result.role === 'display') {
+        socket
+          .to(session.roomCode)
+          .emit('display:disconnected', result.display);
+      } else {
+        socket.to(session.roomCode).emit('player:disconnected', result.player);
+      }
+      io.to(session.roomCode).emit('room:state', result.room);
     });
   });
 

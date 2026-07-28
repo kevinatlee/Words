@@ -1,15 +1,48 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  createRoomInputSchema,
+  createDisplayInputSchema,
   displayNameSchema,
-  joinRoomInputSchema,
+  joinPlayerInputSchema,
   normalizeDisplayName,
   normalizeRoomCode,
-  reconnectRoomInputSchema,
+  reconnectDisplayInputSchema,
+  reconnectPlayerInputSchema,
   roomCodeSchema,
   roomStateSchema,
 } from './lobby';
+
+const controllerPlayerId = '00000000-0000-4000-8000-000000000001';
+
+function roomStateFixture() {
+  return {
+    code: 'ABC234',
+    phase: 'LOBBY',
+    createdAt: '2026-07-27T20:00:00.000Z',
+    lastActivityAt: '2026-07-27T20:00:00.000Z',
+    expiresAt: '2026-07-27T22:00:00.000Z',
+    maxPlayers: 8,
+    display: {
+      connected: true,
+      createdAt: '2026-07-27T20:00:00.000Z',
+    },
+    controllerPlayerId,
+    players: [
+      {
+        id: controllerPlayerId,
+        displayName: 'Bright Fox',
+        connected: true,
+        joinedAt: '2026-07-27T20:00:01.000Z',
+        isController: true,
+      },
+    ],
+    settings: {
+      gridSize: 4,
+      roundDurationSeconds: 180,
+      scoringMode: 'traditional',
+    },
+  } as const;
+}
 
 describe('lobby contracts', () => {
   it('normalizes human-entered room codes consistently', () => {
@@ -38,56 +71,99 @@ describe('lobby contracts', () => {
     expect(displayNameSchema.safeParse('Bright\u0000Fox').success).toBe(false);
   });
 
-  it('rejects client attempts to add host authority', () => {
+  it('allows room creation only for an empty display payload', () => {
+    expect(createDisplayInputSchema.parse({})).toEqual({});
     expect(
-      createRoomInputSchema.safeParse({
-        displayName: 'Bright Fox',
-        isHost: true,
+      createDisplayInputSchema.safeParse({
+        displayName: 'Not a player',
       }).success,
     ).toBe(false);
   });
 
-  it('validates join and reconnect payload sizes', () => {
+  it('rejects client attempts to self-assign controller authority', () => {
     expect(
-      joinRoomInputSchema.parse({
+      joinPlayerInputSchema.safeParse({
+        roomCode: 'ABC234',
+        displayName: 'Bright Fox',
+        controllerPlayerId,
+      }).success,
+    ).toBe(false);
+    expect(
+      joinPlayerInputSchema.safeParse({
+        roomCode: 'ABC234',
+        displayName: 'Bright Fox',
+        isController: true,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('keeps display and player reconnect payloads distinct', () => {
+    const token = 'a'.repeat(43);
+
+    expect(
+      reconnectDisplayInputSchema.parse({
         roomCode: 'abc234',
-        displayName: 'Silver Owl',
+        displayReconnectToken: token,
       }),
     ).toEqual({
       roomCode: 'ABC234',
-      displayName: 'Silver Owl',
+      displayReconnectToken: token,
     });
     expect(
-      reconnectRoomInputSchema.safeParse({
+      reconnectPlayerInputSchema.parse({
+        roomCode: 'abc234',
+        playerReconnectToken: token,
+      }),
+    ).toEqual({
+      roomCode: 'ABC234',
+      playerReconnectToken: token,
+    });
+    expect(
+      reconnectPlayerInputSchema.safeParse({
         roomCode: 'ABC234',
-        reconnectToken: 'short',
+        displayReconnectToken: token,
       }).success,
     ).toBe(false);
   });
 
-  it('accepts only bounded Stage 2 lobby state', () => {
+  it('accepts an empty room with a display session and no controller', () => {
     const state = roomStateSchema.parse({
-      code: 'ABC234',
-      phase: 'LOBBY',
-      createdAt: '2026-07-27T20:00:00.000Z',
-      lastActivityAt: '2026-07-27T20:00:00.000Z',
-      expiresAt: '2026-07-27T22:00:00.000Z',
-      maxPlayers: 8,
-      players: [
-        {
-          id: '00000000-0000-4000-8000-000000000001',
-          displayName: 'Bright Fox',
-          connected: true,
-          joinedAt: '2026-07-27T20:00:00.000Z',
-          isHost: true,
-        },
-      ],
-      settings: {
-        gridSize: 4,
-        roundDurationSeconds: 180,
-        scoringMode: 'traditional',
-      },
+      ...roomStateFixture(),
+      controllerPlayerId: null,
+      players: [],
     });
+
+    expect(state.display.connected).toBe(true);
+    expect(state.players).toHaveLength(0);
+    expect(state.controllerPlayerId).toBeNull();
+  });
+
+  it('requires controller authority to reference exactly one player ID', () => {
+    const state = roomStateSchema.parse(roomStateFixture());
+    expect(state.controllerPlayerId).toBe(controllerPlayerId);
+    expect(state.players[0]?.isController).toBe(true);
+
+    expect(
+      roomStateSchema.safeParse({
+        ...roomStateFixture(),
+        controllerPlayerId: '00000000-0000-4000-8000-000000000002',
+      }).success,
+    ).toBe(false);
+    expect(
+      roomStateSchema.safeParse({
+        ...roomStateFixture(),
+        players: [
+          {
+            ...roomStateFixture().players[0],
+            isController: false,
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('keeps Stage 2 state bounded and free of game-engine data', () => {
+    const state = roomStateSchema.parse(roomStateFixture());
 
     expect(state.phase).toBe('LOBBY');
     expect(state.settings.gridSize).toBe(4);

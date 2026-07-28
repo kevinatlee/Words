@@ -1,23 +1,27 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { createLobbySessionStore } from './session-store';
+import {
+  createLobbySessionStore,
+  type StoredDisplaySession,
+  type StoredPlayerSession,
+} from './session-store';
 
-describe('temporary lobby session storage', () => {
+describe('temporary role-specific lobby session storage', () => {
   beforeEach(() => {
     window.localStorage.clear();
     window.sessionStorage.clear();
   });
 
-  it('keeps reconnect credentials in localStorage with a per-tab pointer', () => {
+  it('stores a display credential with a per-tab display pointer', () => {
     const store = createLobbySessionStore(
       window.localStorage,
       window.sessionStorage,
     );
-    const session = {
+    const session: StoredDisplaySession = {
+      role: 'display',
       roomCode: 'ABC234',
-      playerId: '00000000-0000-4000-8000-000000000001',
-      reconnectToken: 'a'.repeat(43),
-      displayName: 'Game Host',
+      displaySessionId: '00000000-0000-4000-8000-000000000100',
+      displayReconnectToken: 'a'.repeat(43),
     };
 
     store.save(session);
@@ -27,31 +31,77 @@ describe('temporary lobby session storage', () => {
     expect(window.localStorage.length).toBe(1);
   });
 
+  it('stores player credentials separately from display credentials', () => {
+    const store = createLobbySessionStore(
+      window.localStorage,
+      window.sessionStorage,
+    );
+    const session: StoredPlayerSession = {
+      role: 'player',
+      roomCode: 'ABC234',
+      playerId: '00000000-0000-4000-8000-000000000001',
+      playerReconnectToken: 'b'.repeat(43),
+      displayName: 'Silver Owl',
+    };
+
+    store.save(session);
+
+    expect(store.load('ABC234')).toEqual(session);
+    expect(window.localStorage.key(0)).toContain(
+      'words:reconnect:player:ABC234',
+    );
+  });
+
+  it('does not interpret display credentials as player credentials', () => {
+    const store = createLobbySessionStore(
+      window.localStorage,
+      window.sessionStorage,
+    );
+    const playerId = '00000000-0000-4000-8000-000000000001';
+    window.sessionStorage.setItem(
+      'words:active-lobby-session',
+      JSON.stringify({
+        role: 'player',
+        roomCode: 'ABC234',
+        sessionId: playerId,
+      }),
+    );
+    window.localStorage.setItem(
+      `words:reconnect:player:ABC234:${playerId}`,
+      JSON.stringify({
+        displayReconnectToken: 'c'.repeat(43),
+      }),
+    );
+
+    expect(store.load('ABC234')).toBeNull();
+  });
+
   it('does not apply one room session to another room', () => {
     const store = createLobbySessionStore(
       window.localStorage,
       window.sessionStorage,
     );
     store.save({
+      role: 'player',
       roomCode: 'ABC234',
       playerId: '00000000-0000-4000-8000-000000000001',
-      reconnectToken: 'a'.repeat(43),
-      displayName: 'Game Host',
+      playerReconnectToken: 'd'.repeat(43),
+      displayName: 'Silver Owl',
     });
 
     expect(store.load('XYZ789')).toBeNull();
   });
 
-  it('removes both the pointer and reconnect credential', () => {
+  it('removes both the pointer and the role-specific credential', () => {
     const store = createLobbySessionStore(
       window.localStorage,
       window.sessionStorage,
     );
-    const session = {
+    const session: StoredDisplaySession = {
+      role: 'display',
       roomCode: 'ABC234',
-      playerId: '00000000-0000-4000-8000-000000000001',
-      reconnectToken: 'a'.repeat(43),
-      displayName: 'Game Host',
+      displaySessionId: '00000000-0000-4000-8000-000000000100',
+      displayReconnectToken: 'e'.repeat(43),
     };
     store.save(session);
 

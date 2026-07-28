@@ -7,12 +7,13 @@ import {
 
 import type {
   ClientToServerEvents,
-  CreateRoomInput,
-  JoinRoomInput,
-  LeaveRoomResponse,
-  ReconnectRoomInput,
-  RoomActionResponse,
-  RoomError,
+  CreateDisplayInput,
+  DisplayActionResponse,
+  JoinPlayerInput,
+  LeaveSessionResponse,
+  PlayerActionResponse,
+  ReconnectDisplayInput,
+  ReconnectPlayerInput,
   RoomState,
   ServerToClientEvents,
 } from '@words/shared';
@@ -21,31 +22,61 @@ import { createWordsServer, type WordsServer } from '../src/server.js';
 
 type TestClient = ClientSocket<ServerToClientEvents, ClientToServerEvents>;
 
-function emitCreate(
+function emitCreateDisplay(
   client: TestClient,
-  payload: CreateRoomInput,
-): Promise<RoomActionResponse> {
-  return new Promise((resolve) => client.emit('room:create', payload, resolve));
-}
-
-function emitJoin(
-  client: TestClient,
-  payload: JoinRoomInput,
-): Promise<RoomActionResponse> {
-  return new Promise((resolve) => client.emit('room:join', payload, resolve));
-}
-
-function emitReconnect(
-  client: TestClient,
-  payload: ReconnectRoomInput,
-): Promise<RoomActionResponse> {
+  payload: CreateDisplayInput = {},
+): Promise<DisplayActionResponse> {
   return new Promise((resolve) =>
-    client.emit('room:reconnect', payload, resolve),
+    client.emit('display:create', payload, resolve),
   );
 }
 
-function emitLeave(client: TestClient): Promise<LeaveRoomResponse> {
-  return new Promise((resolve) => client.emit('room:leave', {}, resolve));
+function emitJoinPlayer(
+  client: TestClient,
+  payload: JoinPlayerInput,
+): Promise<PlayerActionResponse> {
+  return new Promise((resolve) => client.emit('player:join', payload, resolve));
+}
+
+function emitReconnectDisplay(
+  client: TestClient,
+  payload: ReconnectDisplayInput,
+): Promise<DisplayActionResponse> {
+  return new Promise((resolve) =>
+    client.emit('display:reconnect', payload, resolve),
+  );
+}
+
+function emitReconnectPlayer(
+  client: TestClient,
+  payload: ReconnectPlayerInput,
+): Promise<PlayerActionResponse> {
+  return new Promise((resolve) =>
+    client.emit('player:reconnect', payload, resolve),
+  );
+}
+
+function emitLeaveDisplay(client: TestClient): Promise<LeaveSessionResponse> {
+  return new Promise((resolve) => client.emit('display:leave', {}, resolve));
+}
+
+function emitLeavePlayer(client: TestClient): Promise<LeaveSessionResponse> {
+  return new Promise((resolve) => client.emit('player:leave', {}, resolve));
+}
+
+function nextRoomState(
+  client: TestClient,
+  predicate: (room: RoomState) => boolean,
+): Promise<RoomState> {
+  return new Promise((resolve) => {
+    const listener = (room: RoomState) => {
+      if (predicate(room)) {
+        client.off('room:state', listener);
+        resolve(room);
+      }
+    };
+    client.on('room:state', listener);
+  });
 }
 
 describe('Words Stage 2 server', () => {
@@ -54,12 +85,12 @@ describe('Words Stage 2 server', () => {
   let clients: TestClient[];
 
   beforeEach(async () => {
+    clients = [];
     server = createWordsServer({
       port: 0,
       cleanupIntervalMs: 60_000,
     });
     port = await server.start(0);
-    clients = [];
   });
 
   afterEach(async () => {
@@ -96,28 +127,35 @@ describe('Words Stage 2 server', () => {
     expect(response.headers).not.toHaveProperty('x-powered-by');
   });
 
-  it('creates a room and assigns host authority on the server', async () => {
-    const host = await connectClient();
-    const response = await emitCreate(host, { displayName: 'Game Host' });
+  it('creates a display session, not a player session', async () => {
+    const display = await connectClient();
+    const response = await emitCreateDisplay(display);
 
     expect(response.ok).toBe(true);
     if (!response.ok) {
       return;
     }
 
-    expect(response.room.players).toHaveLength(1);
-    expect(response.room.players[0]).toMatchObject({
-      displayName: 'Game Host',
-      isHost: true,
-    });
-    expect(response.session.reconnectToken).toHaveLength(43);
+    expect(response.room.display.connected).toBe(true);
+    expect(response.room.players).toHaveLength(0);
+    expect(response.room.controllerPlayerId).toBeNull();
+    expect(response.session.displaySessionId).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(response.session.displayReconnectToken).toHaveLength(43);
+    expect(response.session).not.toHaveProperty('playerId');
   });
 
-  it('rejects a client attempt to self-assign host authority', async () => {
-    const client = await connectClient();
-    const response = await emitCreate(client, {
+  it('rejects client attempts to self-assign controller authority', async () => {
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) {
+      throw new Error('Display creation failed in test setup.');
+    }
+
+    const player = await connectClient();
+    const response = await emitJoinPlayer(player, {
+      roomCode: created.room.code,
       displayName: 'Silver Owl',
-      isHost: true,
+      controllerPlayerId: '00000000-0000-4000-8000-000000000001',
     } as never);
 
     expect(response).toMatchObject({
@@ -126,41 +164,57 @@ describe('Words Stage 2 server', () => {
     });
   });
 
-  it('joins a valid normalized room and broadcasts player state', async () => {
-    const host = await connectClient();
-    const created = await emitCreate(host, { displayName: 'Game Host' });
+  it('assigns the first player as controller and keeps later players ordinary', async () => {
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
     if (!created.ok) {
-      throw new Error('Room creation failed in test setup.');
+      throw new Error('Display creation failed in test setup.');
     }
 
-    const stateWithPlayer = new Promise<RoomState>((resolve) => {
-      const listener = (room: RoomState) => {
-        if (room.players.length === 2) {
-          host.off('room:state', listener);
-          resolve(room);
-        }
-      };
-      host.on('room:state', listener);
-    });
-    const player = await connectClient();
-    const joined = await emitJoin(player, {
+    const firstPlayer = await connectClient();
+    const firstJoined = await emitJoinPlayer(firstPlayer, {
       roomCode: created.room.code.toLowerCase(),
       displayName: 'Silver Owl',
     });
-
-    expect(joined.ok).toBe(true);
-    if (joined.ok) {
-      expect(joined.room.players.find((entry) => entry.isHost)?.id).toBe(
-        created.session.playerId,
-      );
-      expect(joined.room.players).toHaveLength(2);
+    if (!firstJoined.ok) {
+      throw new Error('First player join failed in test setup.');
     }
-    expect((await stateWithPlayer).players).toHaveLength(2);
+
+    expect(firstJoined.room.controllerPlayerId).toBe(
+      firstJoined.session.playerId,
+    );
+    expect(firstJoined.room.players[0]).toMatchObject({
+      id: firstJoined.session.playerId,
+      isController: true,
+    });
+
+    const stateWithSecondPlayer = nextRoomState(
+      display,
+      (room) => room.players.length === 2,
+    );
+    const secondPlayer = await connectClient();
+    const secondJoined = await emitJoinPlayer(secondPlayer, {
+      roomCode: created.room.code,
+      displayName: 'Amber Kite',
+    });
+
+    expect(secondJoined.ok).toBe(true);
+    if (secondJoined.ok) {
+      expect(secondJoined.room.controllerPlayerId).toBe(
+        firstJoined.session.playerId,
+      );
+      expect(
+        secondJoined.room.players.find(
+          (player) => player.id === secondJoined.session.playerId,
+        )?.isController,
+      ).toBe(false);
+    }
+    expect((await stateWithSecondPlayer).players).toHaveLength(2);
   });
 
   it('returns structured errors for missing rooms and malformed payloads', async () => {
     const missingRoomClient = await connectClient();
-    const missing = await emitJoin(missingRoomClient, {
+    const missing = await emitJoinPlayer(missingRoomClient, {
       roomCode: 'ZZZ999',
       displayName: 'Silver Owl',
     });
@@ -170,7 +224,7 @@ describe('Words Stage 2 server', () => {
     });
 
     const malformedClient = await connectClient();
-    const malformed = await emitJoin(malformedClient, {
+    const malformed = await emitJoinPlayer(malformedClient, {
       roomCode: 'bad',
       displayName: '',
     } as never);
@@ -180,26 +234,30 @@ describe('Words Stage 2 server', () => {
     });
   });
 
-  it('enforces a total capacity of eight players', async () => {
-    const host = await connectClient();
-    const created = await emitCreate(host, { displayName: 'Game Host' });
+  it('allows eight players in addition to the display session', async () => {
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
     if (!created.ok) {
-      throw new Error('Room creation failed in test setup.');
+      throw new Error('Display creation failed in test setup.');
     }
 
-    for (let index = 1; index <= 7; index += 1) {
+    for (let index = 1; index <= 8; index += 1) {
       const player = await connectClient();
-      const response = await emitJoin(player, {
+      const response = await emitJoinPlayer(player, {
         roomCode: created.room.code,
         displayName: `Player ${index}`,
       });
       expect(response.ok).toBe(true);
     }
 
+    expect(
+      server.roomStore.getRoomState(created.room.code)?.players,
+    ).toHaveLength(8);
+
     const extraPlayer = await connectClient();
-    const rejected = await emitJoin(extraPlayer, {
+    const rejected = await emitJoinPlayer(extraPlayer, {
       roomCode: created.room.code,
-      displayName: 'Player 8',
+      displayName: 'Player 9',
     });
     expect(rejected).toMatchObject({
       ok: false,
@@ -207,100 +265,178 @@ describe('Words Stage 2 server', () => {
     });
   });
 
-  it('marks disconnected players and reconnects without duplication', async () => {
-    const host = await connectClient();
-    const created = await emitCreate(host, { displayName: 'Game Host' });
+  it('does not close the room when the display disconnects', async () => {
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
     if (!created.ok) {
-      throw new Error('Room creation failed in test setup.');
+      throw new Error('Display creation failed in test setup.');
+    }
+    const controller = await connectClient();
+    const controllerJoined = await emitJoinPlayer(controller, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+    if (!controllerJoined.ok) {
+      throw new Error('Controller join failed in test setup.');
     }
 
+    const displayOffline = nextRoomState(
+      controller,
+      (room) => !room.display.connected,
+    );
+    display.disconnect();
+    expect((await displayOffline).players).toHaveLength(1);
+    expect(server.roomStore.roomCount).toBe(1);
+
+    const laterPlayer = await connectClient();
+    expect(
+      await emitJoinPlayer(laterPlayer, {
+        roomCode: created.room.code,
+        displayName: 'Amber Kite',
+      }),
+    ).toMatchObject({ ok: true });
+  });
+
+  it('does not close the room when the controller player disconnects', async () => {
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) {
+      throw new Error('Display creation failed in test setup.');
+    }
+    const controller = await connectClient();
+    const controllerJoined = await emitJoinPlayer(controller, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+    if (!controllerJoined.ok) {
+      throw new Error('Controller join failed in test setup.');
+    }
+    const ordinary = await connectClient();
+    await emitJoinPlayer(ordinary, {
+      roomCode: created.room.code,
+      displayName: 'Amber Kite',
+    });
+
+    const controllerOffline = nextRoomState(display, (room) => {
+      const player = room.players.find(
+        (entry) => entry.id === controllerJoined.session.playerId,
+      );
+      return player !== undefined && !player.connected;
+    });
+    controller.disconnect();
+    const room = await controllerOffline;
+
+    expect(room.controllerPlayerId).toBe(controllerJoined.session.playerId);
+    expect(room.players).toHaveLength(2);
+    expect(server.roomStore.roomCount).toBe(1);
+  });
+
+  it('reconnects the correct display and player roles without duplication', async () => {
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) {
+      throw new Error('Display creation failed in test setup.');
+    }
     const player = await connectClient();
-    const joined = await emitJoin(player, {
+    const joined = await emitJoinPlayer(player, {
       roomCode: created.room.code,
       displayName: 'Silver Owl',
     });
     if (!joined.ok) {
-      throw new Error('Room join failed in test setup.');
+      throw new Error('Player join failed in test setup.');
     }
 
-    const disconnectedState = new Promise<RoomState>((resolve) => {
-      const listener = (room: RoomState) => {
-        const disconnected = room.players.find(
-          (entry) => entry.id === joined.session.playerId,
-        );
-        if (disconnected && !disconnected.connected) {
-          host.off('room:state', listener);
-          resolve(room);
-        }
-      };
-      host.on('room:state', listener);
-    });
+    display.disconnect();
     player.disconnect();
-    expect(
-      (await disconnectedState).players.find(
-        (entry) => entry.id === joined.session.playerId,
-      )?.connected,
-    ).toBe(false);
+
+    const returningDisplay = await connectClient();
+    const displayReconnected = await emitReconnectDisplay(returningDisplay, {
+      roomCode: created.room.code,
+      displayReconnectToken: created.session.displayReconnectToken,
+    });
+    expect(displayReconnected.ok).toBe(true);
+    if (displayReconnected.ok) {
+      expect(displayReconnected.session.displaySessionId).toBe(
+        created.session.displaySessionId,
+      );
+      expect(displayReconnected.room.display.connected).toBe(true);
+    }
 
     const returningPlayer = await connectClient();
-    const reconnected = await emitReconnect(returningPlayer, {
+    const playerReconnected = await emitReconnectPlayer(returningPlayer, {
       roomCode: created.room.code,
-      reconnectToken: joined.session.reconnectToken,
+      playerReconnectToken: joined.session.playerReconnectToken,
     });
-
-    expect(reconnected.ok).toBe(true);
-    if (reconnected.ok) {
-      expect(reconnected.session.playerId).toBe(joined.session.playerId);
-      expect(reconnected.session.reconnectToken).not.toBe(
-        joined.session.reconnectToken,
-      );
-      expect(reconnected.room.players).toHaveLength(2);
+    expect(playerReconnected.ok).toBe(true);
+    if (playerReconnected.ok) {
+      expect(playerReconnected.session.playerId).toBe(joined.session.playerId);
+      expect(playerReconnected.room.players).toHaveLength(1);
+      expect(playerReconnected.room.players[0]?.isController).toBe(true);
     }
   });
 
-  it('rejects invalid reconnect tokens safely', async () => {
-    const host = await connectClient();
-    const created = await emitCreate(host, { displayName: 'Game Host' });
+  it('prevents reconnect credentials from impersonating the other role', async () => {
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
     if (!created.ok) {
-      throw new Error('Room creation failed in test setup.');
+      throw new Error('Display creation failed in test setup.');
+    }
+    const player = await connectClient();
+    const joined = await emitJoinPlayer(player, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+    if (!joined.ok) {
+      throw new Error('Player join failed in test setup.');
     }
 
-    const returningPlayer = await connectClient();
-    const response = await emitReconnect(returningPlayer, {
-      roomCode: created.room.code,
-      reconnectToken: 'x'.repeat(43),
+    const playerImpostor = await connectClient();
+    expect(
+      await emitReconnectPlayer(playerImpostor, {
+        roomCode: created.room.code,
+        playerReconnectToken: created.session.displayReconnectToken,
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: { code: 'RECONNECT_FAILED' },
     });
 
-    expect(response).toMatchObject({
+    const displayImpostor = await connectClient();
+    expect(
+      await emitReconnectDisplay(displayImpostor, {
+        roomCode: created.room.code,
+        displayReconnectToken: joined.session.playerReconnectToken,
+      }),
+    ).toMatchObject({
       ok: false,
       error: { code: 'RECONNECT_FAILED' },
     });
   });
 
-  it('releases remaining sockets when the host closes the room', async () => {
-    const host = await connectClient();
-    const created = await emitCreate(host, { displayName: 'Game Host' });
+  it('leaves display and controller sessions without closing the room', async () => {
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
     if (!created.ok) {
-      throw new Error('Room creation failed in test setup.');
+      throw new Error('Display creation failed in test setup.');
     }
-
-    const player = await connectClient();
-    const joined = await emitJoin(player, {
+    const controller = await connectClient();
+    await emitJoinPlayer(controller, {
       roomCode: created.room.code,
       displayName: 'Silver Owl',
     });
-    if (!joined.ok) {
-      throw new Error('Room join failed in test setup.');
-    }
-
-    const roomClosed = new Promise<RoomError>((resolve) => {
-      player.once('room:error', resolve);
+    const ordinary = await connectClient();
+    await emitJoinPlayer(ordinary, {
+      roomCode: created.room.code,
+      displayName: 'Amber Kite',
     });
-    expect(await emitLeave(host)).toEqual({ ok: true });
-    expect(await roomClosed).toMatchObject({ code: 'ROOM_EXPIRED' });
 
-    const newRoom = await emitCreate(player, { displayName: 'Silver Owl' });
-    expect(newRoom.ok).toBe(true);
+    expect(await emitLeaveDisplay(display)).toEqual({ ok: true });
+    expect(server.roomStore.roomCount).toBe(1);
+    expect(await emitLeavePlayer(controller)).toEqual({ ok: true });
+    expect(server.roomStore.roomCount).toBe(1);
+    expect(
+      server.roomStore.getRoomState(created.room.code)?.players,
+    ).toHaveLength(2);
   });
 
   it('returns a structured rate-limit error after repeated attempts', async () => {
@@ -318,29 +454,35 @@ describe('Words Stage 2 server', () => {
       displayName: 'Silver Owl',
     } as const;
 
-    expect(await emitJoin(client, input)).toMatchObject({
+    expect(await emitJoinPlayer(client, input)).toMatchObject({
       ok: false,
       error: { code: 'ROOM_NOT_FOUND' },
     });
-    expect(await emitJoin(client, input)).toMatchObject({
+    expect(await emitJoinPlayer(client, input)).toMatchObject({
       ok: false,
       error: { code: 'ROOM_NOT_FOUND' },
     });
-    expect(await emitJoin(client, input)).toMatchObject({
+    expect(await emitJoinPlayer(client, input)).toMatchObject({
       ok: false,
       error: { code: 'RATE_LIMITED' },
     });
   });
 
-  it('keeps HTML-like display names as plain network data', async () => {
-    const host = await connectClient();
-    const response = await emitCreate(host, {
-      displayName: '<Game Host>',
+  it('keeps HTML-like display names as plain player network data', async () => {
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) {
+      throw new Error('Display creation failed in test setup.');
+    }
+    const player = await connectClient();
+    const response = await emitJoinPlayer(player, {
+      roomCode: created.room.code,
+      displayName: '<Bright Fox>',
     });
 
     expect(response.ok).toBe(true);
     if (response.ok) {
-      expect(response.room.players[0]?.displayName).toBe('<Game Host>');
+      expect(response.room.players[0]?.displayName).toBe('<Bright Fox>');
     }
   });
 });

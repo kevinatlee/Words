@@ -49,27 +49,30 @@ export const reconnectTokenSchema = z
   .max(128)
   .regex(/^[A-Za-z0-9_-]+$/);
 
-export const createRoomInputSchema = z
-  .object({
-    displayName: displayNameSchema,
-  })
-  .strict();
+export const createDisplayInputSchema = z.object({}).strict();
 
-export const joinRoomInputSchema = z
+export const joinPlayerInputSchema = z
   .object({
     roomCode: roomCodeSchema,
     displayName: displayNameSchema,
   })
   .strict();
 
-export const reconnectRoomInputSchema = z
+export const reconnectDisplayInputSchema = z
   .object({
     roomCode: roomCodeSchema,
-    reconnectToken: reconnectTokenSchema,
+    displayReconnectToken: reconnectTokenSchema,
   })
   .strict();
 
-export const leaveRoomInputSchema = z.object({}).strict();
+export const reconnectPlayerInputSchema = z
+  .object({
+    roomCode: roomCodeSchema,
+    playerReconnectToken: reconnectTokenSchema,
+  })
+  .strict();
+
+export const leaveSessionInputSchema = z.object({}).strict();
 
 export const roomSettingsSchema = z
   .object({
@@ -86,13 +89,20 @@ export const roomSettingsSchema = z
   })
   .strict();
 
+export const displayStateSchema = z
+  .object({
+    connected: z.boolean(),
+    createdAt: z.string().datetime(),
+  })
+  .strict();
+
 export const playerStateSchema = z
   .object({
     id: z.string().uuid(),
     displayName: displayNameSchema,
     connected: z.boolean(),
     joinedAt: z.string().datetime(),
-    isHost: z.boolean(),
+    isController: z.boolean(),
   })
   .strict();
 
@@ -104,15 +114,53 @@ export const roomStateSchema = z
     lastActivityAt: z.string().datetime(),
     expiresAt: z.string().datetime(),
     maxPlayers: z.number().int().min(1).max(productConfig.maxPlayers),
+    display: displayStateSchema,
+    controllerPlayerId: z.string().uuid().nullable(),
     players: z.array(playerStateSchema).max(productConfig.maxPlayers),
     settings: roomSettingsSchema,
   })
+  .strict()
+  .superRefine((room, context) => {
+    const controllerPlayers = room.players.filter(
+      (player) => player.isController,
+    );
+
+    if (room.players.length === 0) {
+      if (room.controllerPlayerId !== null || controllerPlayers.length !== 0) {
+        context.addIssue({
+          code: 'custom',
+          message: 'An empty room cannot have a controller player.',
+          path: ['controllerPlayerId'],
+        });
+      }
+      return;
+    }
+
+    if (
+      room.controllerPlayerId === null ||
+      controllerPlayers.length !== 1 ||
+      controllerPlayers[0]?.id !== room.controllerPlayerId
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'A room with players must reference exactly one controller player.',
+        path: ['controllerPlayerId'],
+      });
+    }
+  });
+
+export const displaySessionCredentialsSchema = z
+  .object({
+    displaySessionId: z.string().uuid(),
+    displayReconnectToken: reconnectTokenSchema,
+  })
   .strict();
 
-export const sessionCredentialsSchema = z
+export const playerSessionCredentialsSchema = z
   .object({
     playerId: z.string().uuid(),
-    reconnectToken: reconnectTokenSchema,
+    playerReconnectToken: reconnectTokenSchema,
   })
   .strict();
 
@@ -135,70 +183,110 @@ export const roomErrorSchema = z
   })
   .strict();
 
-const roomActionSuccessSchema = z
-  .object({
-    ok: z.literal(true),
-    room: roomStateSchema,
-    session: sessionCredentialsSchema,
-  })
-  .strict();
-
-const roomActionFailureSchema = z
+export const roomActionFailureSchema = z
   .object({
     ok: z.literal(false),
     error: roomErrorSchema,
   })
   .strict();
 
-export const roomActionResponseSchema = z.discriminatedUnion('ok', [
-  roomActionSuccessSchema,
+const displayActionSuccessSchema = z
+  .object({
+    ok: z.literal(true),
+    room: roomStateSchema,
+    session: displaySessionCredentialsSchema,
+  })
+  .strict();
+
+const playerActionSuccessSchema = z
+  .object({
+    ok: z.literal(true),
+    room: roomStateSchema,
+    session: playerSessionCredentialsSchema,
+  })
+  .strict();
+
+export const displayActionResponseSchema = z.discriminatedUnion('ok', [
+  displayActionSuccessSchema,
   roomActionFailureSchema,
 ]);
 
-export const leaveRoomResponseSchema = z.discriminatedUnion('ok', [
+export const playerActionResponseSchema = z.discriminatedUnion('ok', [
+  playerActionSuccessSchema,
+  roomActionFailureSchema,
+]);
+
+export const leaveSessionResponseSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true) }).strict(),
   roomActionFailureSchema,
 ]);
 
-export type CreateRoomInput = z.infer<typeof createRoomInputSchema>;
-export type JoinRoomInput = z.infer<typeof joinRoomInputSchema>;
-export type ReconnectRoomInput = z.infer<typeof reconnectRoomInputSchema>;
-export type LeaveRoomInput = z.infer<typeof leaveRoomInputSchema>;
+export type CreateDisplayInput = z.infer<typeof createDisplayInputSchema>;
+export type JoinPlayerInput = z.infer<typeof joinPlayerInputSchema>;
+export type ReconnectDisplayInput = z.infer<typeof reconnectDisplayInputSchema>;
+export type ReconnectPlayerInput = z.infer<typeof reconnectPlayerInputSchema>;
+export type LeaveSessionInput = z.infer<typeof leaveSessionInputSchema>;
 export type RoomSettings = z.infer<typeof roomSettingsSchema>;
+export type DisplayState = z.infer<typeof displayStateSchema>;
 export type PlayerState = z.infer<typeof playerStateSchema>;
 export type RoomState = z.infer<typeof roomStateSchema>;
-export type SessionCredentials = z.infer<typeof sessionCredentialsSchema>;
+export type DisplaySessionCredentials = z.infer<
+  typeof displaySessionCredentialsSchema
+>;
+export type PlayerSessionCredentials = z.infer<
+  typeof playerSessionCredentialsSchema
+>;
 export type RoomErrorCode = z.infer<typeof roomErrorCodeSchema>;
 export type RoomError = z.infer<typeof roomErrorSchema>;
-export type RoomActionSuccess = z.infer<typeof roomActionSuccessSchema>;
-export type RoomActionResponse = z.infer<typeof roomActionResponseSchema>;
-export type LeaveRoomResponse = z.infer<typeof leaveRoomResponseSchema>;
-export type RoomActionAcknowledgement = (response: RoomActionResponse) => void;
-export type LeaveRoomAcknowledgement = (response: LeaveRoomResponse) => void;
+export type RoomActionFailure = z.infer<typeof roomActionFailureSchema>;
+export type DisplayActionSuccess = z.infer<typeof displayActionSuccessSchema>;
+export type DisplayActionResponse = z.infer<typeof displayActionResponseSchema>;
+export type PlayerActionSuccess = z.infer<typeof playerActionSuccessSchema>;
+export type PlayerActionResponse = z.infer<typeof playerActionResponseSchema>;
+export type LeaveSessionResponse = z.infer<typeof leaveSessionResponseSchema>;
+export type DisplayActionAcknowledgement = (
+  response: DisplayActionResponse,
+) => void;
+export type PlayerActionAcknowledgement = (
+  response: PlayerActionResponse,
+) => void;
+export type LeaveSessionAcknowledgement = (
+  response: LeaveSessionResponse,
+) => void;
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 
 export interface ClientToServerEvents {
-  'room:create': (
-    payload: CreateRoomInput,
-    acknowledge: RoomActionAcknowledgement,
+  'display:create': (
+    payload: CreateDisplayInput,
+    acknowledge: DisplayActionAcknowledgement,
   ) => void;
-  'room:join': (
-    payload: JoinRoomInput,
-    acknowledge: RoomActionAcknowledgement,
+  'display:reconnect': (
+    payload: ReconnectDisplayInput,
+    acknowledge: DisplayActionAcknowledgement,
   ) => void;
-  'room:reconnect': (
-    payload: ReconnectRoomInput,
-    acknowledge: RoomActionAcknowledgement,
+  'display:leave': (
+    payload: LeaveSessionInput,
+    acknowledge: LeaveSessionAcknowledgement,
   ) => void;
-  'room:leave': (
-    payload: LeaveRoomInput,
-    acknowledge: LeaveRoomAcknowledgement,
+  'player:join': (
+    payload: JoinPlayerInput,
+    acknowledge: PlayerActionAcknowledgement,
+  ) => void;
+  'player:reconnect': (
+    payload: ReconnectPlayerInput,
+    acknowledge: PlayerActionAcknowledgement,
+  ) => void;
+  'player:leave': (
+    payload: LeaveSessionInput,
+    acknowledge: LeaveSessionAcknowledgement,
   ) => void;
 }
 
 export interface ServerToClientEvents {
   'room:state': (room: RoomState) => void;
   'room:error': (error: RoomError) => void;
+  'display:connected': (display: DisplayState) => void;
+  'display:disconnected': (display: DisplayState) => void;
   'player:connected': (player: PlayerState) => void;
   'player:disconnected': (player: PlayerState) => void;
 }

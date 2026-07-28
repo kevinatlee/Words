@@ -16,13 +16,15 @@ import { RoomCode } from './RoomCode';
 
 type RoomLobbyProps = {
   room: RoomState;
-  currentPlayerId: string;
+  sessionRole: 'display' | 'player';
+  currentPlayerId: string | null;
   connectionStatus: ConnectionStatus;
   onLeave: () => Promise<void>;
 };
 
 export function RoomLobby({
   room,
+  sessionRole,
   currentPlayerId,
   connectionStatus,
   onLeave,
@@ -34,24 +36,30 @@ export function RoomLobby({
   const currentPlayer = room.players.find(
     (player) => player.id === currentPlayerId,
   );
-  const host = room.players.find((player) => player.isHost);
+  const controller = room.players.find(
+    (player) => player.id === room.controllerPlayerId,
+  );
   const letters = useMemo(() => createDemoBoard(gridSize), [gridSize]);
+  const isDisplay = sessionRole === 'display';
+
+  const heading = isDisplay
+    ? 'Shared display is ready.'
+    : currentPlayer?.isController
+      ? 'You’re the game host.'
+      : 'You’re in the room.';
+  const supportingText = isDisplay
+    ? 'Share the code and keep this screen visible while phone players join.'
+    : currentPlayer?.isController
+      ? 'You play normally and will control lobby settings and round starts in a later stage.'
+      : `Waiting with ${controller?.displayName ?? 'the game host'} for a future round.`;
 
   return (
-    <div className="host-page">
-      <section className="host-intro">
+    <div className="room-page">
+      <section className="room-intro">
         <div>
           <span className="eyebrow">Live temporary lobby</span>
-          <h1>
-            {currentPlayer?.isHost
-              ? 'Your room is ready.'
-              : 'You’re in the room.'}
-          </h1>
-          <p>
-            {currentPlayer?.isHost
-              ? 'Share the code and watch players arrive in real time.'
-              : `Waiting with ${host?.displayName ?? 'the host'} for a future round.`}
-          </p>
+          <h1>{heading}</h1>
+          <p>{supportingText}</p>
         </div>
         <RoomCode code={room.code} />
       </section>
@@ -76,17 +84,28 @@ export function RoomLobby({
       </div>
 
       <PrototypeNotice>
-        The lobby is live. Settings remain local previews, and starting a round
-        is intentionally not implemented in Stage 2.
+        The lobby is live. Controller settings, delegation, gameplay, and round
+        starts are intentionally not implemented in Stage 2.
       </PrototypeNotice>
 
-      <div className="host-dashboard">
-        <div className="host-dashboard__lobby">
+      <div className="room-dashboard">
+        <div className="room-dashboard__lobby">
           <section className="panel share-panel">
-            <span className="eyebrow">Invite players</span>
-            <h2>Share {room.code}</h2>
+            <div className="panel-heading">
+              <div>
+                <span className="eyebrow">Display session</span>
+                <h2>Shared screen</h2>
+              </div>
+              <span
+                className={`status-label${room.display.connected ? ' status-label--display' : ''}`}
+              >
+                {room.display.connected
+                  ? 'Display connected'
+                  : 'Display offline'}
+              </span>
+            </div>
             <p>
-              Players open the join page and enter this code. QR joining comes
+              Players open the join page and enter {room.code}. QR joining comes
               in a later stage.
             </p>
           </section>
@@ -97,7 +116,7 @@ export function RoomLobby({
           />
         </div>
 
-        <div className="host-dashboard__game">
+        <div className="room-dashboard__preview">
           <GameSettingsPrototype
             gridSize={gridSize}
             duration={duration}
@@ -120,7 +139,10 @@ export function RoomLobby({
               label={`${gridSize} by ${gridSize} demonstration letter grid`}
             />
             <div className="round-action">
-              <p>Room settings and round starts are not network actions yet.</p>
+              <p>
+                The controller will own settings and round starts in a future
+                stage.
+              </p>
               <button className="button button--primary" type="button" disabled>
                 Start Round
               </button>

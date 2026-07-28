@@ -14,7 +14,7 @@ import {
 } from '@words/shared';
 
 import { AppShell } from './components/AppShell';
-import { HostRoomForm } from './components/HostRoomForm';
+import { DisplayRoomForm } from './components/DisplayRoomForm';
 import { JoinRoomForm } from './components/JoinRoomForm';
 import { LobbyError } from './components/LobbyError';
 import { NotFound } from './components/NotFound';
@@ -73,20 +73,7 @@ export function App({
   );
 
   const rememberSession = useCallback(
-    (
-      nextRoom: RoomState,
-      credentials: {
-        playerId: string;
-        reconnectToken: string;
-      },
-      displayName: string,
-    ) => {
-      const nextSession: StoredLobbySession = {
-        roomCode: nextRoom.code,
-        playerId: credentials.playerId,
-        reconnectToken: credentials.reconnectToken,
-        displayName,
-      };
+    (nextRoom: RoomState, nextSession: StoredLobbySession) => {
       sessionStore.save(nextSession);
       sessionRef.current = nextSession;
       setSession(nextSession);
@@ -106,10 +93,18 @@ export function App({
 
       reconnectingRef.current = true;
       setReconnecting(true);
-      const response = await client.reconnectRoom({
-        roomCode: storedSession.roomCode,
-        reconnectToken: storedSession.reconnectToken,
-      });
+
+      const response =
+        storedSession.role === 'display'
+          ? await client.reconnectDisplay({
+              roomCode: storedSession.roomCode,
+              displayReconnectToken: storedSession.displayReconnectToken,
+            })
+          : await client.reconnectPlayer({
+              roomCode: storedSession.roomCode,
+              playerReconnectToken: storedSession.playerReconnectToken,
+            });
+
       reconnectingRef.current = false;
       setReconnecting(false);
 
@@ -122,11 +117,26 @@ export function App({
         return;
       }
 
-      rememberSession(
-        response.room,
-        response.session,
-        storedSession.displayName,
-      );
+      if (
+        storedSession.role === 'display' &&
+        'displaySessionId' in response.session
+      ) {
+        rememberSession(response.room, {
+          role: 'display',
+          roomCode: response.room.code,
+          ...response.session,
+        });
+        return;
+      }
+
+      if (storedSession.role === 'player' && 'playerId' in response.session) {
+        rememberSession(response.room, {
+          role: 'player',
+          roomCode: response.room.code,
+          ...response.session,
+          displayName: storedSession.displayName,
+        });
+      }
     },
     [client, rememberSession, sessionStore],
   );
@@ -202,40 +212,62 @@ export function App({
     return () => window.clearTimeout(reconnectTimer);
   }, [currentPath, reconnectSession, room?.code, sessionStore]);
 
-  const createRoom = async (displayName: string): Promise<RoomError | null> => {
-    const response = await client.createRoom({ displayName });
+  const createDisplay = async (): Promise<RoomError | null> => {
+    const response = await client.createDisplay({});
 
     if (!response.ok) {
       return response.error;
     }
 
-    rememberSession(response.room, response.session, displayName.trim());
+    rememberSession(response.room, {
+      role: 'display',
+      roomCode: response.room.code,
+      ...response.session,
+    });
     return null;
   };
 
-  const joinRoom = async (
+  const joinPlayer = async (
     roomCode: string,
     displayName: string,
   ): Promise<RoomError | null> => {
-    const response = await client.joinRoom({ roomCode, displayName });
+    const response = await client.joinPlayer({ roomCode, displayName });
 
     if (!response.ok) {
       return response.error;
     }
 
-    rememberSession(response.room, response.session, displayName.trim());
+    const playerName =
+      response.room.players.find(
+        (player) => player.id === response.session.playerId,
+      )?.displayName ?? displayName.trim();
+
+    rememberSession(response.room, {
+      role: 'player',
+      roomCode: response.room.code,
+      ...response.session,
+      displayName: playerName,
+    });
     return null;
   };
 
-  const leaveRoom = async (): Promise<void> => {
-    const response = await client.leaveRoom();
+  const leaveSession = async (): Promise<void> => {
+    const currentSession = sessionRef.current;
+    if (!currentSession) {
+      return;
+    }
+
+    const response =
+      currentSession.role === 'display'
+        ? await client.leaveDisplay()
+        : await client.leavePlayer();
 
     if (!response.ok) {
       setRoomError(response.error);
       return;
     }
 
-    sessionStore.clear(sessionRef.current);
+    sessionStore.clear(currentSession);
     sessionRef.current = null;
     setSession(null);
     setRoom(null);
@@ -251,11 +283,11 @@ export function App({
   if (currentPath === '/') {
     page = <RoleSelection />;
     pageClassName = 'app-shell--home';
-  } else if (currentPath === '/host') {
-    page = <HostRoomForm onCreate={createRoom} />;
-    pageClassName = 'app-shell--host';
+  } else if (currentPath === '/display' || currentPath === '/host') {
+    page = <DisplayRoomForm onCreate={createDisplay} />;
+    pageClassName = 'app-shell--display';
   } else if (currentPath === '/join') {
-    page = <JoinRoomForm onJoin={joinRoom} />;
+    page = <JoinRoomForm onJoin={joinPlayer} />;
     pageClassName = 'app-shell--player';
   } else if (currentPath === '/play/demo') {
     page = <PlayerPrototype />;
@@ -267,9 +299,12 @@ export function App({
           <LobbyError error={roomError} />
           <RoomLobby
             room={room}
-            currentPlayerId={session.playerId}
+            sessionRole={session.role}
+            currentPlayerId={
+              session.role === 'player' ? session.playerId : null
+            }
             connectionStatus={connectionStatus}
-            onLeave={leaveRoom}
+            onLeave={leaveSession}
           />
         </>
       );
@@ -285,11 +320,12 @@ export function App({
       page = (
         <>
           <LobbyError error={roomError} />
-          <JoinRoomForm initialRoomCode={routeRoomCode} onJoin={joinRoom} />
+          <JoinRoomForm initialRoomCode={routeRoomCode} onJoin={joinPlayer} />
         </>
       );
     }
-    pageClassName = 'app-shell--host';
+    pageClassName =
+      session?.role === 'display' ? 'app-shell--display' : 'app-shell--player';
   } else {
     page = <NotFound />;
     pageClassName = 'app-shell--not-found';

@@ -34,13 +34,13 @@ export function RoleSelection() {
       </div>
 
       <div className="role-actions" aria-label="Choose how to enter a lobby">
-        <a className="role-card role-card--host" href="/host">
+        <a className="role-card role-card--display" href="/display">
           <span className="role-card__number" aria-hidden="true">
             01
           </span>
           <span>
-            <small>For the shared screen</small>
-            <strong>Host a Game</strong>
+            <small>For the TV or shared screen</small>
+            <strong>Open Shared Display</strong>
           </span>
           <span className="role-card__arrow" aria-hidden="true">
             ↗

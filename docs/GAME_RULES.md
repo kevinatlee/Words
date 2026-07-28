@@ -5,7 +5,7 @@ decisions.
 
 ## Implemented through Stage 2
 
-- The host prototype can locally preview 4 × 4, 5 × 5, and 6 × 6 layouts.
+- The shared lobby can locally preview 4 × 4, 5 × 5, and 6 × 6 layouts.
 - The default preview is 4 × 4.
 - The player prototype shows a static touch-sized 4 × 4 layout.
 - Allowed duration labels and defaults are represented in shared configuration.
@@ -27,8 +27,8 @@ duplicate detection, or scoring.
   path.
 - A word must appear in a bundled, openly licensed English dictionary.
 - Dictionary license and attribution will be recorded before data is bundled.
-- The host chooses supported settings; the server validates the selection
-  against an allowlist.
+- The controller player chooses supported settings; the server validates the
+  selection against an allowlist.
 
 ## Planned durations
 
@@ -73,7 +73,7 @@ normal or reduced points. Stage 2 does not score duplicates.
 
 - Which openly licensed English dictionary provides the right balance of
   familiar and unusual words?
-- Should host delegation be allowed during an active round?
+- Should controller delegation be allowed during an active round?
 - How should custom scoring be configured and bounded?
 - What feedback should distinguish an invalid path, an unknown word, a
   duplicate personal submission, and a shared word?

@@ -194,7 +194,8 @@ button:disabled {
   white-space: nowrap;
 }
 
-.status-label--host {
+.status-label--controller,
+.status-label--display {
   border-color: rgba(112, 231, 162, 0.4);
   background: rgba(112, 231, 162, 0.12);
   color: var(--mint);
@@ -415,7 +416,7 @@ button:disabled {
   transform: translateY(-0.25rem);
 }
 
-.role-card--host {
+.role-card--display {
   background: var(--mint-strong);
 }
 
@@ -456,14 +457,14 @@ button:disabled {
   line-height: 0.8;
 }
 
-/* Shared host components */
+/* Shared room components */
 
-.host-page,
+.room-page,
 .player-page {
   padding-block: clamp(2.5rem, 5vw, 5rem);
 }
 
-.host-intro {
+.room-intro {
   display: flex;
   align-items: end;
   justify-content: space-between;
@@ -471,7 +472,7 @@ button:disabled {
   margin-bottom: 1.5rem;
 }
 
-.host-intro h1,
+.room-intro h1,
 .player-page__intro h1,
 .not-found h1 {
   max-width: 48rem;
@@ -481,7 +482,7 @@ button:disabled {
   line-height: 0.95;
 }
 
-.host-intro p,
+.room-intro p,
 .player-page__intro p,
 .not-found p {
   max-width: 45rem;
@@ -519,15 +520,15 @@ button:disabled {
   font-size: 0.72rem;
 }
 
-.host-dashboard {
+.room-dashboard {
   display: grid;
   margin-top: 1.25rem;
   grid-template-columns: minmax(16rem, 0.7fr) minmax(32rem, 1.3fr);
   gap: 1.25rem;
 }
 
-.host-dashboard__lobby,
-.host-dashboard__game {
+.room-dashboard__lobby,
+.room-dashboard__preview {
   display: grid;
   align-content: start;
   gap: 1.25rem;
@@ -615,7 +616,7 @@ button:disabled {
 }
 
 .player-list__item,
-.phone-host {
+.phone-controller {
   display: flex;
   min-height: 4rem;
   align-items: center;
@@ -647,7 +648,7 @@ button:disabled {
 }
 
 .player-list__identity,
-.phone-host > span:nth-child(2) {
+.phone-controller > span:nth-child(2) {
   display: flex;
   min-width: 0;
   flex: 1;
@@ -655,7 +656,7 @@ button:disabled {
 }
 
 .player-list__identity small,
-.phone-host small {
+.phone-controller small {
   margin-top: 0.15rem;
   color: var(--paper-muted);
   font-size: 0.74rem;
@@ -911,11 +912,11 @@ button:disabled {
   display: none;
 }
 
-.phone-host {
+.phone-controller {
   margin-block: 1rem;
 }
 
-.phone-host .player-avatar {
+.phone-controller .player-avatar {
   width: 2.25rem;
   background: var(--mint);
 }
@@ -1187,15 +1188,15 @@ button:disabled {
     gap: 2rem;
   }
 
-  .host-dashboard {
+  .room-dashboard {
     grid-template-columns: 1fr;
   }
 
-  .host-dashboard__lobby {
+  .room-dashboard__lobby {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .host-dashboard__lobby .qr-placeholder {
+  .room-dashboard__lobby .qr-placeholder {
     grid-row: span 2;
   }
 }
@@ -1251,20 +1252,20 @@ button:disabled {
     min-height: 8.5rem;
   }
 
-  .host-intro {
+  .room-intro {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .host-intro .room-code {
+  .room-intro .room-code {
     width: 100%;
   }
 
-  .host-dashboard__lobby {
+  .room-dashboard__lobby {
     grid-template-columns: 1fr;
   }
 
-  .host-dashboard__lobby .qr-placeholder {
+  .room-dashboard__lobby .qr-placeholder {
     grid-row: auto;
   }
 

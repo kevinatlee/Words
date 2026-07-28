@@ -31,15 +31,17 @@ export function PlayerPrototype() {
             <RoomCode code="MINT 42" />
           </header>
 
-          <div className="phone-host">
+          <div className="phone-controller">
             <span className="player-avatar" aria-hidden="true">
               H
             </span>
             <span>
-              <small>Current host</small>
-              <strong>Host</strong>
+              <small>Game host</small>
+              <strong>Guest Finch</strong>
             </span>
-            <span className="status-label status-label--host">Host</span>
+            <span className="status-label status-label--controller">
+              Controller
+            </span>
           </div>
 
           <div className="player-timer" aria-label="Mock time remaining">

@@ -4,19 +4,30 @@ import {
   productConfig,
   roomCodeAlphabet,
   roomCodeSchema,
+  type DisplaySessionCredentials,
+  type DisplayState,
+  type PlayerSessionCredentials,
   type PlayerState,
   type RoomErrorCode,
   type RoomSettings,
   type RoomState,
-  type SessionCredentials,
 } from '@words/shared';
+
+type InternalDisplay = {
+  id: string;
+  connected: boolean;
+  createdAt: number;
+  reconnectToken: string | null;
+  socketId: string | null;
+  disconnectExpiresAt: number | null;
+};
 
 type InternalPlayer = {
   id: string;
   displayName: string;
   connected: boolean;
   joinedAt: number;
-  reconnectToken: string;
+  reconnectToken: string | null;
   socketId: string | null;
   disconnectExpiresAt: number | null;
 };
@@ -27,39 +38,75 @@ type InternalRoom = {
   createdAt: number;
   lastActivityAt: number;
   expiresAt: number;
-  hostPlayerId: string;
+  display: InternalDisplay;
+  controllerPlayerId: string | null;
   players: Map<string, InternalPlayer>;
   settings: RoomSettings;
 };
 
-type SessionReference = {
+type DisplaySessionReference = {
+  roomCode: string;
+  displaySessionId: string;
+};
+
+type PlayerSessionReference = {
   roomCode: string;
   playerId: string;
 };
 
-export type BoundSession = {
+export type BoundDisplaySession = {
+  role: 'display';
+  roomCode: string;
+  displaySessionId: string;
+};
+
+export type BoundPlayerSession = {
+  role: 'player';
   roomCode: string;
   playerId: string;
 };
 
-export type RoomSessionResult = {
+export type BoundSession = BoundDisplaySession | BoundPlayerSession;
+
+export type DisplaySessionResult = {
   room: RoomState;
-  session: SessionCredentials;
+  session: DisplaySessionCredentials;
+  display: DisplayState;
+  replacedSocketId: string | null;
+};
+
+export type PlayerSessionResult = {
+  room: RoomState;
+  session: PlayerSessionCredentials;
   player: PlayerState;
   replacedSocketId: string | null;
 };
 
-export type RoomPresenceResult = {
-  room: RoomState;
-  player: PlayerState;
-};
+export type RoomPresenceResult =
+  | {
+      role: 'display';
+      room: RoomState;
+      display: DisplayState;
+    }
+  | {
+      role: 'player';
+      room: RoomState;
+      player: PlayerState;
+    };
 
-export type LeaveResult = {
-  roomCode: string;
-  deletedRoom: boolean;
-  room: RoomState | null;
-  player: PlayerState;
-};
+export type LeaveResult =
+  | {
+      role: 'display';
+      roomCode: string;
+      room: RoomState;
+      display: DisplayState;
+    }
+  | {
+      role: 'player';
+      roomCode: string;
+      room: RoomState;
+      player: PlayerState;
+    };
 
 export type CleanupResult = {
   deletedRoomCodes: string[];
@@ -73,6 +120,7 @@ export type RoomStoreOptions = {
   reconnectGraceMs: number;
   now?: () => number;
   roomCodeGenerator?: () => string;
+  displaySessionIdGenerator?: () => string;
   playerIdGenerator?: () => string;
   reconnectTokenGenerator?: () => string;
 };
@@ -100,10 +148,12 @@ function defaultReconnectTokenGenerator(): string {
 
 export class RoomStore {
   private readonly rooms = new Map<string, InternalRoom>();
-  private readonly sessions = new Map<string, SessionReference>();
+  private readonly displaySessions = new Map<string, DisplaySessionReference>();
+  private readonly playerSessions = new Map<string, PlayerSessionReference>();
   private readonly expiredRoomCodes = new Map<string, number>();
   private readonly now: () => number;
   private readonly roomCodeGenerator: () => string;
+  private readonly displaySessionIdGenerator: () => string;
   private readonly playerIdGenerator: () => string;
   private readonly reconnectTokenGenerator: () => string;
 
@@ -111,12 +161,14 @@ export class RoomStore {
     this.now = options.now ?? Date.now;
     this.roomCodeGenerator =
       options.roomCodeGenerator ?? defaultRoomCodeGenerator;
+    this.displaySessionIdGenerator =
+      options.displaySessionIdGenerator ?? randomUUID;
     this.playerIdGenerator = options.playerIdGenerator ?? randomUUID;
     this.reconnectTokenGenerator =
       options.reconnectTokenGenerator ?? defaultReconnectTokenGenerator;
   }
 
-  createRoom(displayName: string, socketId: string): RoomSessionResult {
+  createDisplay(socketId: string): DisplaySessionResult {
     if (this.rooms.size >= this.options.maxRooms) {
       throw new RoomOperationError(
         'SERVER_BUSY',
@@ -126,15 +178,16 @@ export class RoomStore {
 
     const now = this.now();
     const code = this.createUniqueRoomCode();
-    const player = this.createPlayer(displayName, socketId, now);
+    const display = this.createDisplaySession(socketId, now);
     const room: InternalRoom = {
       code,
       phase: 'LOBBY',
       createdAt: now,
       lastActivityAt: now,
       expiresAt: now + this.options.roomTtlMs,
-      hostPlayerId: player.id,
-      players: new Map([[player.id, player]]),
+      display,
+      controllerPlayerId: null,
+      players: new Map(),
       settings: {
         gridSize: productConfig.defaultGridSize,
         roundDurationSeconds: productConfig.defaultRoundDurationSeconds,
@@ -143,19 +196,26 @@ export class RoomStore {
     };
 
     this.rooms.set(code, room);
-    this.sessions.set(player.reconnectToken, {
+    const displayReconnectToken = display.reconnectToken;
+    if (!displayReconnectToken) {
+      throw new RoomOperationError(
+        'INTERNAL_ERROR',
+        'The display session could not be created.',
+      );
+    }
+    this.displaySessions.set(displayReconnectToken, {
       roomCode: code,
-      playerId: player.id,
+      displaySessionId: display.id,
     });
 
-    return this.createSessionResult(room, player);
+    return this.createDisplayResult(room, display);
   }
 
-  joinRoom(
+  joinPlayer(
     roomCode: string,
     displayName: string,
     socketId: string,
-  ): RoomSessionResult {
+  ): PlayerSessionResult {
     const room = this.requireActiveRoom(roomCode);
 
     if (room.players.size >= this.options.maxPlayers) {
@@ -182,27 +242,88 @@ export class RoomStore {
     const now = this.now();
     const player = this.createPlayer(displayName, socketId, now);
     room.players.set(player.id, player);
-    this.sessions.set(player.reconnectToken, {
+    const playerReconnectToken = player.reconnectToken;
+    if (!playerReconnectToken) {
+      throw new RoomOperationError(
+        'INTERNAL_ERROR',
+        'The player session could not be created.',
+      );
+    }
+    this.playerSessions.set(playerReconnectToken, {
       roomCode: room.code,
       playerId: player.id,
     });
+
+    if (room.controllerPlayerId === null) {
+      room.controllerPlayerId = player.id;
+    }
+
     this.touch(room, now);
 
-    return this.createSessionResult(room, player);
+    return this.createPlayerResult(room, player);
   }
 
-  reconnectRoom(
+  reconnectDisplay(
     roomCode: string,
-    reconnectToken: string,
+    displayReconnectToken: string,
     socketId: string,
-  ): RoomSessionResult {
+  ): DisplaySessionResult {
     const room = this.requireActiveRoom(roomCode);
-    const session = this.sessions.get(reconnectToken);
+    const session = this.displaySessions.get(displayReconnectToken);
+
+    if (
+      !session ||
+      session.roomCode !== room.code ||
+      session.displaySessionId !== room.display.id
+    ) {
+      throw new RoomOperationError(
+        'RECONNECT_FAILED',
+        'That display reconnect credential is no longer valid.',
+      );
+    }
+
+    const now = this.now();
+    const display = room.display;
+
+    if (
+      display.reconnectToken !== displayReconnectToken ||
+      (display.disconnectExpiresAt !== null &&
+        display.disconnectExpiresAt <= now)
+    ) {
+      this.displaySessions.delete(displayReconnectToken);
+      throw new RoomOperationError(
+        'RECONNECT_FAILED',
+        'That display reconnect credential has expired.',
+      );
+    }
+
+    const replacedSocketId = display.socketId;
+    this.displaySessions.delete(displayReconnectToken);
+    display.reconnectToken = this.createReconnectToken(displayReconnectToken);
+    display.socketId = socketId;
+    display.connected = true;
+    display.disconnectExpiresAt = null;
+    this.displaySessions.set(display.reconnectToken, {
+      roomCode: room.code,
+      displaySessionId: display.id,
+    });
+    this.touch(room, now);
+
+    return this.createDisplayResult(room, display, replacedSocketId);
+  }
+
+  reconnectPlayer(
+    roomCode: string,
+    playerReconnectToken: string,
+    socketId: string,
+  ): PlayerSessionResult {
+    const room = this.requireActiveRoom(roomCode);
+    const session = this.playerSessions.get(playerReconnectToken);
 
     if (!session || session.roomCode !== room.code) {
       throw new RoomOperationError(
         'RECONNECT_FAILED',
-        'That temporary reconnect session is no longer valid.',
+        'That player reconnect credential is no longer valid.',
       );
     }
 
@@ -211,28 +332,29 @@ export class RoomStore {
 
     if (
       !player ||
+      player.reconnectToken !== playerReconnectToken ||
       (player.disconnectExpiresAt !== null && player.disconnectExpiresAt <= now)
     ) {
-      this.sessions.delete(reconnectToken);
+      this.playerSessions.delete(playerReconnectToken);
       throw new RoomOperationError(
         'RECONNECT_FAILED',
-        'That temporary reconnect session has expired.',
+        'That player reconnect credential has expired.',
       );
     }
 
     const replacedSocketId = player.socketId;
-    this.sessions.delete(reconnectToken);
-    player.reconnectToken = this.reconnectTokenGenerator();
+    this.playerSessions.delete(playerReconnectToken);
+    player.reconnectToken = this.createReconnectToken(playerReconnectToken);
     player.socketId = socketId;
     player.connected = true;
     player.disconnectExpiresAt = null;
-    this.sessions.set(player.reconnectToken, {
+    this.playerSessions.set(player.reconnectToken, {
       roomCode: room.code,
       playerId: player.id,
     });
     this.touch(room, now);
 
-    return this.createSessionResult(room, player, replacedSocketId);
+    return this.createPlayerResult(room, player, replacedSocketId);
   }
 
   disconnect(
@@ -240,19 +362,46 @@ export class RoomStore {
     socketId: string,
   ): RoomPresenceResult | null {
     const room = this.rooms.get(session.roomCode);
-    const player = room?.players.get(session.playerId);
 
-    if (!room || !player || player.socketId !== socketId) {
+    if (!room) {
       return null;
     }
 
     const now = this.now();
+
+    if (session.role === 'display') {
+      const display = room.display;
+      if (
+        display.id !== session.displaySessionId ||
+        display.socketId !== socketId
+      ) {
+        return null;
+      }
+
+      display.connected = false;
+      display.socketId = null;
+      display.disconnectExpiresAt = now + this.options.reconnectGraceMs;
+      this.touch(room, now);
+
+      return {
+        role: 'display',
+        room: this.toRoomState(room),
+        display: this.toDisplayState(display),
+      };
+    }
+
+    const player = room.players.get(session.playerId);
+    if (!player || player.socketId !== socketId) {
+      return null;
+    }
+
     player.connected = false;
     player.socketId = null;
     player.disconnectExpiresAt = now + this.options.reconnectGraceMs;
     this.touch(room, now);
 
     return {
+      role: 'player',
       room: this.toRoomState(room),
       player: this.toPlayerState(room, player),
     };
@@ -260,35 +409,71 @@ export class RoomStore {
 
   leave(session: BoundSession, socketId: string): LeaveResult | null {
     const room = this.rooms.get(session.roomCode);
-    const player = room?.players.get(session.playerId);
 
-    if (!room || !player || player.socketId !== socketId) {
+    if (!room) {
       return null;
     }
 
+    if (session.role === 'display') {
+      const display = room.display;
+      if (
+        display.id !== session.displaySessionId ||
+        display.socketId !== socketId
+      ) {
+        return null;
+      }
+
+      if (display.reconnectToken) {
+        this.displaySessions.delete(display.reconnectToken);
+      }
+      display.connected = false;
+      display.socketId = null;
+      display.reconnectToken = null;
+      display.disconnectExpiresAt = null;
+      this.touch(room, this.now());
+
+      return {
+        role: 'display',
+        roomCode: room.code,
+        room: this.toRoomState(room),
+        display: this.toDisplayState(display),
+      };
+    }
+
+    const player = room.players.get(session.playerId);
+    if (!player || player.socketId !== socketId) {
+      return null;
+    }
+
+    const now = this.now();
     const playerState = {
       ...this.toPlayerState(room, player),
       connected: false,
     };
-    const isHost = player.id === room.hostPlayerId;
 
-    if (isHost) {
-      this.deleteRoom(room, this.now(), true);
-      return {
-        roomCode: room.code,
-        deletedRoom: true,
-        room: null,
-        player: playerState,
-      };
+    if (player.id === room.controllerPlayerId && room.players.size > 1) {
+      if (player.reconnectToken) {
+        this.playerSessions.delete(player.reconnectToken);
+      }
+      player.connected = false;
+      player.socketId = null;
+      player.reconnectToken = null;
+      player.disconnectExpiresAt = null;
+    } else {
+      if (player.reconnectToken) {
+        this.playerSessions.delete(player.reconnectToken);
+      }
+      room.players.delete(player.id);
+      if (player.id === room.controllerPlayerId) {
+        room.controllerPlayerId = null;
+      }
     }
 
-    this.sessions.delete(player.reconnectToken);
-    room.players.delete(player.id);
-    this.touch(room, this.now());
+    this.touch(room, now);
 
     return {
+      role: 'player',
       roomCode: room.code,
-      deletedRoom: false,
       room: this.toRoomState(room),
       player: playerState,
     };
@@ -297,7 +482,7 @@ export class RoomStore {
   cleanupExpired(): CleanupResult {
     const now = this.now();
     const deletedRoomCodes: string[] = [];
-    const updatedRoomCodes: string[] = [];
+    const updatedRoomCodes = new Set<string>();
 
     this.pruneExpiredCodeTombstones(now);
 
@@ -308,6 +493,20 @@ export class RoomStore {
         continue;
       }
 
+      const display = room.display;
+      if (
+        !display.connected &&
+        display.disconnectExpiresAt !== null &&
+        display.disconnectExpiresAt <= now
+      ) {
+        if (display.reconnectToken) {
+          this.displaySessions.delete(display.reconnectToken);
+        }
+        display.reconnectToken = null;
+        display.disconnectExpiresAt = null;
+        updatedRoomCodes.add(room.code);
+      }
+
       const expiredPlayers = [...room.players.values()].filter(
         (player) =>
           !player.connected &&
@@ -315,28 +514,38 @@ export class RoomStore {
           player.disconnectExpiresAt <= now,
       );
 
-      if (expiredPlayers.some((player) => player.id === room.hostPlayerId)) {
-        deletedRoomCodes.push(room.code);
-        this.deleteRoom(room, now, true);
-        continue;
-      }
-
-      if (expiredPlayers.length > 0) {
-        for (const player of expiredPlayers) {
-          this.sessions.delete(player.reconnectToken);
-          room.players.delete(player.id);
+      for (const player of expiredPlayers) {
+        if (player.reconnectToken) {
+          this.playerSessions.delete(player.reconnectToken);
         }
-        this.touch(room, now);
-        updatedRoomCodes.push(room.code);
+
+        if (player.id === room.controllerPlayerId && room.players.size > 1) {
+          player.reconnectToken = null;
+          player.disconnectExpiresAt = null;
+        } else {
+          room.players.delete(player.id);
+          if (player.id === room.controllerPlayerId) {
+            room.controllerPlayerId = null;
+          }
+        }
+        updatedRoomCodes.add(room.code);
       }
 
-      if (room.players.size === 0) {
+      if (
+        room.players.size === 0 &&
+        !display.connected &&
+        display.reconnectToken === null
+      ) {
         deletedRoomCodes.push(room.code);
+        updatedRoomCodes.delete(room.code);
         this.deleteRoom(room, now, true);
       }
     }
 
-    return { deletedRoomCodes, updatedRoomCodes };
+    return {
+      deletedRoomCodes,
+      updatedRoomCodes: [...updatedRoomCodes],
+    };
   }
 
   getRoomState(roomCode: string): RoomState | null {
@@ -363,6 +572,35 @@ export class RoomStore {
     );
   }
 
+  private createReconnectToken(previousToken?: string): string {
+    for (let attempt = 0; attempt < 32; attempt += 1) {
+      const token = this.reconnectTokenGenerator();
+      if (
+        token !== previousToken &&
+        !this.displaySessions.has(token) &&
+        !this.playerSessions.has(token)
+      ) {
+        return token;
+      }
+    }
+
+    throw new RoomOperationError(
+      'SERVER_BUSY',
+      'A temporary reconnect credential could not be allocated.',
+    );
+  }
+
+  private createDisplaySession(socketId: string, now: number): InternalDisplay {
+    return {
+      id: this.displaySessionIdGenerator(),
+      connected: true,
+      createdAt: now,
+      reconnectToken: this.createReconnectToken(),
+      socketId,
+      disconnectExpiresAt: null,
+    };
+  }
+
   private createPlayer(
     displayName: string,
     socketId: string,
@@ -373,7 +611,7 @@ export class RoomStore {
       displayName,
       connected: true,
       joinedAt: now,
-      reconnectToken: this.reconnectTokenGenerator(),
+      reconnectToken: this.createReconnectToken(),
       socketId,
       disconnectExpiresAt: null,
     };
@@ -409,18 +647,48 @@ export class RoomStore {
     return room;
   }
 
-  private createSessionResult(
+  private createDisplayResult(
+    room: InternalRoom,
+    display: InternalDisplay,
+    replacedSocketId: string | null = null,
+  ): DisplaySessionResult {
+    if (!display.reconnectToken) {
+      throw new RoomOperationError(
+        'RECONNECT_FAILED',
+        'That display reconnect credential is no longer valid.',
+      );
+    }
+
+    return {
+      room: this.toRoomState(room),
+      display: this.toDisplayState(display),
+      replacedSocketId,
+      session: {
+        displaySessionId: display.id,
+        displayReconnectToken: display.reconnectToken,
+      },
+    };
+  }
+
+  private createPlayerResult(
     room: InternalRoom,
     player: InternalPlayer,
     replacedSocketId: string | null = null,
-  ): RoomSessionResult {
+  ): PlayerSessionResult {
+    if (!player.reconnectToken) {
+      throw new RoomOperationError(
+        'RECONNECT_FAILED',
+        'That player reconnect credential is no longer valid.',
+      );
+    }
+
     return {
       room: this.toRoomState(room),
       player: this.toPlayerState(room, player),
       replacedSocketId,
       session: {
         playerId: player.id,
-        reconnectToken: player.reconnectToken,
+        playerReconnectToken: player.reconnectToken,
       },
     };
   }
@@ -433,10 +701,19 @@ export class RoomStore {
       lastActivityAt: new Date(room.lastActivityAt).toISOString(),
       expiresAt: new Date(room.expiresAt).toISOString(),
       maxPlayers: this.options.maxPlayers,
+      display: this.toDisplayState(room.display),
+      controllerPlayerId: room.controllerPlayerId,
       players: [...room.players.values()]
         .sort((left, right) => left.joinedAt - right.joinedAt)
         .map((player) => this.toPlayerState(room, player)),
       settings: room.settings,
+    };
+  }
+
+  private toDisplayState(display: InternalDisplay): DisplayState {
+    return {
+      connected: display.connected,
+      createdAt: new Date(display.createdAt).toISOString(),
     };
   }
 
@@ -449,7 +726,7 @@ export class RoomStore {
       displayName: player.displayName,
       connected: player.connected,
       joinedAt: new Date(player.joinedAt).toISOString(),
-      isHost: player.id === room.hostPlayerId,
+      isController: player.id === room.controllerPlayerId,
     };
   }
 
@@ -463,8 +740,13 @@ export class RoomStore {
     now: number,
     rememberExpiration: boolean,
   ): void {
+    if (room.display.reconnectToken) {
+      this.displaySessions.delete(room.display.reconnectToken);
+    }
     for (const player of room.players.values()) {
-      this.sessions.delete(player.reconnectToken);
+      if (player.reconnectToken) {
+        this.playerSessions.delete(player.reconnectToken);
+      }
     }
 
     this.rooms.delete(room.code);

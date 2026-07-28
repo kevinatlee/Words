@@ -5,13 +5,13 @@ later game stages must preserve.
 
 ## Runtime pieces
 
-**React browser client (`apps/client`):** Provides host, join, live-lobby, and
-retained static preview screens. It renders server state but is never the source
-of truth for room membership or host authority.
+**React browser client (`apps/client`):** Provides display, player join,
+live-lobby, and retained static preview screens. It renders server state but is
+never the source of truth for membership or controller authority.
 
 **Node.js server (`apps/server`):** Runs Express and Socket.IO in one process.
-It owns active rooms, players, host identity, reconnect credentials, expiration,
-capacity, and cleanup.
+It owns active rooms, display sessions, players, `controllerPlayerId`,
+role-specific reconnect credentials, expiration, capacity, and cleanup.
 
 **Shared package (`packages/shared`):** Defines product configuration, strict
 Zod schemas, state shapes, structured errors, acknowledgements, and typed
@@ -20,6 +20,23 @@ Socket.IO event maps. Both client and server import the same contract.
 **Game-engine package (`packages/game-engine`):** Reserved for Stage 3. The
 lobby does not generate boards, validate paths, use a dictionary, or score
 words.
+
+## Roles
+
+```text
+Room
+├── one display session
+│   └── TV/shared-screen presentation; not a player
+└── zero to eight player sessions
+    └── exactly one controllerPlayerId once any player exists
+```
+
+The controller is a participating phone player. The first player receives the
+role from the server. Future delegation will change only
+`controllerPlayerId`; it must not replace or modify the display session.
+
+The display is excluded from player capacity and cannot use player
+credentials. Future word-submission handlers must reject display-bound sockets.
 
 ## Local request path
 
@@ -40,15 +57,12 @@ Vite client on :5173
                             in-memory RoomStore
 ```
 
-The Vite proxy means the browser connects to its current origin. It does not
-need a hard-coded development Socket.IO address.
-
-The Stage 2 production build does not yet serve the React build from Express.
-One-container serving and deployment remain Stage 5 work.
+The Vite proxy means the browser connects to its current origin. The Stage 2
+production build does not yet serve the React build from Express.
 
 ## Health endpoint
 
-`GET /api/health` returns a small public JSON response:
+`GET /api/health` returns:
 
 ```json
 {
@@ -63,48 +77,76 @@ inspect an external database because there is none.
 
 ## Shared real-time contract
 
-Client requests use Socket.IO acknowledgements so one request receives one
-structured result:
+Client requests use acknowledgements so one request receives one structured
+result.
 
-| Event            | Client fields                | Purpose                               |
-| ---------------- | ---------------------------- | ------------------------------------- |
-| `room:create`    | `displayName`                | Allocate a room and server-owned host |
-| `room:join`      | `roomCode`, `displayName`    | Add a player if the room permits it   |
-| `room:reconnect` | `roomCode`, `reconnectToken` | Restore one disconnected player       |
-| `room:leave`     | no fields                    | Explicitly leave the current room     |
+Display events:
+
+| Event               | Client fields                       | Purpose                       |
+| ------------------- | ----------------------------------- | ----------------------------- |
+| `display:create`    | none                                | Create the room display       |
+| `display:reconnect` | `roomCode`, `displayReconnectToken` | Restore the display role      |
+| `display:leave`     | none                                | Leave the display socket room |
+
+Player events:
+
+| Event              | Client fields                      | Purpose                      |
+| ------------------ | ---------------------------------- | ---------------------------- |
+| `player:join`      | `roomCode`, `displayName`          | Create a player session      |
+| `player:reconnect` | `roomCode`, `playerReconnectToken` | Restore one player role      |
+| `player:leave`     | none                               | Leave the player socket room |
 
 The server emits:
 
-| Event                 | Purpose                                             |
-| --------------------- | --------------------------------------------------- |
-| `room:state`          | Replace the client’s room snapshot                  |
-| `room:error`          | Report an asynchronous room closure or expiry       |
-| `player:connected`    | Announce presence before the state snapshot         |
-| `player:disconnected` | Announce loss of presence before the state snapshot |
+| Event                  | Purpose                                           |
+| ---------------------- | ------------------------------------------------- |
+| `room:state`           | Replace the client’s authoritative room snapshot  |
+| `room:error`           | Report asynchronous expiry or session replacement |
+| `display:connected`    | Announce restored display presence                |
+| `display:disconnected` | Announce lost display presence                    |
+| `player:connected`     | Announce joined or restored player presence       |
+| `player:disconnected`  | Announce lost player presence                     |
 
-All incoming request objects are strict Zod schemas: unknown fields, invalid
-codes, invalid names, and malformed reconnect tokens are rejected. Successful
-create, join, and reconnect acknowledgements contain a full room snapshot plus
-the player ID and reconnect token. Failures contain a bounded public error code
-and message.
+All incoming request objects use strict Zod schemas. Unknown fields—including
+client-provided controller fields—are rejected. Display acknowledgements return
+`displaySessionId` and `displayReconnectToken`; player acknowledgements return
+`playerId` and `playerReconnectToken`. Public room snapshots never include
+either token.
 
-## Create and join flow
+## Display creation flow
 
 ```text
-client request
+display:create {}
   -> per-socket request limit
-  -> strict shared-schema validation
-  -> RoomStore operation
-  -> bind socket to server-created player identity
-  -> join Socket.IO room
-  -> acknowledge state + temporary credentials
+  -> strict empty-object validation
+  -> allocate server room code
+  -> create display session and credential
+  -> controllerPlayerId = null
+  -> players = []
+  -> bind socket as role: display
+  -> acknowledge room + display credential
+```
+
+Room creation accepts no name, room code, player ID, or role field. The display
+is never inserted into the player map.
+
+## Player join flow
+
+```text
+player:join { roomCode, displayName }
+  -> per-socket request limit
+  -> strict validation and code normalization
+  -> capacity and duplicate-name checks
+  -> create server player ID and credential
+  -> if first player: controllerPlayerId = new player ID
+  -> otherwise: preserve existing controllerPlayerId
+  -> bind socket as role: player
+  -> acknowledge room + player credential
   -> broadcast authoritative room state
 ```
 
-The host is always the player created by `RoomStore.createRoom`. There is no
-host flag, role field, player ID, or room-state object in the create or join
-input. A socket must leave its current room before it can create, join, or
-reconnect to another one.
+No join payload can contain a controller claim. The room store, not player
+order supplied by the browser, decides initial authority.
 
 ## In-memory room store
 
@@ -112,81 +154,87 @@ Rooms are keyed by normalized room code. Each internal room holds:
 
 - phase (`LOBBY` only)
 - creation, activity, and expiration timestamps
-- the host player ID
-- a bounded map of players
+- one internal display session
+- `controllerPlayerId`
+- a bounded map of zero to eight players
 - read-only default settings
 
-Internal players hold a server-generated UUID, normalized display name,
+The internal display holds a server UUID, connection status, creation time,
+current socket ID, reconnect-token reference, and disconnect deadline.
+
+Internal players hold a different server UUID, normalized display name,
 connection status, join time, current socket ID, reconnect-token reference, and
-disconnect deadline. Public state omits socket IDs, reconnect credentials, and
-internal indexes.
+disconnect deadline.
 
-The store also maps reconnect tokens to one room and player. Room codes,
-player IDs, and tokens use Node’s cryptographic random APIs. Active-code
-collisions are retried with a fixed upper bound.
+The store maintains separate display-token and player-token maps. A display
+token is never looked up as a player token, and a player token is never looked
+up as a display token. Token generation collision-checks both maps.
 
-## Reconnection flow
+Room codes, IDs, and tokens use Node’s cryptographic random APIs. Active-code
+and token collisions are retried with fixed upper bounds.
 
-1. After create or join, the browser stores credentials under a
-   room-and-player key in local storage.
-2. The current tab stores only a pointer to that key in session storage.
-3. A transport disconnect marks the server player disconnected and starts the
-   grace period.
-4. A refreshed `/room/:code` route reads the pointer and sends the room code
-   and reconnect token.
-5. The server checks token scope, room lifetime, player lifetime, and socket
-   membership.
-6. A successful reconnect marks the same player connected and rotates the
-   token.
-7. The browser replaces its stored credential and room snapshot.
+## Browser session storage
 
-Rotation prevents a successfully used token from being replayed. The
-per-tab pointer lets different tabs maintain different players even though they
-share one origin’s local storage.
+Display and player credentials have distinct browser-storage entries:
 
-If a valid credential is presented while its previous socket still exists—for
-example, during a fast page refresh—the new socket replaces the old one. The
-server clears the old socket’s room binding and tells that tab that the
-temporary session resumed elsewhere.
+```text
+words:reconnect:display:<roomCode>:<displaySessionId>
+words:reconnect:player:<roomCode>:<playerId>
+```
 
-Socket.IO transport reconnection follows the same application-level token flow;
-transport recovery by itself does not confer room membership.
+The current tab stores a role, room code, and session-ID pointer in session
+storage. This lets tabs on one origin represent different players or the
+display without overwriting the active identity for another tab.
+
+On `/room/:code`, the client validates the stored credential shape and calls
+only the matching reconnect event. A successful reconnect rotates and replaces
+that role’s token.
+
+If a valid token is presented while the previous socket still exists—for
+example, during a fast refresh—the new socket replaces the old socket binding.
+The old tab receives `RECONNECT_FAILED`.
 
 ## Disconnect, leave, and cleanup
 
-A transport disconnect preserves the player for the configured grace period,
-60 seconds by default. Other clients immediately see the player as
-disconnected.
+A transport disconnect marks the applicable display or player offline and
+starts the configured grace period. It does not directly delete the room.
 
-An explicit non-host leave removes that player immediately. An explicit host
-leave closes the room and tells remaining members why. If the host’s grace
-period expires, cleanup closes the room rather than silently transferring
-authority. Closing a room also removes every connected socket’s stale server
-binding so those browsers can create or join another room without reconnecting
-their transport.
+An explicit leave also does not make either the display socket or controller
+socket a room-lifetime switch:
 
-Room expiration is a sliding deadline updated by valid activity. Its default is
-two hours. A periodic cleanup:
+- a display leave marks the display offline;
+- an ordinary player leave removes that player;
+- a sole controller leave removes that player and returns the room to zero
+  players with `controllerPlayerId = null`;
+- a controller leave while other players remain keeps that controller offline,
+  preserving authority without automatic transfer.
 
-- deletes expired rooms
-- deletes a room whose disconnected host exceeded the grace period
-- removes disconnected non-host players whose grace period ended
-- clears reconnect-token references
-- broadcasts updated state or a room-expired error
+Periodic cleanup:
 
-Room count, player count, cleanup work, reconnect sessions, and remembered
-recently expired codes are bounded to avoid unbounded process memory.
+- deletes any room whose sliding lifetime expired;
+- expires disconnected display credentials without removing present players;
+- removes ordinary players whose reconnect grace expired;
+- removes a sole disconnected controller after its grace period;
+- retains an offline controller record when other players remain, while
+  invalidating its expired credential;
+- removes an abandoned room when it has no players and its disconnected display
+  credential has expired;
+- clears token mappings and bounded expired-code tombstones.
+
+This Stage 2 model deliberately prefers an unavailable offline controller to an
+unauthorized automatic election. Future delegation can assign a new
+`controllerPlayerId` through a server-authorized controller action. Room TTL
+still bounds every such room.
 
 ## Server-authority boundary
 
-Browsers are controlled by users and can send invented events. Stage 2
-therefore trusts only data that it independently validates and maps to a
-server-bound socket session.
+Browsers are controlled by users and can send invented events. Stage 2 trusts
+only data it validates and maps to a server-bound role session.
 
-Future stages must keep the same boundary. A client may request an action, but
-the server must verify room membership, role, phase, settings, path, word,
-deadline, and rate limits. The client must never supply an official score,
-host role, board, timer, dictionary verdict, or round result.
+Future stages must verify room membership, role, phase, controller player ID,
+settings, path, word, deadline, and rate limits. The client must never supply an
+official score, controller role, board, timer, dictionary verdict, or round
+result. A display-bound socket must never submit a player word.
 
 ## Generic board dimensions
 
@@ -202,23 +250,14 @@ restarts is acceptable. A database would introduce migrations, backups,
 credentials, and failure cases without satisfying a current requirement.
 
 Redis is useful when several processes must share room state. The intended
-initial deployment is one Node.js process, so in-memory state is simpler and
-more honest. This decision can be revisited if measured needs change.
+initial deployment is one Node.js process, so in-memory state is simpler. This
+decision can be revisited if measured needs change.
 
 ## Intended production request path
 
-```text
-browser
-  -> https://words.atlee.io
-  -> Cloudflare Tunnel
-  -> Unraid host :6532
-  -> one future Words container
-       |-- Express serves the built React client
-       |-- Socket.IO handles real-time events
-       |-- RoomStore holds temporary state
-       |-- game engine validates boards and paths
-       `-- openly licensed dictionary validates words
-```
+The eventual production topology is one public HTTPS origin forwarding to one
+Words process on port `6532`. That process will serve the built client, health
+API, Socket.IO, game engine, and an openly licensed dictionary.
 
 Container packaging, static serving, tunnel configuration, and image publishing
 are not implemented in Stage 2.

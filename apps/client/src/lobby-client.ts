@@ -3,11 +3,13 @@ import { io, type Socket } from 'socket.io-client';
 import type {
   ClientToServerEvents,
   ConnectionStatus,
-  CreateRoomInput,
-  JoinRoomInput,
-  LeaveRoomResponse,
-  ReconnectRoomInput,
-  RoomActionResponse,
+  CreateDisplayInput,
+  DisplayActionResponse,
+  JoinPlayerInput,
+  LeaveSessionResponse,
+  PlayerActionResponse,
+  ReconnectDisplayInput,
+  ReconnectPlayerInput,
   RoomError,
   RoomState,
   ServerToClientEvents,
@@ -15,10 +17,16 @@ import type {
 
 export type LobbyClient = {
   getConnectionStatus: () => ConnectionStatus;
-  createRoom: (input: CreateRoomInput) => Promise<RoomActionResponse>;
-  joinRoom: (input: JoinRoomInput) => Promise<RoomActionResponse>;
-  reconnectRoom: (input: ReconnectRoomInput) => Promise<RoomActionResponse>;
-  leaveRoom: () => Promise<LeaveRoomResponse>;
+  createDisplay: (input: CreateDisplayInput) => Promise<DisplayActionResponse>;
+  reconnectDisplay: (
+    input: ReconnectDisplayInput,
+  ) => Promise<DisplayActionResponse>;
+  leaveDisplay: () => Promise<LeaveSessionResponse>;
+  joinPlayer: (input: JoinPlayerInput) => Promise<PlayerActionResponse>;
+  reconnectPlayer: (
+    input: ReconnectPlayerInput,
+  ) => Promise<PlayerActionResponse>;
+  leavePlayer: () => Promise<LeaveSessionResponse>;
   onRoomState: (listener: (room: RoomState) => void) => () => void;
   onRoomError: (listener: (error: RoomError) => void) => () => void;
   onConnectionStatus: (
@@ -31,7 +39,17 @@ const connectionError: RoomError = {
   message: 'The lobby server could not be reached. Try again.',
 };
 
-const connectionFailure: RoomActionResponse = {
+const displayConnectionFailure: DisplayActionResponse = {
+  ok: false,
+  error: connectionError,
+};
+
+const playerConnectionFailure: PlayerActionResponse = {
+  ok: false,
+  error: connectionError,
+};
+
+const leaveConnectionFailure: LeaveSessionResponse = {
   ok: false,
   error: connectionError,
 };
@@ -55,64 +73,90 @@ export class SocketLobbyClient implements LobbyClient {
     return this.socket.active ? 'connecting' : 'disconnected';
   }
 
-  async createRoom(input: CreateRoomInput): Promise<RoomActionResponse> {
+  async createDisplay(
+    input: CreateDisplayInput,
+  ): Promise<DisplayActionResponse> {
     if (!(await this.ensureConnected())) {
-      return connectionFailure;
+      return displayConnectionFailure;
     }
 
     return new Promise((resolve) => {
       this.socket
         .timeout(5_000)
-        .emit('room:create', input, (error, response) => {
-          resolve(error ? connectionFailure : response);
+        .emit('display:create', input, (error, response) => {
+          resolve(error ? displayConnectionFailure : response);
         });
     });
   }
 
-  async joinRoom(input: JoinRoomInput): Promise<RoomActionResponse> {
+  async reconnectDisplay(
+    input: ReconnectDisplayInput,
+  ): Promise<DisplayActionResponse> {
     if (!(await this.ensureConnected())) {
-      return connectionFailure;
-    }
-
-    return new Promise((resolve) => {
-      this.socket.timeout(5_000).emit('room:join', input, (error, response) => {
-        resolve(error ? connectionFailure : response);
-      });
-    });
-  }
-
-  async reconnectRoom(input: ReconnectRoomInput): Promise<RoomActionResponse> {
-    if (!(await this.ensureConnected())) {
-      return connectionFailure;
+      return displayConnectionFailure;
     }
 
     return new Promise((resolve) => {
       this.socket
         .timeout(5_000)
-        .emit('room:reconnect', input, (error, response) => {
-          resolve(error ? connectionFailure : response);
+        .emit('display:reconnect', input, (error, response) => {
+          resolve(error ? displayConnectionFailure : response);
         });
     });
   }
 
-  async leaveRoom(): Promise<LeaveRoomResponse> {
+  async leaveDisplay(): Promise<LeaveSessionResponse> {
     if (!this.socket.connected) {
-      return {
-        ok: false,
-        error: connectionError,
-      };
+      return leaveConnectionFailure;
     }
 
     return new Promise((resolve) => {
-      this.socket.timeout(5_000).emit('room:leave', {}, (error, response) => {
-        resolve(
-          error
-            ? {
-                ok: false,
-                error: connectionError,
-              }
-            : response,
-        );
+      this.socket
+        .timeout(5_000)
+        .emit('display:leave', {}, (error, response) => {
+          resolve(error ? leaveConnectionFailure : response);
+        });
+    });
+  }
+
+  async joinPlayer(input: JoinPlayerInput): Promise<PlayerActionResponse> {
+    if (!(await this.ensureConnected())) {
+      return playerConnectionFailure;
+    }
+
+    return new Promise((resolve) => {
+      this.socket
+        .timeout(5_000)
+        .emit('player:join', input, (error, response) => {
+          resolve(error ? playerConnectionFailure : response);
+        });
+    });
+  }
+
+  async reconnectPlayer(
+    input: ReconnectPlayerInput,
+  ): Promise<PlayerActionResponse> {
+    if (!(await this.ensureConnected())) {
+      return playerConnectionFailure;
+    }
+
+    return new Promise((resolve) => {
+      this.socket
+        .timeout(5_000)
+        .emit('player:reconnect', input, (error, response) => {
+          resolve(error ? playerConnectionFailure : response);
+        });
+    });
+  }
+
+  async leavePlayer(): Promise<LeaveSessionResponse> {
+    if (!this.socket.connected) {
+      return leaveConnectionFailure;
+    }
+
+    return new Promise((resolve) => {
+      this.socket.timeout(5_000).emit('player:leave', {}, (error, response) => {
+        resolve(error ? leaveConnectionFailure : response);
       });
     });
   }

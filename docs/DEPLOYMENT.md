@@ -30,15 +30,15 @@ one-container production topology.
 The server has working defaults. Optional values are documented in
 `.env.example`:
 
-| Variable                   |                  Default | Validated purpose                         |
-| -------------------------- | -----------------------: | ----------------------------------------- |
-| `PORT`                     |                   `6532` | Node HTTP and Socket.IO port              |
-| `PUBLIC_BASE_URL`          | `https://words.atlee.io` | Allowed public browser origin             |
-| `MAX_PLAYERS`              |                      `8` | Total players per room, never above eight |
-| `MAX_ROOMS`                |                    `500` | Active in-memory room bound               |
-| `ROOM_TTL_MINUTES`         |                    `120` | Sliding room lifetime                     |
-| `RECONNECT_GRACE_SECONDS`  |                     `60` | Temporary disconnect grace                |
-| `CLEANUP_INTERVAL_SECONDS` |                     `30` | Expired-state cleanup frequency           |
+| Variable                   |                  Default | Validated purpose                        |
+| -------------------------- | -----------------------: | ---------------------------------------- |
+| `PORT`                     |                   `6532` | Node HTTP and Socket.IO port             |
+| `PUBLIC_BASE_URL`          | `https://words.atlee.io` | Allowed public browser origin            |
+| `MAX_PLAYERS`              |                      `8` | Phone players per room; display excluded |
+| `MAX_ROOMS`                |                    `500` | Active in-memory room bound              |
+| `ROOM_TTL_MINUTES`         |                    `120` | Sliding room lifetime                    |
+| `RECONNECT_GRACE_SECONDS`  |                     `60` | Display/player reconnect grace           |
+| `CLEANUP_INTERVAL_SECONDS` |                     `30` | Expired-state cleanup frequency          |
 
 Invalid numeric values fall back to bounded defaults. A real `.env` file,
 private host address, credential, tunnel token, or registry token must not be
