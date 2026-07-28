@@ -25,7 +25,7 @@ export function GameSettingsPrototype({
           <span className="eyebrow">Local preview controls</span>
           <h2 id="settings-title">Round setup</h2>
         </div>
-        <span className="status-label">Not connected</span>
+        <span className="status-label">Local only</span>
       </div>
 
       <fieldset className="choice-group">

@@ -1,140 +1,224 @@
 # Architecture
 
-This document describes the intended system. Stage 1 only implements the React
-client prototype and shared configuration.
+This document describes the implemented Stage 2 lobby and the boundaries that
+later game stages must preserve.
 
-## The pieces in plain language
+## Runtime pieces
 
-**React browser client:** The screens people see. One layout can adapt to a
-large host display or a phone. A browser shows local state, but it is not the
-source of truth for a real game.
+**React browser client (`apps/client`):** Provides host, join, live-lobby, and
+retained static preview screens. It renders server state but is never the source
+of truth for room membership or host authority.
 
-**Node.js server:** The single trusted application process. It will create and
-expire rooms, choose boards, track deadlines and hosts, validate submissions,
-and calculate results.
+**Node.js server (`apps/server`):** Runs Express and Socket.IO in one process.
+It owns active rooms, players, host identity, reconnect credentials, expiration,
+capacity, and cleanup.
 
-**Express:** A small Node.js web framework. It will eventually serve the built
-React files and a health endpoint such as `/health`.
+**Shared package (`packages/shared`):** Defines product configuration, strict
+Zod schemas, state shapes, structured errors, acknowledgements, and typed
+Socket.IO event maps. Both client and server import the same contract.
 
-**Socket.IO:** The planned real-time connection between browsers and the
-server. It will carry validated events for room and round changes without
-requiring page refreshes.
+**Game-engine package (`packages/game-engine`):** Reserved for Stage 3. The
+lobby does not generate boards, validate paths, use a dictionary, or score
+words.
 
-**Shared TypeScript package:** Types, configuration, event payload definitions,
-and Zod schemas used by both client and server. Central definitions reduce the
-chance that two sides interpret a message differently.
+## Local request path
 
-**Game-engine package:** Framework-independent rules. It should not import
-React or Socket.IO. Pure functions make adjacency, paths, dictionaries,
-duplicates, and scoring easier to test.
-
-## Intended request path
+`npm run dev` starts both development processes:
 
 ```text
-Host or player browser
-          |
-          v
-https://words.atlee.io
-          |
-          v
-Cloudflare Tunnel
-          |
-          v
-Unraid server:6532
-          |
-          v
-One Words container
-  +-- Express serves the React application
-  +-- Socket.IO handles real-time events
-  +-- room manager stores temporary state
-  +-- game engine validates paths and scores
-  +-- openly licensed dictionary validates words
+Browser
+  |
+  v
+Vite client on :5173
+  |-- React routes and assets
+  |-- /api/* ---------+
+  `-- /socket.io/* ---+--> Node server on :6532
+                            |-- GET /api/health
+                            `-- Socket.IO lobby events
+                                  |
+                                  v
+                            in-memory RoomStore
 ```
 
-The public URL and production port are centralized in
-`packages/shared/src/config.ts`.
+The Vite proxy means the browser connects to its current origin. It does not
+need a hard-coded development Socket.IO address.
 
-## Room state and server authority
+The Stage 2 production build does not yet serve the React build from Express.
+One-container serving and deployment remain Stage 5 work.
 
-Each room will exist as an in-memory server object containing its code,
-participants, current host identity, validated settings, current phase, board,
-server deadline, accepted submissions, and results. Multiple rooms can share
-one Node.js process while remaining independent.
+## Health endpoint
 
-The server is authoritative because browsers are controlled by their users. A
-modified browser can send invented messages. Therefore a client may request an
-action, but the server must independently check:
+`GET /api/health` returns a small public JSON response:
 
-- the payload shape and size
-- whether the session belongs to the room
-- whether that session has the required role
-- whether the room is in the correct state
-- whether a path is legal and forms the submitted word
-- whether the word is in the approved dictionary
-- what score and official time apply
+```json
+{
+  "status": "ok",
+  "service": "Words",
+  "version": "0.2.0"
+}
+```
 
-The client never supplies an official score, deadline, host role, room
-ownership, dictionary verdict, or round result.
+The endpoint proves that the Node process can answer HTTP requests. It does not
+inspect an external database because there is none.
 
-## Host authority and secure transfer
+## Shared real-time contract
 
-Room membership and host authority must be separate server-controlled facts. A
-host-transfer request will identify the target player, not claim a new host.
-The server will verify that the sender is the current host and that the target
-is connected to the same room. Only then will it update the host identity and
-broadcast a complete state update.
+Client requests use Socket.IO acknowledgements so one request receives one
+structured result:
 
-Unexpected host disconnection and transfer during an active round remain
-unresolved. A complex automatic election system is not planned early.
+| Event            | Client fields                | Purpose                               |
+| ---------------- | ---------------------------- | ------------------------------------- |
+| `room:create`    | `displayName`                | Allocate a room and server-owned host |
+| `room:join`      | `roomCode`, `displayName`    | Add a player if the room permits it   |
+| `room:reconnect` | `roomCode`, `reconnectToken` | Restore one disconnected player       |
+| `room:leave`     | no fields                    | Explicitly leave the current room     |
+
+The server emits:
+
+| Event                 | Purpose                                             |
+| --------------------- | --------------------------------------------------- |
+| `room:state`          | Replace the client’s room snapshot                  |
+| `room:error`          | Report an asynchronous room closure or expiry       |
+| `player:connected`    | Announce presence before the state snapshot         |
+| `player:disconnected` | Announce loss of presence before the state snapshot |
+
+All incoming request objects are strict Zod schemas: unknown fields, invalid
+codes, invalid names, and malformed reconnect tokens are rejected. Successful
+create, join, and reconnect acknowledgements contain a full room snapshot plus
+the player ID and reconnect token. Failures contain a bounded public error code
+and message.
+
+## Create and join flow
+
+```text
+client request
+  -> per-socket request limit
+  -> strict shared-schema validation
+  -> RoomStore operation
+  -> bind socket to server-created player identity
+  -> join Socket.IO room
+  -> acknowledge state + temporary credentials
+  -> broadcast authoritative room state
+```
+
+The host is always the player created by `RoomStore.createRoom`. There is no
+host flag, role field, player ID, or room-state object in the create or join
+input. A socket must leave its current room before it can create, join, or
+reconnect to another one.
+
+## In-memory room store
+
+Rooms are keyed by normalized room code. Each internal room holds:
+
+- phase (`LOBBY` only)
+- creation, activity, and expiration timestamps
+- the host player ID
+- a bounded map of players
+- read-only default settings
+
+Internal players hold a server-generated UUID, normalized display name,
+connection status, join time, current socket ID, reconnect-token reference, and
+disconnect deadline. Public state omits socket IDs, reconnect credentials, and
+internal indexes.
+
+The store also maps reconnect tokens to one room and player. Room codes,
+player IDs, and tokens use Node’s cryptographic random APIs. Active-code
+collisions are retried with a fixed upper bound.
+
+## Reconnection flow
+
+1. After create or join, the browser stores credentials under a
+   room-and-player key in local storage.
+2. The current tab stores only a pointer to that key in session storage.
+3. A transport disconnect marks the server player disconnected and starts the
+   grace period.
+4. A refreshed `/room/:code` route reads the pointer and sends the room code
+   and reconnect token.
+5. The server checks token scope, room lifetime, player lifetime, and socket
+   membership.
+6. A successful reconnect marks the same player connected and rotates the
+   token.
+7. The browser replaces its stored credential and room snapshot.
+
+Rotation prevents a successfully used token from being replayed. The
+per-tab pointer lets different tabs maintain different players even though they
+share one origin’s local storage.
+
+If a valid credential is presented while its previous socket still exists—for
+example, during a fast page refresh—the new socket replaces the old one. The
+server clears the old socket’s room binding and tells that tab that the
+temporary session resumed elsewhere.
+
+Socket.IO transport reconnection follows the same application-level token flow;
+transport recovery by itself does not confer room membership.
+
+## Disconnect, leave, and cleanup
+
+A transport disconnect preserves the player for the configured grace period,
+60 seconds by default. Other clients immediately see the player as
+disconnected.
+
+An explicit non-host leave removes that player immediately. An explicit host
+leave closes the room and tells remaining members why. If the host’s grace
+period expires, cleanup closes the room rather than silently transferring
+authority. Closing a room also removes every connected socket’s stale server
+binding so those browsers can create or join another room without reconnecting
+their transport.
+
+Room expiration is a sliding deadline updated by valid activity. Its default is
+two hours. A periodic cleanup:
+
+- deletes expired rooms
+- deletes a room whose disconnected host exceeded the grace period
+- removes disconnected non-host players whose grace period ended
+- clears reconnect-token references
+- broadcasts updated state or a room-expired error
+
+Room count, player count, cleanup work, reconnect sessions, and remembered
+recently expired codes are bounded to avoid unbounded process memory.
+
+## Server-authority boundary
+
+Browsers are controlled by users and can send invented events. Stage 2
+therefore trusts only data that it independently validates and maps to a
+server-bound socket session.
+
+Future stages must keep the same boundary. A client may request an action, but
+the server must verify room membership, role, phase, settings, path, word,
+deadline, and rate limits. The client must never supply an official score,
+host role, board, timer, dictionary verdict, or round result.
 
 ## Generic board dimensions
 
-Board data should store a dimension and a flat or nested collection whose size
-is checked against that dimension. Adjacency should calculate rows and columns
-from the configured size. Code must not assume 4 columns or 16 tiles, because
-4 × 4, 5 × 5, and 6 × 6 are all supported.
+The retained board preview accepts a dimension and generates its cell count.
+Future engine data must likewise store a dimension and validate the tile count
+against it. Adjacency must derive rows and columns instead of assuming four
+columns or 16 tiles. Supported dimensions remain 4 × 4, 5 × 5, and 6 × 6.
 
-## Why no database or Redis yet
+## Why no database or Redis
 
-Rooms are intentionally temporary. Losing active rooms when the single server
-restarts is acceptable for the first version, so a database would add
-migrations, backups, credentials, and failure cases without meeting a current
-requirement.
+Rooms are intentionally temporary. Losing active rooms when the server process
+restarts is acceptable. A database would introduce migrations, backups,
+credentials, and failure cases without satisfying a current requirement.
 
-Redis helps multiple server processes share state and messages. The initial
-deployment uses one Node.js process in one container, so normal in-memory
-objects are simpler. If future scale or high availability requires several
-processes, that decision can be revisited with evidence.
+Redis is useful when several processes must share room state. The intended
+initial deployment is one Node.js process, so in-memory state is simpler and
+more honest. This decision can be revisited if measured needs change.
 
-## Why one container
+## Intended production request path
 
-One container is easier for a first-time developer to build, update, monitor,
-and configure on Unraid. It can contain the static browser build, Node.js
-server, game engine, and licensed dictionary. There is initially no separate
-database, Redis, or reverse proxy.
+```text
+browser
+  -> https://words.atlee.io
+  -> Cloudflare Tunnel
+  -> Unraid host :6532
+  -> one future Words container
+       |-- Express serves the built React client
+       |-- Socket.IO handles real-time events
+       |-- RoomStore holds temporary state
+       |-- game engine validates boards and paths
+       `-- openly licensed dictionary validates words
+```
 
-## Planned real-time events
-
-Likely Socket.IO events include:
-
-- `room:create`, `room:created`, `room:join`, `room:joined`, `room:state`
-- `room:settings-update`, `room:host-transfer-request`,
-  `room:host-transferred`, `room:return-to-lobby`
-- `player:connected`, `player:disconnected`
-- `game:start-request`, `game:countdown`, `game:started`, `game:ended`
-- `word:submit`, `word:accepted`, `word:rejected`
-- `results:ready`
-
-Names are a planning aid, not a frozen protocol. Payloads must be centrally
-defined, size-limited, runtime-validated with Zod, and authorized on the server.
-
-## Planned delivery flow
-
-A future GitHub Actions workflow will run formatting, linting, type checking,
-tests, and builds. After production packaging exists, reviewed changes can
-build one image and publish it to GitHub Container Registry. Unraid will run
-that image with host port 6532 mapped to container port 6532. A Cloudflare
-Tunnel will provide HTTPS at `https://words.atlee.io` and connect to the Unraid
-origin.
-
-None of this deployment flow is implemented in Stage 1.
+Container packaging, static serving, tunnel configuration, and image publishing
+are not implemented in Stage 2.

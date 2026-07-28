@@ -7,7 +7,7 @@ export function RoomCode({ code }: RoomCodeProps) {
     <div className="room-code" aria-label={`Room code ${code}`}>
       <span className="eyebrow">Room code</span>
       <strong>{code}</strong>
-      <span className="room-code__hint">Mock code</span>
+      <span className="room-code__hint">Case-insensitive</span>
     </div>
   );
 }

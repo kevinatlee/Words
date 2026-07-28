@@ -19,6 +19,14 @@ and explain important choices in plain language.
   round results.
 - Define network payloads centrally in the shared package and validate future
   network payloads at runtime with Zod.
+- Keep lobby payload schemas strict. Never accept a client-provided host flag,
+  player ID, reconnect expiry, or room code during room creation.
+- Keep room, player, socket-attempt, and expired-code collections bounded.
+- Reconnect tokens must be random, server-issued, short-lived, rotated after a
+  successful reconnect, absent from URLs and logs, and treated as secrets.
+- Preserve the Stage 2 maximum of eight total players per room.
+- Do not add automatic host election. A disconnected host retains authority
+  only during the documented reconnect grace period.
 - Support 4 × 4, 5 × 5, and 6 × 6 grids generically. Never assume a grid has
   exactly 16 tiles.
 - Preserve port `6532` as the default production port.

@@ -3,15 +3,18 @@
 This document separates current prototype behavior from planned rules and open
 decisions.
 
-## Implemented in Stage 1
+## Implemented through Stage 2
 
 - The host prototype can locally preview 4 × 4, 5 × 5, and 6 × 6 layouts.
 - The default preview is 4 × 4.
 - The player prototype shows a static touch-sized 4 × 4 layout.
 - Allowed duration labels and defaults are represented in shared configuration.
+- Temporary room state includes the planned grid-size, duration, and
+  traditional-scoring defaults.
 
-There is no functional game engine, timer, dictionary, submission, validation,
-duplicate detection, or scoring in Stage 1.
+The Stage 2 settings controls remain local previews. There is no functional
+game engine, board generation, timer, dictionary, submission, validation,
+duplicate detection, or scoring.
 
 ## Planned board and word rules
 
@@ -38,7 +41,8 @@ duplicate detection, or scoring in Stage 1.
 |  150 seconds | 2 minutes 30 seconds |
 |  180 seconds | 3 minutes            |
 
-The default is 180 seconds (3 minutes). The future server will reject arbitrary
+The default is 180 seconds (3 minutes). The Stage 2 server includes that default
+in read-only lobby state. The future round server will reject arbitrary
 client-provided durations and own the official deadline.
 
 ## Planned default scoring
@@ -63,7 +67,7 @@ letter, or use a custom table.
 
 By default, a word submitted by more than one player will score zero for every
 player who submitted it. Future configuration may allow shared words to receive
-normal or reduced points. Stage 1 does not score duplicates.
+normal or reduced points. Stage 2 does not score duplicates.
 
 ## Unresolved rules
 

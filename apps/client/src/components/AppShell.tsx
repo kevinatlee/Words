@@ -28,16 +28,14 @@ export function AppShell({
               Choose another view
             </a>
           )}
-          <span className="stage-badge">Stage 1 prototype</span>
+          <span className="stage-badge">Stage 2 lobby</span>
         </div>
       </header>
       <main id="main-content">{children}</main>
       <footer className="site-footer">
-        <span>Static interface preview</span>
+        <span>Temporary real-time lobbies</span>
         <span aria-hidden="true">•</span>
-        <span>
-          No account. No progress grind. Just a future room and a grid.
-        </span>
+        <span>No account. No progress grind. Just a temporary room.</span>
       </footer>
     </div>
   );

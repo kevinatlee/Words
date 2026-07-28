@@ -1,6 +1,6 @@
 {
   "name": "words",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "A self-hosted real-time letter-grid party game.",
@@ -13,13 +13,13 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace @words/client",
+    "dev": "concurrently --kill-others-on-fail --names server,client --prefix-colors blue,green \"npm run dev --workspace @words/server\" \"npm run dev --workspace @words/client\"",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "build": "npm run build --workspace @words/client"
+    "build": "npm run build --workspaces --if-present"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -30,6 +30,7 @@
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.0.4",
+    "concurrently": "^9.2.1",
     "eslint": "^10.8.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
