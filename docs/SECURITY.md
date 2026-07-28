@@ -92,7 +92,9 @@ credential after the deadline.
 If a valid credential is reused while its previous socket exists, the new
 socket supersedes it. The old socket loses its room binding and receives a
 structured error. This prevents two active sockets from silently sharing one
-role during a refresh race.
+role during a refresh race. Stale-tab cleanup compares the failed token before
+removing shared browser storage, so it cannot delete the replacement tab’s
+newly rotated credential.
 
 Browser storage is appropriate for this temporary, account-free Stage 2
 session, but it is accessible to JavaScript on the same origin. A future

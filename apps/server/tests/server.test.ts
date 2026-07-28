@@ -14,6 +14,7 @@ import type {
   PlayerActionResponse,
   ReconnectDisplayInput,
   ReconnectPlayerInput,
+  RoomError,
   RoomState,
   ServerToClientEvents,
 } from '@words/shared';
@@ -77,6 +78,10 @@ function nextRoomState(
     };
     client.on('room:state', listener);
   });
+}
+
+function nextRoomError(client: TestClient): Promise<RoomError> {
+  return new Promise((resolve) => client.once('room:error', resolve));
 }
 
 describe('Words Stage 2 server', () => {
@@ -410,6 +415,58 @@ describe('Words Stage 2 server', () => {
     ).toMatchObject({
       ok: false,
       error: { code: 'RECONNECT_FAILED' },
+    });
+  });
+
+  it('keeps the newest role sockets authoritative during refresh races', async () => {
+    const staleDisplay = await connectClient();
+    const created = await emitCreateDisplay(staleDisplay);
+    if (!created.ok) {
+      throw new Error('Display creation failed in test setup.');
+    }
+    const stalePlayer = await connectClient();
+    const joined = await emitJoinPlayer(stalePlayer, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+    if (!joined.ok) {
+      throw new Error('Player join failed in test setup.');
+    }
+
+    const staleDisplayError = nextRoomError(staleDisplay);
+    const currentDisplay = await connectClient();
+    const displayReconnected = await emitReconnectDisplay(currentDisplay, {
+      roomCode: created.room.code,
+      displayReconnectToken: created.session.displayReconnectToken,
+    });
+    expect(displayReconnected.ok).toBe(true);
+    expect(await staleDisplayError).toMatchObject({
+      code: 'RECONNECT_FAILED',
+    });
+    staleDisplay.disconnect();
+    expect(
+      server.roomStore.getRoomState(created.room.code)?.display.connected,
+    ).toBe(true);
+
+    const stalePlayerError = nextRoomError(stalePlayer);
+    const currentPlayer = await connectClient();
+    const playerReconnected = await emitReconnectPlayer(currentPlayer, {
+      roomCode: created.room.code,
+      playerReconnectToken: joined.session.playerReconnectToken,
+    });
+    expect(playerReconnected.ok).toBe(true);
+    expect(await stalePlayerError).toMatchObject({
+      code: 'RECONNECT_FAILED',
+    });
+    stalePlayer.disconnect();
+
+    const room = server.roomStore.getRoomState(created.room.code);
+    expect(room?.display.connected).toBe(true);
+    expect(room?.players).toHaveLength(1);
+    expect(room?.players[0]).toMatchObject({
+      id: joined.session.playerId,
+      connected: true,
+      isController: true,
     });
   });
 

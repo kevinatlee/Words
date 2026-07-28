@@ -3,6 +3,40 @@
 Future meaningful work must add a new chronological entry. Record what changed,
 why, what remains open, and the exact verification results.
 
+## 2026-07-27 — Stage 2 final lifecycle review
+
+### Medium review finding
+
+A replaced display or player tab cleared its role-specific local-storage entry
+without checking which token was stored there. During a refresh race, the
+replacement tab could save its rotated token before the stale tab processed
+`RECONNECT_FAILED`; the stale tab would then delete the new valid credential.
+
+### Work completed
+
+- Made stale-session cleanup remove a display or player credential only when
+  the stored token still matches the stale session’s token.
+- Added browser-storage regressions for both display and player refresh races.
+- Added an integration regression proving replaced display and player sockets
+  cannot mark the newest sockets offline when they later disconnect.
+- Strengthened coverage for distinct role IDs, ordinary-player cleanup,
+  controller-state validation after grace expiry, and both credential indexes
+  on room expiration.
+- Updated architecture and security documentation for the token-aware cleanup.
+
+### Verification
+
+- `npm run format:check` — passed; all matched files use Prettier formatting
+- `npm run lint` — passed with no warnings or errors
+- `npm run typecheck` — passed for client, server, and shared workspaces
+- `npm test` — passed; 73 tests across 8 files:
+  - client: 22 tests across 3 files
+  - server: 37 tests across 3 files
+  - shared: 14 tests across 2 files
+- `npm run build` — passed; Vite transformed 158 modules and the server build
+  boundary passed strict TypeScript
+- `npm audit --audit-level=high` — passed; 0 vulnerabilities
+
 ## 2026-07-27 — Stage 2 display/controller architecture correction
 
 ### Critical review finding

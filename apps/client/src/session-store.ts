@@ -45,6 +45,21 @@ function reconnectStorageKey(
   return `words:reconnect:${role}:${roomCode}:${id}`;
 }
 
+function storedCredentialMatchesSession(
+  credentialText: string,
+  session: StoredLobbySession,
+): boolean {
+  try {
+    const credential = JSON.parse(credentialText) as Record<string, unknown>;
+
+    return session.role === 'display'
+      ? credential.displayReconnectToken === session.displayReconnectToken
+      : credential.playerReconnectToken === session.playerReconnectToken;
+  } catch {
+    return true;
+  }
+}
+
 export function createLobbySessionStore(
   localStorage: Storage,
   sessionStorage: Storage,
@@ -156,13 +171,19 @@ export function createLobbySessionStore(
     },
     clear: (session) => {
       if (session) {
-        localStorage.removeItem(
-          reconnectStorageKey(
-            session.role,
-            session.roomCode,
-            sessionId(session),
-          ),
+        const credentialKey = reconnectStorageKey(
+          session.role,
+          session.roomCode,
+          sessionId(session),
         );
+        const credentialText = localStorage.getItem(credentialKey);
+
+        if (
+          credentialText &&
+          storedCredentialMatchesSession(credentialText, session)
+        ) {
+          localStorage.removeItem(credentialKey);
+        }
       }
       sessionStorage.removeItem(activeSessionKey);
     },

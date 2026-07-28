@@ -192,7 +192,10 @@ that role’s token.
 
 If a valid token is presented while the previous socket still exists—for
 example, during a fast refresh—the new socket replaces the old socket binding.
-The old tab receives `RECONNECT_FAILED`.
+The old tab receives `RECONNECT_FAILED`. When that tab clears its stale browser
+state, it removes the shared local-storage credential only if the stored token
+still matches the token that failed. It cannot erase a newer rotated token
+saved by the replacement tab.
 
 ## Disconnect, leave, and cleanup
 

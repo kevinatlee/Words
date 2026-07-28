@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { roomStateSchema } from '@words/shared';
+
 import { RoomOperationError, RoomStore } from '../src/room-store.js';
 
 function createUuid(index: number): string {
@@ -112,6 +114,7 @@ describe('RoomStore display and player sessions', () => {
     });
     expect(first.session.playerReconnectToken).toHaveLength(43);
     expect(first.session).not.toHaveProperty('displaySessionId');
+    expect(first.session.playerId).not.toBe(created.session.displaySessionId);
   });
 
   it('joins another player without changing controller authority', () => {
@@ -351,7 +354,11 @@ describe('RoomStore display and player sessions', () => {
       reconnectGraceMs: 60_000,
     });
     const created = store.createDisplay('socket-display');
-    store.joinPlayer(created.room.code, 'Silver Owl', 'socket-controller');
+    const controller = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-controller',
+    );
     const ordinary = store.joinPlayer(
       created.room.code,
       'Amber Kite',
@@ -372,7 +379,10 @@ describe('RoomStore display and player sessions', () => {
 
     now += 1;
     store.cleanupExpired();
-    expect(store.getRoomState(created.room.code)?.players).toHaveLength(1);
+    const room = store.getRoomState(created.room.code);
+    expect(room?.players).toHaveLength(1);
+    expect(room?.controllerPlayerId).toBe(controller.session.playerId);
+    expect(room?.players[0]?.id).toBe(controller.session.playerId);
   });
 
   it('retains an offline controller record without electing another player', () => {
@@ -405,6 +415,7 @@ describe('RoomStore display and player sessions', () => {
     store.cleanupExpired();
 
     const room = store.getRoomState(created.room.code);
+    expect(() => roomStateSchema.parse(room)).not.toThrow();
     expect(room?.controllerPlayerId).toBe(controller.session.playerId);
     expect(room?.players).toHaveLength(2);
     expect(
@@ -527,17 +538,24 @@ describe('RoomStore display and player sessions', () => {
     ).toBe(false);
   });
 
-  it('expires inactive rooms after the configured TTL', () => {
+  it('expires inactive rooms and clears both role credential indexes', () => {
     let now = Date.parse('2026-07-27T20:00:00.000Z');
     const store = createStore({
       now: () => now,
       roomTtlMs: 1_000,
     });
-    store.createDisplay('socket-display');
+    const created = store.createDisplay('socket-display');
+    store.joinPlayer(created.room.code, 'Silver Owl', 'socket-player');
     now += 1_000;
 
     expect(store.cleanupExpired().deletedRoomCodes).toEqual(['ABC234']);
     expect(store.roomCount).toBe(0);
+    const credentialIndexes = store as unknown as {
+      displaySessions: Map<string, unknown>;
+      playerSessions: Map<string, unknown>;
+    };
+    expect(credentialIndexes.displaySessions.size).toBe(0);
+    expect(credentialIndexes.playerSessions.size).toBe(0);
   });
 
   it('keeps HTML-like display names as plain player state data', () => {
