@@ -13,17 +13,16 @@ before public deployment and gameplay.
 - Player join accepts only room code and display name. It does not accept a
   controller flag or controller player ID.
 - The first player receives controller authority from the server.
-- Controller state is explicit: `none` has no players, `assigned` references
-  exactly one existing player, and `recovery-required` has players but no
-  controller ID.
+- Controller state is explicit: `none` has no controller ID or connected
+  player, and `assigned` references exactly one existing player.
 - Normal transfer accepts only `targetPlayerId`, requires the currently
   connected controller socket, and requires a different connected player in
   the same room.
-- Recovery accepts only `targetPlayerId`, requires the currently connected
-  display socket, and is blocked until the former controller’s reconnect grace
-  expires.
-- Transfer and recovery never change display identity, player membership, or
-  reconnect credentials.
+- The display has no controller-assignment event. It cannot select, recover, or
+  approve a game host.
+- Controller succession is a server-owned lifecycle transition. It considers
+  only connected remaining players and sorts by `joinedAt`, then player ID.
+- Transfer and succession never change display identity.
 - The display session is never inserted into the player collection and never
   counts toward the eight-player maximum.
 - Each connected socket is bound to at most one server-created role session:
@@ -31,7 +30,6 @@ before public deployment and gameplay.
 - Display and player reconnect tokens are stored in separate server indexes.
   Neither token can restore or impersonate the other role.
 - Display or controller disconnect does not directly close the room.
-- Stage 2.5 never automatically elects a replacement controller.
 - Public room state excludes socket IDs, token values, and private token
   indexes.
 
@@ -73,8 +71,8 @@ whether a validated action is allowed for the socket and current role.
 - Disconnect grace defaults to 60 seconds.
 - Cleanup runs every 30 seconds by default and removes expired rooms, ordinary
   players, token mappings, socket references, and expired-code tombstones.
-- A room awaiting controller recovery is still bounded by the eight-player cap
-  and room lifetime.
+- A room with no connected controller candidate is still bounded by the
+  eight-player cap and room lifetime.
 - Environment-provided numeric limits are range-checked and fall back to safe
   defaults when invalid.
 
@@ -116,20 +114,21 @@ Disconnect is presence loss, not room ownership loss:
 
 - the display going offline does not remove players;
 - the controller going offline does not close the room;
-- controller authority is not transferred automatically;
+- the disconnected controller retains authority during reconnect grace;
 - a disconnected display or player may restore only its own role during grace;
 - an ordinary player is removed after grace;
 - if controller grace expires, its token and player record are removed;
-- with remaining players, the room enters `recovery-required`;
-- only the connected display can recover authority to a connected player;
-- the old credential cannot reconnect after recovery, although the person can
+- the server promotes the earliest-joined connected remaining player, breaking
+  equal join-time ties by player ID;
+- if none is connected, state becomes `none` and the next join or reconnect
+  becomes controller;
+- the old credential cannot reconnect after expiry, although the person can
   join again as an ordinary player;
 - room TTL remains the final bound.
 
-Controller absence is explicit rather than inferred. The display recovery
-permission is narrow: it cannot override a connected controller or one still
-inside reconnect grace, and it cannot make the display a player. Silently
-choosing another player remains forbidden.
+Controller absence is explicit rather than inferred. The display stays passive
+through disconnect, expiry, and succession; it cannot make itself or anyone
+else controller.
 
 ## Controller race handling
 
@@ -138,14 +137,20 @@ current socket binding:
 
 - after one transfer succeeds, a second request from the former controller is
   rejected;
-- a controller reconnect during grace preserves authority and blocks recovery;
-- after grace expiry and cleanup, the expired token is invalid and display
-  recovery may proceed;
-- duplicate recovery attempts cannot create two controllers;
+- a controller reconnect processed at the grace deadline before cleanup
+  preserves authority;
+- if cleanup wins, it invalidates the expired token before choosing a
+  successor;
+- duplicate cleanup work and competing leave/transfer operations resolve to
+  exactly one controller;
+- stale cleanup cannot overwrite a newer manual controller assignment;
+- if the selected successor disconnects, that player receives the same grace
+  behavior before the next deterministic succession;
 - a replaced stale socket cannot disconnect the newer valid socket.
 
 Tests cover these boundaries with competing requests, refreshed sockets,
-cross-room targets, offline targets, and old-token reconnect attempts.
+offline targets, deterministic ties, repeat cleanup, and old-token reconnect
+attempts.
 
 ## Origin and transport policy
 
@@ -164,9 +169,6 @@ be sent over unencrypted public HTTP.
 - A client can reconnect to obtain a new socket and a fresh request window.
 - Room-not-found and recently expired responses are distinguishable, which may
   help code enumeration.
-- Recovery depends on the display session remaining authenticated. If its
-  credential also expires, the room stays bounded but cannot recover authority
-  through an unauthenticated browser.
 - There is no reverse-proxy request limit, network firewall policy, or
   production monitoring in this repository.
 - Temporary credentials have no account identity, revocation interface, or

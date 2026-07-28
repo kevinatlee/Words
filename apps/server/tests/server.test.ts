@@ -15,7 +15,6 @@ import type {
   PlayerActionResponse,
   ReconnectDisplayInput,
   ReconnectPlayerInput,
-  RecoverControllerInput,
   RoomError,
   RoomState,
   ServerToClientEvents,
@@ -74,15 +73,6 @@ function emitTransferController(
 ): Promise<ControllerActionResponse> {
   return new Promise((resolve) =>
     client.emit('controller:transfer', payload, resolve),
-  );
-}
-
-function emitRecoverController(
-  client: TestClient,
-  payload: RecoverControllerInput,
-): Promise<ControllerActionResponse> {
-  return new Promise((resolve) =>
-    client.emit('controller:recover', payload, resolve),
   );
 }
 
@@ -329,29 +319,13 @@ describe('Words Stage 2.5 server', () => {
       }),
     ).toMatchObject({ ok: false, error: { code: 'NOT_CONTROLLER' } });
     expect(
-      await emitRecoverController(ordinary, {
-        targetPlayerId: ordinaryJoined.session.playerId,
-      }),
-    ).toMatchObject({ ok: false, error: { code: 'DISPLAY_ONLY' } });
-    expect(
       await emitTransferController(unbound, {
-        targetPlayerId: ordinaryJoined.session.playerId,
-      }),
-    ).toMatchObject({ ok: false, error: { code: 'UNAUTHORIZED' } });
-    expect(
-      await emitRecoverController(unbound, {
         targetPlayerId: ordinaryJoined.session.playerId,
       }),
     ).toMatchObject({ ok: false, error: { code: 'UNAUTHORIZED' } });
     expect(
       await emitTransferController(controller, {
         targetPlayerId: 'x'.repeat(1_000),
-      } as never),
-    ).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
-    expect(
-      await emitRecoverController(display, {
-        targetPlayerId: ordinaryJoined.session.playerId,
-        requesterRole: 'display',
       } as never),
     ).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
   });
@@ -450,7 +424,7 @@ describe('Words Stage 2.5 server', () => {
     ).toHaveLength(1);
   });
 
-  it('lets the display recover only after controller authority is unavailable', async () => {
+  it('automatically promotes the earliest connected player when the controller leaves', async () => {
     const display = await connectClient();
     const created = await emitCreateDisplay(display);
     if (!created.ok) {
@@ -461,63 +435,98 @@ describe('Words Stage 2.5 server', () => {
       roomCode: created.room.code,
       displayName: 'Silver Owl',
     });
-    const target = await connectClient();
-    const targetJoined = await emitJoinPlayer(target, {
+    const second = await connectClient();
+    const secondJoined = await emitJoinPlayer(second, {
       roomCode: created.room.code,
       displayName: 'Amber Kite',
     });
-    if (!controllerJoined.ok || !targetJoined.ok) {
+    const third = await connectClient();
+    const thirdJoined = await emitJoinPlayer(third, {
+      roomCode: created.room.code,
+      displayName: 'Copper Lynx',
+    });
+    if (!controllerJoined.ok || !secondJoined.ok || !thirdJoined.ok) {
       throw new Error('Player join failed in test setup.');
     }
 
-    expect(
-      await emitRecoverController(display, {
-        targetPlayerId: targetJoined.session.playerId,
-      }),
-    ).toMatchObject({
-      ok: false,
-      error: { code: 'CONTROLLER_STILL_ACTIVE' },
-    });
-
+    const observedTransitions: RoomState[] = [];
+    const observeSuccession = (room: RoomState) => {
+      if (room.controllerPlayerId === secondJoined.session.playerId) {
+        observedTransitions.push(room);
+      }
+    };
+    second.on('room:state', observeSuccession);
+    const successionUpdate = nextRoomState(
+      display,
+      (room) => room.controllerPlayerId === secondJoined.session.playerId,
+    );
     expect(await emitLeavePlayer(controller)).toEqual({ ok: true });
-    const recoveryUpdate = nextRoomState(
-      target,
-      (room) => room.controllerPlayerId === targetJoined.session.playerId,
-    );
-    const recovered = await emitRecoverController(display, {
-      targetPlayerId: targetJoined.session.playerId,
-    });
+    const updatedRoom = await successionUpdate;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    second.off('room:state', observeSuccession);
 
-    expect(recovered.ok).toBe(true);
-    if (recovered.ok) {
-      expect(recovered.room.controllerStatus).toBe('assigned');
-      expect(recovered.room.controllerPlayerId).toBe(
-        targetJoined.session.playerId,
-      );
-    }
-    expect((await recoveryUpdate).controllerPlayerId).toBe(
-      targetJoined.session.playerId,
-    );
+    expect(updatedRoom.controllerStatus).toBe('assigned');
+    expect(updatedRoom.controllerPlayerId).toBe(secondJoined.session.playerId);
     expect(
-      await emitRecoverController(display, {
-        targetPlayerId: targetJoined.session.playerId,
-      }),
-    ).toMatchObject({
-      ok: false,
-      error: { code: 'CONTROLLER_STILL_ACTIVE' },
-    });
-
-    const staleController = await connectClient();
+      updatedRoom.players.find(
+        (player) => player.id === secondJoined.session.playerId,
+      ),
+    ).toMatchObject({ connected: true, isController: true });
     expect(
-      await emitReconnectPlayer(staleController, {
-        roomCode: created.room.code,
-        playerReconnectToken: controllerJoined.session.playerReconnectToken,
-      }),
-    ).toMatchObject({
-      ok: false,
-      error: { code: 'RECONNECT_FAILED' },
-    });
+      updatedRoom.players.find(
+        (player) => player.id === thirdJoined.session.playerId,
+      ),
+    ).toMatchObject({ connected: true, isController: false });
+    expect(observedTransitions).toHaveLength(1);
     expect(server.roomStore.roomCount).toBe(1);
+  });
+
+  it('broadcasts controller succession once after disconnect grace expires', async () => {
+    await server.stop();
+    server = createWordsServer({
+      port: 0,
+      reconnectGraceMs: 30,
+      cleanupIntervalMs: 10,
+    });
+    port = await server.start(0);
+
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) {
+      throw new Error('Display creation failed in test setup.');
+    }
+    const controller = await connectClient();
+    await emitJoinPlayer(controller, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+    const second = await connectClient();
+    const secondJoined = await emitJoinPlayer(second, {
+      roomCode: created.room.code,
+      displayName: 'Amber Kite',
+    });
+    if (!secondJoined.ok) {
+      throw new Error('Player join failed in test setup.');
+    }
+
+    const observedTransitions: RoomState[] = [];
+    const observeSuccession = (room: RoomState) => {
+      if (room.controllerPlayerId === secondJoined.session.playerId) {
+        observedTransitions.push(room);
+      }
+    };
+    second.on('room:state', observeSuccession);
+    const successionUpdate = nextRoomState(
+      display,
+      (room) => room.controllerPlayerId === secondJoined.session.playerId,
+    );
+    controller.disconnect();
+    const updatedRoom = await successionUpdate;
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    second.off('room:state', observeSuccession);
+
+    expect(updatedRoom.controllerPlayerId).toBe(secondJoined.session.playerId);
+    expect(observedTransitions).toHaveLength(1);
   });
 
   it('returns structured errors for missing rooms and malformed payloads', async () => {
@@ -812,9 +821,13 @@ describe('Words Stage 2.5 server', () => {
     expect(await emitLeavePlayer(controller)).toEqual({ ok: true });
     expect(server.roomStore.roomCount).toBe(1);
     expect(server.roomStore.getRoomState(created.room.code)).toMatchObject({
-      controllerStatus: 'recovery-required',
-      controllerPlayerId: null,
-      players: [expect.objectContaining({ connected: true })],
+      controllerStatus: 'assigned',
+      players: [
+        expect.objectContaining({
+          connected: true,
+          isController: true,
+        }),
+      ],
     });
   });
 

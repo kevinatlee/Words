@@ -33,15 +33,16 @@ Room
 ```
 
 The controller is a participating phone player. The first player receives the
-role from the server. An authorized transfer or recovery changes only
-`controllerPlayerId` and `controllerStatus`; it does not replace or modify the
-display session or player membership.
+role from the server. An authorized transfer or automatic succession changes
+only controller authority; it does not replace or modify the display session.
+The display is passive and has no event for selecting, recovering, or approving
+a controller.
 
 The valid controller states are:
 
-- `none`: zero players and `controllerPlayerId = null`
+- `none`: `controllerPlayerId = null`, no player is marked as controller, and no
+  remaining player is connected
 - `assigned`: exactly one player matches `controllerPlayerId`
-- `recovery-required`: players remain and `controllerPlayerId = null`
 
 The display is excluded from player capacity and cannot use player
 credentials. Future word-submission handlers must reject display-bound sockets.
@@ -106,10 +107,9 @@ Player events:
 
 Controller events:
 
-| Event                 | Client fields    | Authorized caller and purpose                      |
-| --------------------- | ---------------- | -------------------------------------------------- |
-| `controller:transfer` | `targetPlayerId` | Current controller assigns a connected player      |
-| `controller:recover`  | `targetPlayerId` | Display assigns after controller grace has expired |
+| Event                 | Client fields    | Authorized caller and purpose                 |
+| --------------------- | ---------------- | --------------------------------------------- |
+| `controller:transfer` | `targetPlayerId` | Current controller assigns a connected player |
 
 The server emits:
 
@@ -153,7 +153,7 @@ player:join { roomCode, displayName }
   -> strict validation and code normalization
   -> capacity and duplicate-name checks
   -> create server player ID and credential
-  -> if first player: controllerPlayerId = new player ID
+  -> if no controller: assign the earliest-joined connected player
   -> otherwise: preserve existing controllerPlayerId
   -> bind socket as role: player
   -> acknowledge room + player credential
@@ -180,23 +180,23 @@ and a disconnected or cross-room target are rejected with structured errors.
 The payload cannot include a requester ID, controller claim, role, or room
 state.
 
-## Controller recovery flow
+## Automatic controller succession
 
 ```text
-controller:recover { targetPlayerId }
-  -> strict validation and per-socket request limit
-  -> require the currently bound display socket
-  -> reject while a controller is connected or within reconnect grace
-  -> require controllerStatus = recovery-required
-  -> require a connected target in the same room
-  -> atomically set controllerPlayerId and controllerStatus = assigned
-  -> acknowledge and broadcast authoritative room state
+controller explicitly leaves, or cleanup expires controller grace
+  -> remove the former controller and invalidate its credential
+  -> collect connected remaining players
+  -> sort by joinedAt ascending, then player ID ascending
+  -> assign the first eligible player
+  -> or set controllerStatus = none when none is connected
+  -> broadcast one authoritative room state for the completed transition
 ```
 
-Cleanup enters `recovery-required` only after invalidating and removing the
-expired controller session. An old controller credential therefore cannot
-regain authority after display recovery. That person may join again as a new
-ordinary player.
+If controller state is `none`, the next player to join or reconnect is selected
+automatically. A reconnect processed exactly at its grace deadline is valid if
+cleanup has not already removed the player. If cleanup wins, the expired token
+is invalid and cannot reclaim authority. The person may join again as a new
+ordinary player. The display does not participate in any of these transitions.
 
 ## In-memory room store
 
@@ -258,12 +258,12 @@ socket a room-lifetime switch:
 
 - a display leave marks the display offline;
 - an ordinary player leave removes that player;
-- if the last player leaves during recovery, the room returns to
-  `controllerStatus = none`;
 - a sole controller leave removes that player and returns the room to zero
   players with `controllerStatus = none`;
-- a controller leave while other players remain removes that player and enters
-  `recovery-required`.
+- a controller leave while other players remain promotes the earliest-joined
+  connected player, with player ID as the tie-breaker;
+- if no remaining player is connected, controller state becomes `none` until a
+  player joins or reconnects.
 
 Periodic cleanup:
 
@@ -271,16 +271,17 @@ Periodic cleanup:
 - expires disconnected display credentials without removing present players;
 - removes ordinary players whose reconnect grace expired;
 - removes a disconnected controller and invalidates its credential after grace;
-- enters `recovery-required` when other players remain, without electing one;
+- promotes the earliest-joined connected remaining player after controller
+  expiry, or uses `none` if no player is connected;
 - removes an abandoned room when it has no players and its disconnected display
   credential has expired;
 - clears token mappings and bounded expired-code tombstones.
 
-The store performs transfer, recovery, disconnect, reconnect, and cleanup
+The store performs transfer, succession, disconnect, reconnect, and cleanup
 mutations synchronously. Each action rechecks the current server binding and
 room state, so two requests from a formerly authorized socket cannot both win.
 A stale replaced socket cannot disconnect the newest valid socket. Room TTL
-still bounds every room, including one awaiting recovery.
+still bounds every room, including one with no connected controller candidate.
 
 ## Server-authority boundary
 

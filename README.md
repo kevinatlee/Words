@@ -7,9 +7,9 @@ shared-screen browser creates and presents a temporary room. Phone players join
 without accounts, and the first player becomes the initial game host
 (controller).
 
-This repository is at **Stage 2.5: controller delegation and recovery**. The
-secure lobby and its game-host authority controls work locally; gameplay and
-production deployment do not.
+This repository is at **Stage 2.5: controller delegation and automatic
+succession**. The secure lobby and its game-host authority controls work
+locally; gameplay and production deployment do not.
 
 ## What works today
 
@@ -21,8 +21,9 @@ production deployment do not.
   without gaining controller authority.
 - The connected game host can explicitly transfer authority to another
   connected player.
-- If the game host misses reconnect grace, the display can explicitly assign a
-  connected replacement without becoming a player or controller.
+- If the game host explicitly leaves or misses reconnect grace, the server
+  automatically promotes the earliest-joined connected player, breaking equal
+  join-time ties by player ID.
 - Display and player presence update in real time.
 - Display and player tabs use separate, temporary reconnect credentials.
 - A display or controller disconnect does not immediately close the room.
@@ -35,8 +36,8 @@ production deployment do not.
 
 Stage 2.5 does not implement gameplay, board generation, touch tracing,
 dictionaries, word validation, scoring, timers, round starts, QR codes,
-automatic controller election, persistence, container packaging, image
-publishing, server installation, or tunnel configuration.
+arbitrary or random controller election, persistence, container packaging,
+image publishing, server installation, or tunnel configuration.
 
 `Start Round` remains disabled. Settings in the lobby are local interface
 previews and are not server actions yet.
@@ -44,7 +45,8 @@ previews and are not server actions yet.
 ## Roles and authority
 
 - The **display session** is the TV or shared-screen browser. It creates and
-  presents the room, but it is not a player and has no controller authority.
+  presents the room, but it is not a player, has no controller authority, and
+  never selects or approves a game host.
 - A **player session** belongs to one phone participant and can eventually
   submit words during gameplay.
 - The **controller** or **game host** is one player. The first player gets this
@@ -52,9 +54,8 @@ previews and are not server actions yet.
   connected player.
 - Controller authority is stored as `controllerPlayerId`, which must reference
   a player ID while assigned. A client cannot self-assign it.
-- The **recovery-required** state means players remain but no controller is
-  assigned. Only the authenticated display can assign a connected player in
-  this state.
+- `controllerStatus` is `none` only when no player is connected. The next join
+  or reconnect becomes game host automatically.
 
 The server owns room membership, roles, settings, and expiration. No database,
 Redis instance, account provider, or paid service is used.
@@ -108,8 +109,8 @@ Try the lobby:
 4. Join from another phone tab and watch the shared display update.
 5. On the controller phone, transfer Game Host authority to the second player.
 6. Disconnect the new controller and confirm the room remains visible during
-   reconnect grace. After grace expires, the display can assign a connected
-   replacement.
+   reconnect grace. After grace expires, confirm the server automatically
+   promotes the earliest-joined connected player without display action.
 
 Stop both processes with `Control+C`.
 
@@ -179,9 +180,11 @@ period. It does not immediately close the room:
 - an expired display credential does not remove remaining players;
 - the controller remains assigned while its reconnect grace is active;
 - if controller grace expires while other players remain, the expired player
-  and credential are removed and the room enters `recovery-required`;
-- the display may then explicitly assign a connected replacement;
-- no disconnect or cleanup path automatically chooses a controller;
+  and credential are removed and the server promotes the earliest-joined
+  connected player, with player ID as the stable tie-breaker;
+- if nobody is connected, controller state becomes `none`; the next player to
+  join or reconnect becomes controller automatically;
+- the display stays passive and cannot select, recover, or approve a controller;
 - a room closes on its bounded lifetime, or when it has no players and its
   disconnected display credential has expired.
 
@@ -202,8 +205,6 @@ Player requests:
 Controller requests:
 
 - `controller:transfer` — current connected controller to connected player
-- `controller:recover` — connected display to connected player, only while
-  recovery is required
 
 The server broadcasts:
 

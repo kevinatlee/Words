@@ -3,82 +3,94 @@
 Future meaningful work must add a new chronological entry. Record what changed,
 why, what remains open, and the exact verification results.
 
-## 2026-07-27 — Stage 2.5 controller delegation and recovery
+## 2026-07-27 — Stage 2.5 passive-display succession correction
+
+### Critical review finding
+
+The initial Stage 2.5 revision required the shared display to recover Game Host
+authority after controller grace expired. That conflated the passive
+presentation session with player authority and made controller continuity
+depend on someone operating the TV. The revision was not ready to merge.
 
 ### Work completed
 
-- Added explicit `none`, `assigned`, and `recovery-required` controller states
-  to the shared room contract and server store.
-- Added strict `controller:transfer` and `controller:recover` requests whose
-  only client field is `targetPlayerId`.
-- Authorized normal transfer only for the currently connected controller and
-  recovery only for the connected display after controller reconnect grace has
-  expired.
-- Required every target to be a connected player in the same room. Transfer
-  and recovery preserve the display session, player membership, and reconnect
-  credentials.
-- Removed an expired or explicitly departed controller without silently
-  electing a replacement. Remaining players instead enter
-  `recovery-required`.
-- Normalized the empty-room transition to `controllerStatus: none` when the
-  last player leaves during recovery, with a regression for the invariant.
-- Added role-specific Game Host controls and status text. Round settings remain
-  previews and `Start Round` remains disabled.
-- Updated product, architecture, security, contributor, server, and event
-  documentation for the Stage 2.5 model.
+- Removed the `controller:recover` contract, server handler, client method,
+  display controls, errors, and `recovery-required` room state.
+- Kept voluntary `controller:transfer` available only to the current connected
+  controller and a connected target player in the same room.
+- Added deterministic server-owned succession when the controller explicitly
+  leaves or expires after grace: connected players sort by `joinedAt`, then
+  player ID.
+- Used `controllerStatus: none` only when no controller is assigned and no
+  player is connected. The next player to join or reconnect becomes controller
+  automatically.
+- Kept the display passive through controller disconnect, expiry, transfer, and
+  succession. Display disconnect and credential expiry do not alter player
+  authority.
+- Updated shared contracts, the room store, Socket.IO integration, client
+  status text, contributor rules, product documentation, architecture, and
+  security guidance.
 
 ### Security and race decisions
 
-- Ordinary players, displays using the normal transfer event, stale former
-  controllers, unbound sockets, and malformed claims cannot transfer authority.
-- Players cannot use the display recovery event. The display cannot recover
-  while the controller is connected or still inside reconnect grace.
-- Store mutations authorize against the current socket binding. Competing
-  stale transfers and duplicate recoveries produce one final controller.
-- Controller reconnect during grace wins normally. After grace, the expired
-  token is invalidated before display recovery, so the former controller can
-  return only by joining as an ordinary player.
+- Reconnect at the exact grace deadline succeeds if processed before cleanup.
+  If cleanup wins, it invalidates the expired credential before succession.
+- Cleanup computes succession once after removing all expired players, so two
+  callbacks cannot create multiple transitions.
+- A stale former-controller cleanup cannot overwrite a newer voluntary
+  transfer.
+- A selected successor that disconnects retains authority during its own grace;
+  expiry then applies the same deterministic rule again.
+- Display and player credentials remain separate and cannot impersonate the
+  other role. Stale socket replacement cannot disconnect the newest valid
+  socket.
 
 ### Regression coverage
 
-- shared controller-state invariants and strict action schemas
-- authorized transfer with authoritative broadcasts
-- ordinary, display, stale, self, missing, offline, and cross-room rejection
-- deterministic simultaneous transfer and duplicate-recovery outcomes
-- recovery blocked while a controller is connected or within grace
-- expired-token invalidation and ordinary rejoin after recovery
-- display and player refresh races without stale-socket disconnect corruption
-- role-specific transfer and recovery controls with visible structured errors
+- passive display creation and display exclusion from player capacity
+- strict transfer-only network contracts and rejected controller claims
+- earliest-join selection with player-ID tie-breaking and disconnected-player
+  exclusion
+- explicit leave, grace expiry, selected-successor disconnect, and no-connected
+  fallback
+- reconnect-at-deadline and cleanup-first race ordering
+- competing transfer/leave operations, repeat cleanup, and stale cleanup
+- role credential misuse, refreshed-socket races, room expiration, and
+  disconnect cleanup
+- one authoritative succession broadcast per completed explicit-leave and
+  grace-expiry transition
+- passive display and role-specific player controls in the client
 
 ### Verification
 
-- `npm install` — passed; 409 packages audited and 0 vulnerabilities found
+- `npm install` — passed; dependencies were already current, 409 packages were
+  audited, and 0 vulnerabilities were found
 - `npm run dev` — passed; Vite served the client on `5173` and the Words server
   listened on `6532`
 - `npm run format:check` — passed; all matched files use Prettier formatting
 - `npm run lint` — passed with no warnings or errors
 - `npm run typecheck` — passed for client, server, and shared workspaces
-- `npm test` — passed; 95 tests across 8 files:
-  - client: 26 tests across 3 files
-  - server: 52 tests across 3 files
+- `npm test` — passed; 102 tests across 8 files:
+  - client: 27 tests across 3 files
+  - server: 58 tests across 3 files
   - shared: 17 tests across 2 files
 - `npm run build` — passed; Vite transformed 159 modules and the server build
   boundary passed strict TypeScript
 - `npm audit --audit-level=high` — passed; 0 vulnerabilities
 - Manual four-tab check — passed with one display and three phone players
-- Normal transfer — passed; the first player moved authority to the second,
-  every tab updated, the former controller lost controls, and the new
-  controller gained them
-- Recovery grace — passed; the display showed the controller offline without
-  recovery controls until the configured test grace expired
-- Display recovery — passed; the display assigned the third connected player,
-  the former controller rejoined as an ordinary player, and `Start Round`
-  remained disabled
-- Display disconnect — passed; all three player views kept the same controller
-  authority
-- Browser console check — passed with no warnings or errors in the final
-  display, controller, or ordinary-player tabs
-- Screenshots — captured under `docs/screenshots/`
+- Initial authority — passed; the first player became Game Host and only that
+  player had transfer controls
+- Reconnect grace — passed; the display showed the Game Host offline with no
+  authority control, and a reconnect within grace preserved the Game Host
+- Automatic grace succession — passed; after a second disconnect and grace
+  expiry, the earliest-joined connected player became Game Host without display
+  action
+- Explicit-leave succession — passed; when that player left, the third player
+  became Game Host automatically
+- Display disconnect — passed; the final player stayed Game Host while the
+  display showed offline
+- Browser console check — passed with no warnings or errors in any of the four
+  verification tabs
 
 ## 2026-07-27 — Stage 2 final lifecycle review
 

@@ -11,7 +11,6 @@ import type {
   PlayerActionResponse,
   ReconnectDisplayInput,
   ReconnectPlayerInput,
-  RecoverControllerInput,
   RoomError,
   RoomState,
   ServerToClientEvents,
@@ -32,9 +31,6 @@ export type LobbyClient = {
   leavePlayer: () => Promise<LeaveSessionResponse>;
   transferController: (
     input: TransferControllerInput,
-  ) => Promise<ControllerActionResponse>;
-  recoverController: (
-    input: RecoverControllerInput,
   ) => Promise<ControllerActionResponse>;
   onRoomState: (listener: (room: RoomState) => void) => () => void;
   onRoomError: (listener: (error: RoomError) => void) => () => void;
@@ -186,22 +182,6 @@ export class SocketLobbyClient implements LobbyClient {
       this.socket
         .timeout(5_000)
         .emit('controller:transfer', input, (error, response) => {
-          resolve(error ? controllerConnectionFailure : response);
-        });
-    });
-  }
-
-  async recoverController(
-    input: RecoverControllerInput,
-  ): Promise<ControllerActionResponse> {
-    if (!this.socket.connected) {
-      return controllerConnectionFailure;
-    }
-
-    return new Promise((resolve) => {
-      this.socket
-        .timeout(5_000)
-        .emit('controller:recover', input, (error, response) => {
           resolve(error ? controllerConnectionFailure : response);
         });
     });

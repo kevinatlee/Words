@@ -8,7 +8,6 @@ import {
   normalizeRoomCode,
   reconnectDisplayInputSchema,
   reconnectPlayerInputSchema,
-  recoverControllerInputSchema,
   roomCodeSchema,
   roomStateSchema,
   transferControllerInputSchema,
@@ -101,20 +100,14 @@ describe('lobby contracts', () => {
     ).toBe(false);
   });
 
-  it('accepts only a target player ID for transfer and recovery', () => {
+  it('accepts only a target player ID for controller transfer', () => {
     const input = { targetPlayerId: ordinaryPlayerId };
 
     expect(transferControllerInputSchema.parse(input)).toEqual(input);
-    expect(recoverControllerInputSchema.parse(input)).toEqual(input);
     expect(
       transferControllerInputSchema.safeParse({
         ...input,
         requesterPlayerId: controllerPlayerId,
-      }).success,
-    ).toBe(false);
-    expect(
-      recoverControllerInputSchema.safeParse({
-        targetPlayerId: 'not-a-player-id',
       }).success,
     ).toBe(false);
     expect(
@@ -190,11 +183,11 @@ describe('lobby contracts', () => {
     ).toBe(false);
   });
 
-  it('represents controller recovery without assigning hidden authority', () => {
+  it('represents no controller only when no player is connected', () => {
     const fixture = roomStateFixture();
-    const recoveryState = roomStateSchema.parse({
+    const noControllerState = roomStateSchema.parse({
       ...fixture,
-      controllerStatus: 'recovery-required',
+      controllerStatus: 'none',
       controllerPlayerId: null,
       players: fixture.players.map((player) => ({
         ...player,
@@ -203,11 +196,11 @@ describe('lobby contracts', () => {
       })),
     });
 
-    expect(recoveryState.controllerStatus).toBe('recovery-required');
-    expect(recoveryState.controllerPlayerId).toBeNull();
-    expect(recoveryState.players.every((player) => !player.isController)).toBe(
-      true,
-    );
+    expect(noControllerState.controllerStatus).toBe('none');
+    expect(noControllerState.controllerPlayerId).toBeNull();
+    expect(
+      noControllerState.players.every((player) => !player.isController),
+    ).toBe(true);
   });
 
   it('rejects controller status and player-ID mismatches', () => {
@@ -216,7 +209,12 @@ describe('lobby contracts', () => {
     expect(
       roomStateSchema.safeParse({
         ...fixture,
-        controllerStatus: 'recovery-required',
+        controllerStatus: 'assigned',
+        controllerPlayerId: null,
+        players: fixture.players.map((player) => ({
+          ...player,
+          isController: false,
+        })),
       }).success,
     ).toBe(false);
     expect(

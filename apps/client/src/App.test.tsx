@@ -33,6 +33,14 @@ const ordinaryPlayer: PlayerState = {
   isController: false,
 };
 
+const thirdPlayer: PlayerState = {
+  id: '00000000-0000-4000-8000-000000000003',
+  displayName: 'Copper Lynx',
+  connected: true,
+  joinedAt: '2026-07-27T20:03:00.000Z',
+  isController: false,
+};
+
 function createRoom(
   players: PlayerState[] = [],
   controllerStatus: RoomState['controllerStatus'] = players.length
@@ -101,9 +109,9 @@ const controllerWithPlayersSuccess: PlayerActionResponse = {
   room: createRoom([controllerPlayer, ordinaryPlayer]),
 };
 
-const recoveryRequiredRoom = createRoom(
-  [{ ...ordinaryPlayer, isController: false }],
-  'recovery-required',
+const awaitingAutomaticRoom = createRoom(
+  [{ ...ordinaryPlayer, connected: false, isController: false }],
+  'none',
 );
 
 function createFakeClient(overrides: Partial<LobbyClient> = {}): LobbyClient {
@@ -128,10 +136,6 @@ function createFakeClient(overrides: Partial<LobbyClient> = {}): LobbyClient {
       ok: true,
     })),
     transferController: vi.fn(async (): Promise<ControllerActionResponse> => ({
-      ok: true,
-      room: transferredRoom,
-    })),
-    recoverController: vi.fn(async (): Promise<ControllerActionResponse> => ({
       ok: true,
       room: transferredRoom,
     })),
@@ -366,16 +370,15 @@ describe('Stage 2.5 display and player lobby routes', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows display recovery controls only when assignment is required', async () => {
-    const user = userEvent.setup();
+  it('keeps the display passive while an offline controller is in grace', async () => {
+    const room = createRoom([
+      { ...controllerPlayer, connected: false },
+      ordinaryPlayer,
+    ]);
     const client = createFakeClient({
       reconnectDisplay: vi.fn(async (): Promise<DisplayActionResponse> => ({
         ...displaySuccess,
-        room: recoveryRequiredRoom,
-      })),
-      recoverController: vi.fn(async (): Promise<ControllerActionResponse> => ({
-        ok: true,
-        room: createRoom([{ ...ordinaryPlayer, isController: true }]),
+        room,
       })),
     });
 
@@ -392,29 +395,70 @@ describe('Stage 2.5 display and player lobby routes', () => {
       />,
     );
 
-    expect(await screen.findByText('Assignment required')).toBeInTheDocument();
+    expect(await screen.findAllByText('Game Host offline')).toHaveLength(2);
     expect(
-      screen.getByText(/Game Host assignment is required/i),
+      screen.getByText(/If grace expires, the server will select/i),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Make Game Host' }),
     ).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Assign Game Host' }));
-    expect(client.recoverController).toHaveBeenCalledWith({
-      targetPlayerId: ordinaryPlayer.id,
-    });
     expect(
-      await screen.findByText('<Bright Fox> is now the Game Host.'),
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: 'Assign Game Host' }),
+    ).not.toBeInTheDocument();
   });
 
-  it('shows recovery-required state to players without display controls', async () => {
+  it('shows automatic succession waiting without display controls', async () => {
+    const client = createFakeClient({
+      reconnectDisplay: vi.fn(async (): Promise<DisplayActionResponse> => ({
+        ...displaySuccess,
+        room: awaitingAutomaticRoom,
+      })),
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'display',
+          roomCode: 'ABC234',
+          displaySessionId: displaySuccess.session.displaySessionId,
+          displayReconnectToken: 'm'.repeat(43),
+        })}
+      />,
+    );
+
+    expect(
+      await screen.findByText('Selecting automatically'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/next player to join or reconnect/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Assign Game Host' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('gives a newly auto-promoted player controller controls immediately', async () => {
+    let reportRoomState: ((room: RoomState) => void) | undefined;
+    const waitingRoom = createRoom([
+      { ...controllerPlayer, connected: false },
+      ordinaryPlayer,
+      thirdPlayer,
+    ]);
+    const promotedRoom = createRoom([
+      { ...ordinaryPlayer, isController: true },
+      thirdPlayer,
+    ]);
     const client = createFakeClient({
       reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
         ...ordinarySuccess,
-        room: recoveryRequiredRoom,
+        room: waitingRoom,
       })),
+      onRoomState: (listener) => {
+        reportRoomState = listener;
+        return () => undefined;
+      },
     });
 
     render(
@@ -425,20 +469,31 @@ describe('Stage 2.5 display and player lobby routes', () => {
           role: 'player',
           roomCode: 'ABC234',
           playerId: ordinaryPlayer.id,
-          playerReconnectToken: 'm'.repeat(43),
+          playerReconnectToken: 'n'.repeat(43),
           displayName: ordinaryPlayer.displayName,
         })}
       />,
     );
 
     expect(
-      await screen.findByText(
-        /The Shared Display can choose a connected player/i,
-      ),
+      await screen.findByRole('heading', { name: 'You’re in the room.' }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Assign Game Host' }),
+      screen.queryByRole('button', { name: 'Make Game Host' }),
     ).not.toBeInTheDocument();
+
+    act(() => {
+      reportRoomState?.(promotedRoom);
+    });
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'You’re the game host.',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Make Game Host' }),
+    ).toBeInTheDocument();
   });
 
   it('shows understandable structured errors', async () => {

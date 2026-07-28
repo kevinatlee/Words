@@ -37,12 +37,13 @@ Words has three related but separate concepts:
   becomes the initial controller.
 
 Creating the room does not grant the display player membership or controller
-authority. Changing the controller must never change the display session.
+authority. The display never selects or approves a controller. Changing the
+controller must never change the display session.
 
 ## Current scope: Stage 2.5
 
 Stage 2.5 extends the secure, server-backed lobby with explicit game-host
-delegation and recovery:
+delegation and deterministic automatic succession:
 
 - a display creates a temporary room without a display name
 - the server generates a six-character room code and display credential
@@ -50,8 +51,8 @@ delegation and recovery:
 - the first joining player becomes `controllerPlayerId`
 - later players join without controller authority
 - the connected controller can transfer authority to another connected player
-- if controller reconnect grace expires, the authenticated display can assign
-  a connected replacement
+- if the controller explicitly leaves or reconnect grace expires, the server
+  promotes the earliest-joined connected player, breaking ties by player ID
 - display and player connection state update in real time
 - refreshed tabs can restore the correct role during a 60-second grace period
 - display and player credentials cannot impersonate one another
@@ -71,11 +72,10 @@ A room contains:
 
 - exactly one display session
 - zero to eight player sessions
-- `controllerPlayerId: null` while there are no players
-- `controllerStatus: none` with zero players
+- `controllerPlayerId: null` before the first join or when succession has no
+  connected eligible player
+- `controllerStatus: none` in those same no-controller states
 - `controllerStatus: assigned` with exactly one controller player ID
-- `controllerStatus: recovery-required` with remaining players and no
-  controller player ID
 - a cryptographically random, collision-checked room code
 - separate temporary reconnect credentials for the display and each player
 - connection status for the display and players
@@ -105,21 +105,20 @@ single room-lifetime switch.
 - An ordinary player is removed when their reconnect grace expires.
 - A disconnected controller remains assigned during reconnect grace.
 - If controller grace expires, its player record and credential are removed. A
-  room with remaining players enters `recovery-required`.
-- Recovery is an explicit display action naming a connected player. It is
-  unavailable while a controller is connected or still within reconnect grace.
+  connected replacement is selected by earliest `joinedAt`, then player ID.
+- If no player is connected, controller state becomes `none`; the next player
+  to join or reconnect becomes controller automatically.
 - Normal transfer is an explicit action by the connected current controller
   naming another connected player.
-- Neither path changes the display session, player membership, or reconnect
-  credentials.
+- Transfer and automatic succession never change the display session.
 - A disconnected display whose credential expires remains visible as offline
   while players are present.
 - A room is removed when its sliding lifetime expires, or when it has no
   players and its disconnected display credential has expired.
 
-The server never automatically elects a controller. Transfer and recovery are
-atomic server-authorized actions, and simultaneous stale requests cannot create
-two controllers.
+Transfer, leave, reconnect, and cleanup are atomic server-owned transitions.
+Simultaneous stale work cannot create two controllers or overwrite a newer
+valid assignment.
 
 ## Room codes and names
 
@@ -171,7 +170,7 @@ and 11 for 8 or more. These rules are documentation only in Stage 2.5.
 ## Non-goals for Stage 2.5
 
 Stage 2.5 does not include board generation, touch tracing, dictionaries, word
-validation, scoring, timers, synchronized rounds, QR codes, automatic
+validation, scoring, timers, synchronized rounds, QR codes, arbitrary or random
 controller election, persistence, production container packaging, image
 publishing, server installation, or tunnel configuration.
 
@@ -200,8 +199,8 @@ details are future deployment work, not a claim about Stage 2.
 2. **Stage 2 — complete:** Express health endpoint, Socket.IO lobby, separate
    display/player sessions, server-controlled controller authority, shared Zod
    contracts, reconnection, expiration, and authorization tests.
-3. **Stage 2.5 — in review:** explicit controller delegation, reconnect-grace
-   recovery by the display, role-specific controls, and race coverage.
+3. **Stage 2.5 — in review:** explicit controller delegation, deterministic
+   reconnect-grace succession, role-specific controls, and race coverage.
 4. **Stage 3 — recommended:** framework-independent board and path engine for
    4 × 4, 5 × 5, and 6 × 6 grids, plus evaluation of an openly licensed English
    dictionary.

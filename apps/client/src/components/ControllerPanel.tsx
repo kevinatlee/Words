@@ -6,18 +6,14 @@ import { LobbyError } from './LobbyError';
 
 type ControllerPanelProps = {
   room: RoomState;
-  sessionRole: 'display' | 'player';
   currentPlayerId: string | null;
   onTransfer: (targetPlayerId: string) => Promise<RoomError | null>;
-  onRecover: (targetPlayerId: string) => Promise<RoomError | null>;
 };
 
 export function ControllerPanel({
   room,
-  sessionRole,
   currentPlayerId,
   onTransfer,
-  onRecover,
 }: ControllerPanelProps) {
   const [selectedPlayerId, setSelectedPlayerId] = useState('');
   const [actionError, setActionError] = useState<RoomError | null>(null);
@@ -29,11 +25,9 @@ export function ControllerPanel({
   const currentPlayer = room.players.find(
     (player) => player.id === currentPlayerId,
   );
-  const isDisplay = sessionRole === 'display';
   const canTransfer =
     room.controllerStatus === 'assigned' &&
     currentPlayer?.id === room.controllerPlayerId;
-  const canRecover = isDisplay && room.controllerStatus === 'recovery-required';
   const eligiblePlayers = room.players.filter(
     (player) => player.connected && player.id !== room.controllerPlayerId,
   );
@@ -48,23 +42,21 @@ export function ControllerPanel({
 
   const statusLabel =
     room.controllerStatus === 'none'
-      ? 'Awaiting first player'
-      : room.controllerStatus === 'recovery-required'
-        ? 'Assignment required'
-        : controller?.connected
-          ? 'Game Host online'
-          : 'Game Host offline';
+      ? room.players.length === 0
+        ? 'Awaiting first player'
+        : 'Selecting automatically'
+      : controller?.connected
+        ? 'Game Host online'
+        : 'Game Host offline';
 
   const statusMessage =
     room.controllerStatus === 'none'
-      ? 'The first phone player to join will become the Game Host.'
-      : room.controllerStatus === 'recovery-required'
-        ? isDisplay
-          ? 'Game Host assignment is required. Choose a connected player below.'
-          : 'Game Host assignment is required. The Shared Display can choose a connected player.'
-        : controller?.connected
-          ? `${controller.displayName} is the current Game Host.`
-          : 'Waiting for the Game Host to reconnect. The Shared Display can assign a replacement after reconnect grace expires.';
+      ? room.players.length === 0
+        ? 'The first phone player to join will become the Game Host.'
+        : 'No connected player is available. The next player to join or reconnect will become Game Host automatically.'
+      : controller?.connected
+        ? `${controller.displayName} is the current Game Host.`
+        : 'Waiting for the Game Host to reconnect. If grace expires, the server will select the earliest-joined connected player automatically.';
 
   const submit = async () => {
     if (!targetPlayer) {
@@ -74,9 +66,7 @@ export function ControllerPanel({
     setSubmitting(true);
     setActionError(null);
     setSuccessMessage(null);
-    const error = canRecover
-      ? await onRecover(targetPlayer.id)
-      : await onTransfer(targetPlayer.id);
+    const error = await onTransfer(targetPlayer.id);
     setSubmitting(false);
 
     if (error) {
@@ -85,9 +75,7 @@ export function ControllerPanel({
     }
 
     setSuccessMessage(
-      canRecover
-        ? `${targetPlayer.displayName} is now the Game Host.`
-        : `Game Host control moved to ${targetPlayer.displayName}.`,
+      `Game Host control moved to ${targetPlayer.displayName}.`,
     );
   };
 
@@ -107,7 +95,7 @@ export function ControllerPanel({
 
       <p className="controller-panel__status">{statusMessage}</p>
 
-      {(canTransfer || canRecover) && (
+      {canTransfer && (
         <div className="controller-actions">
           {eligiblePlayers.length > 0 ? (
             <>
@@ -134,11 +122,7 @@ export function ControllerPanel({
                   disabled={submitting}
                   onClick={() => void submit()}
                 >
-                  {submitting
-                    ? 'Updating…'
-                    : canRecover
-                      ? 'Assign Game Host'
-                      : 'Make Game Host'}
+                  {submitting ? 'Updating…' : 'Make Game Host'}
                 </button>
               </div>
             </>

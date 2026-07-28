@@ -152,6 +152,14 @@ function defaultReconnectTokenGenerator(): string {
   return randomBytes(32).toString('base64url');
 }
 
+function comparePlayersByJoinOrder(
+  left: InternalPlayer,
+  right: InternalPlayer,
+): number {
+  const joinedAtDifference = left.joinedAt - right.joinedAt;
+  return joinedAtDifference || left.id.localeCompare(right.id);
+}
+
 export class RoomStore {
   private readonly rooms = new Map<string, InternalRoom>();
   private readonly displaySessions = new Map<string, DisplaySessionReference>();
@@ -261,13 +269,8 @@ export class RoomStore {
       playerId: player.id,
     });
 
-    if (
-      room.controllerStatus === 'none' &&
-      room.controllerPlayerId === null &&
-      room.players.size === 1
-    ) {
-      room.controllerPlayerId = player.id;
-      room.controllerStatus = 'assigned';
+    if (room.controllerPlayerId === null) {
+      this.assignEarliestConnectedController(room);
     }
 
     this.touch(room, now);
@@ -329,87 +332,6 @@ export class RoomStore {
     return { room: this.toRoomState(room) };
   }
 
-  recoverController(
-    session: BoundDisplaySession,
-    targetPlayerId: string,
-    socketId: string,
-  ): ControllerActionResult {
-    const room = this.requireActiveRoom(session.roomCode);
-    const display = room.display;
-
-    if (
-      display.id !== session.displaySessionId ||
-      !display.connected ||
-      display.socketId !== socketId
-    ) {
-      throw new RoomOperationError(
-        'UNAUTHORIZED',
-        'That display session is no longer authorized for this room.',
-      );
-    }
-
-    const now = this.now();
-    const controller =
-      room.controllerPlayerId === null
-        ? null
-        : room.players.get(room.controllerPlayerId);
-
-    if (room.controllerStatus === 'assigned' && controller?.connected) {
-      throw new RoomOperationError(
-        'CONTROLLER_STILL_ACTIVE',
-        'The current game host is still connected.',
-      );
-    }
-
-    if (
-      room.controllerStatus === 'assigned' &&
-      controller &&
-      controller.disconnectExpiresAt !== null &&
-      controller.disconnectExpiresAt > now
-    ) {
-      throw new RoomOperationError(
-        'CONTROLLER_RECOVERY_NOT_REQUIRED',
-        'Wait for the current game host’s reconnect grace period to end.',
-      );
-    }
-
-    if (
-      room.controllerStatus !== 'recovery-required' &&
-      room.controllerStatus !== 'assigned'
-    ) {
-      throw new RoomOperationError(
-        'CONTROLLER_RECOVERY_NOT_REQUIRED',
-        'This room does not currently need a game host assignment.',
-      );
-    }
-
-    const target = room.players.get(targetPlayerId);
-    if (!target) {
-      throw new RoomOperationError(
-        'TARGET_PLAYER_NOT_FOUND',
-        'Choose a player who is currently in this room.',
-      );
-    }
-
-    if (!target.connected || !target.socketId) {
-      throw new RoomOperationError(
-        'TARGET_PLAYER_OFFLINE',
-        'Choose a connected player to become the game host.',
-      );
-    }
-
-    if (controller && controller.id !== target.id) {
-      this.invalidatePlayerCredential(controller);
-      room.players.delete(controller.id);
-    }
-
-    room.controllerPlayerId = target.id;
-    room.controllerStatus = 'assigned';
-    this.touch(room, now);
-
-    return { room: this.toRoomState(room) };
-  }
-
   reconnectDisplay(
     roomCode: string,
     displayReconnectToken: string,
@@ -435,7 +357,7 @@ export class RoomStore {
     if (
       display.reconnectToken !== displayReconnectToken ||
       (display.disconnectExpiresAt !== null &&
-        display.disconnectExpiresAt <= now)
+        display.disconnectExpiresAt < now)
     ) {
       this.displaySessions.delete(displayReconnectToken);
       throw new RoomOperationError(
@@ -480,7 +402,7 @@ export class RoomStore {
     if (
       !player ||
       player.reconnectToken !== playerReconnectToken ||
-      (player.disconnectExpiresAt !== null && player.disconnectExpiresAt <= now)
+      (player.disconnectExpiresAt !== null && player.disconnectExpiresAt < now)
     ) {
       this.playerSessions.delete(playerReconnectToken);
       throw new RoomOperationError(
@@ -499,6 +421,9 @@ export class RoomStore {
       roomCode: room.code,
       playerId: player.id,
     });
+    if (room.controllerPlayerId === null) {
+      this.assignEarliestConnectedController(room);
+    }
     this.touch(room, now);
 
     return this.createPlayerResult(room, player, replacedSocketId);
@@ -602,13 +527,7 @@ export class RoomStore {
     room.players.delete(player.id);
 
     if (player.id === room.controllerPlayerId) {
-      room.controllerPlayerId = null;
-      room.controllerStatus =
-        room.players.size === 0 ? 'none' : 'recovery-required';
-    }
-    if (room.players.size === 0) {
-      room.controllerPlayerId = null;
-      room.controllerStatus = 'none';
+      this.assignEarliestConnectedController(room);
     }
 
     this.touch(room, now);
@@ -656,20 +575,20 @@ export class RoomStore {
           player.disconnectExpiresAt <= now,
       );
 
+      let removedController = false;
+
       for (const player of expiredPlayers) {
         this.invalidatePlayerCredential(player);
         room.players.delete(player.id);
 
         if (player.id === room.controllerPlayerId) {
-          room.controllerPlayerId = null;
-          room.controllerStatus =
-            room.players.size === 0 ? 'none' : 'recovery-required';
+          removedController = true;
         }
         updatedRoomCodes.add(room.code);
       }
 
-      if (room.players.size === 0 && room.controllerPlayerId === null) {
-        room.controllerStatus = 'none';
+      if (removedController) {
+        this.assignEarliestConnectedController(room);
       }
 
       if (
@@ -846,7 +765,7 @@ export class RoomStore {
       controllerStatus: room.controllerStatus,
       controllerPlayerId: room.controllerPlayerId,
       players: [...room.players.values()]
-        .sort((left, right) => left.joinedAt - right.joinedAt)
+        .sort(comparePlayersByJoinOrder)
         .map((player) => this.toPlayerState(room, player)),
       settings: room.settings,
     };
@@ -875,6 +794,15 @@ export class RoomStore {
   private touch(room: InternalRoom, now: number): void {
     room.lastActivityAt = now;
     room.expiresAt = now + this.options.roomTtlMs;
+  }
+
+  private assignEarliestConnectedController(room: InternalRoom): void {
+    const nextController = [...room.players.values()]
+      .filter((player) => player.connected && player.socketId !== null)
+      .sort(comparePlayersByJoinOrder)[0];
+
+    room.controllerPlayerId = nextController?.id ?? null;
+    room.controllerStatus = nextController ? 'assigned' : 'none';
   }
 
   private invalidatePlayerCredential(player: InternalPlayer): void {

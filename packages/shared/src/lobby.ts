@@ -82,12 +82,6 @@ export const transferControllerInputSchema = z
   })
   .strict();
 
-export const recoverControllerInputSchema = z
-  .object({
-    targetPlayerId: playerIdSchema,
-  })
-  .strict();
-
 export const roomSettingsSchema = z
   .object({
     gridSize: z.union([z.literal(4), z.literal(5), z.literal(6)]),
@@ -120,11 +114,7 @@ export const playerStateSchema = z
   })
   .strict();
 
-export const controllerStatusSchema = z.enum([
-  'none',
-  'assigned',
-  'recovery-required',
-]);
+export const controllerStatusSchema = z.enum(['none', 'assigned']);
 
 export const roomStateSchema = z
   .object({
@@ -148,29 +138,14 @@ export const roomStateSchema = z
 
     if (room.controllerStatus === 'none') {
       if (
-        room.players.length !== 0 ||
         room.controllerPlayerId !== null ||
-        controllerPlayers.length !== 0
-      ) {
-        context.addIssue({
-          code: 'custom',
-          message: 'Controller status none requires an empty room.',
-          path: ['controllerStatus'],
-        });
-      }
-      return;
-    }
-
-    if (room.controllerStatus === 'recovery-required') {
-      if (
-        room.players.length === 0 ||
-        room.controllerPlayerId !== null ||
-        controllerPlayers.length !== 0
+        controllerPlayers.length !== 0 ||
+        room.players.some((player) => player.connected)
       ) {
         context.addIssue({
           code: 'custom',
           message:
-            'Controller recovery requires players and no assigned controller.',
+            'Controller status none requires no assigned or connected player.',
           path: ['controllerStatus'],
         });
       }
@@ -210,9 +185,6 @@ export const roomErrorCodeSchema = z.enum([
   'INVALID_NAME',
   'UNAUTHORIZED',
   'NOT_CONTROLLER',
-  'DISPLAY_ONLY',
-  'CONTROLLER_STILL_ACTIVE',
-  'CONTROLLER_RECOVERY_NOT_REQUIRED',
   'TARGET_PLAYER_NOT_FOUND',
   'TARGET_PLAYER_OFFLINE',
   'TARGET_ALREADY_CONTROLLER',
@@ -290,9 +262,6 @@ export type LeaveSessionInput = z.infer<typeof leaveSessionInputSchema>;
 export type TransferControllerInput = z.infer<
   typeof transferControllerInputSchema
 >;
-export type RecoverControllerInput = z.infer<
-  typeof recoverControllerInputSchema
->;
 export type RoomSettings = z.infer<typeof roomSettingsSchema>;
 export type DisplayState = z.infer<typeof displayStateSchema>;
 export type PlayerState = z.infer<typeof playerStateSchema>;
@@ -356,10 +325,6 @@ export interface ClientToServerEvents {
   ) => void;
   'controller:transfer': (
     payload: TransferControllerInput,
-    acknowledge: ControllerActionAcknowledgement,
-  ) => void;
-  'controller:recover': (
-    payload: RecoverControllerInput,
     acknowledge: ControllerActionAcknowledgement,
   ) => void;
 }
