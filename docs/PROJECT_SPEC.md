@@ -40,10 +40,10 @@ Creating the room does not grant the display player membership or controller
 authority. The display never selects or approves a controller. Changing the
 controller must never change the display session.
 
-## Current scope: Stage 2.5
+## Current scope: Stage 3 in review
 
-Stage 2.5 extends the secure, server-backed lobby with explicit game-host
-delegation and deterministic automatic succession:
+Stage 2.5 is complete. It extends the secure, server-backed lobby with explicit
+game-host delegation and deterministic automatic succession:
 
 - opening `/` reconnects that browser profile’s display or creates one
   temporary room without a display name or button press
@@ -66,6 +66,22 @@ the retained static preview at `/play/demo`. `/display` and `/host` are
 compatibility aliases for the automatic root display flow. The Node server
 listens on port `6532` by default. During development Vite listens on `5173` and
 proxies API and Socket.IO traffic to the Node server.
+
+Stage 3 adds a separate framework-independent `@words/game-engine` package:
+
+- immutable validated 4 × 4, 5 × 5, and 6 × 6 boards
+- row-major tile-index paths and coordinate helpers
+- uppercase ASCII tile tokens, including short multi-character tokens such as
+  `QU`
+- caller-supplied weighted distributions and injected deterministic randomness
+- bounded board-quality rejection
+- horizontal, vertical, and diagonal adjacency with no tile reuse
+- ASCII word normalization and exact path-word matching
+- an injected synchronous dictionary interface and Set-backed implementation
+- a pinned, licence-reviewed Stage 4 dictionary recommendation
+
+The package has no runtime dependencies and is not imported by the lobby,
+server, or client. Stage 3 does not add gameplay events or live round state.
 
 ## Stage 2.5 room model
 
@@ -175,12 +191,13 @@ Planned rules remain:
 Traditional scoring gives 1 point for 3–4 letters, 2 for 5, 3 for 6, 5 for 7,
 and 11 for 8 or more. These rules are documentation only in Stage 2.5.
 
-## Non-goals for Stage 2.5
+## Non-goals for Stage 3
 
-Stage 2.5 does not include board generation, touch tracing, dictionaries, word
-validation, scoring, timers, synchronized rounds, scannable QR images, arbitrary or random
-controller election, persistence, production container packaging, image
-publishing, server installation, or tunnel configuration.
+Stage 3 does not include touch tracing, a live board, production dictionary
+data, a default letter distribution, gameplay network events, room game state,
+scoring, duplicate handling, timers, synchronized rounds, scannable QR images,
+arbitrary or random controller election, persistence, production container
+packaging, image publishing, server installation, or tunnel configuration.
 
 The product also has no database, Redis, accounts, external authentication,
 microservices, paid APIs, analytics, advertisements, payments, unlocks, or
@@ -207,11 +224,11 @@ details are future deployment work, not a claim about Stage 2.
 2. **Stage 2 — complete:** Express health endpoint, Socket.IO lobby, separate
    display/player sessions, server-controlled controller authority, shared Zod
    contracts, reconnection, expiration, and authorization tests.
-3. **Stage 2.5 — in review:** explicit controller delegation, deterministic
+3. **Stage 2.5 — complete:** explicit controller delegation, deterministic
    reconnect-grace succession, role-specific controls, and race coverage.
-4. **Stage 3 — recommended:** framework-independent board and path engine for
-   4 × 4, 5 × 5, and 6 × 6 grids, plus evaluation of an openly licensed English
-   dictionary.
+4. **Stage 3 — in review:** framework-independent board generation, path and
+   word validation for 4 × 4, 5 × 5, and 6 × 6 grids, plus a pinned,
+   licence-reviewed dictionary recommendation.
 5. **Stage 4:** synchronized rounds, submissions, validation, scoring,
    duplicate handling, results, and round-aware reconnection.
 6. **Stage 5:** production hardening, one-container build, automated checks and
@@ -237,11 +254,13 @@ The eventual MVP must allow:
     player.
 
 Stage 2.5 completes the room-code and authority portions of items 1–3 and 10.
+Stage 3 supplies the isolated engine foundation for items 6–8 without
+connecting it to room or network state.
 
 ## Decisions deferred to later stages
 
 - Whether controller transfer should be allowed during future non-lobby phases
-- Dictionary choice, license, attribution, and play-quality evaluation
-- Server-owned board-generation method and letter distribution
+- Final Stage 4 dictionary export checksum and play-vocabulary audit
+- Server-owned production letter distribution and board-quality policy
 - Per-IP production throttling and room-code enumeration responses
 - Custom scoring representation

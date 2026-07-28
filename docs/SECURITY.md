@@ -1,7 +1,8 @@
 # Security requirements
 
-Stage 2.5 has a real network boundary and controller-authority actions. This
-document separates implemented lobby controls from protections still required
+Stage 2.5 has a real network boundary and controller-authority actions. Stage 3
+adds an isolated, defensive game engine without exposing it to the network.
+This document separates implemented controls from protections still required
 before public deployment and gameplay.
 
 ## Implemented authority controls
@@ -187,6 +188,38 @@ Before public deployment, add layered IP-aware limits at a trusted boundary,
 review enumeration behavior, verify proxy IP handling, add safe operational
 metrics, and test the exact origin and TLS configuration.
 
+## Implemented Stage 3 engine controls
+
+- Canonical boards support only sizes 4, 5, and 6 and exactly `size × size`
+  tiles.
+- Canonical tile tokens contain one to four uppercase ASCII letters.
+- Successful board and path validation returns frozen snapshots rather than
+  caller-owned arrays.
+- Candidate words contain at most 64 ASCII letters after outer trimming and
+  case normalization. Punctuation, internal whitespace, control and formatting
+  characters, accents, and Unicode case expansions are rejected rather than
+  silently removed.
+- Paths must be non-empty, no longer than the board, and contain only unique
+  in-range integer indexes. All entries are checked before tile access.
+- Row/column adjacency prevents numeric row wrapping and accepts only one-cell
+  horizontal, vertical, or diagonal moves.
+- Path validation is linear and uses a Set for tile reuse. It has no recursion
+  based on candidate data.
+- The supplied path must reconstruct exactly the normalized submitted word
+  before dictionary membership is queried.
+- Dictionary lookup is injected, synchronous, filesystem-free, network-free,
+  and Set-backed. Malformed input entries are reported.
+- Weighted generation requires a validated injected random source. Non-finite
+  or out-of-range values, non-finite weights, duplicate normalized tokens, and
+  non-finite totals are rejected.
+- Board-quality retry uses an iterative explicit limit from 1 through 1,000 and
+  returns a structured exhaustion result.
+- No production dictionary data, proprietary distribution, gameplay event, or
+  dynamic code execution is included.
+
+These controls protect pure engine calls. They do not authorize a socket,
+verify room phase, enforce a deadline, or rate-limit network submissions.
+
 ## Future gameplay requirements
 
 When gameplay is added, the server must:
@@ -195,9 +228,8 @@ When gameplay is added, the server must:
 - authorize settings and round starts against `controllerPlayerId`
 - reject word submissions from display-bound sockets
 - generate and retain the official board
-- validate path bounds, adjacency, tile reuse, and maximum path length
-- reconstruct the submitted word from the server board
-- evaluate an approved licensed dictionary
+- call the Stage 3 path and word engine only with the server-retained board
+- reproduce, notice, checksum, audit, and load the approved pinned dictionary
 - enforce the server deadline and phase
 - rate-limit submissions per player and room
 - calculate scores and duplicate handling from accepted server data

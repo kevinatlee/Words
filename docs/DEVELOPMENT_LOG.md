@@ -3,6 +3,100 @@
 Future meaningful work must add a new chronological entry. Record what changed,
 why, what remains open, and the exact verification results.
 
+## 2026-07-28 — Stage 3 game-engine foundation
+
+### Work completed
+
+- Turned `packages/game-engine` into the private, zero-runtime-dependency
+  `@words/game-engine` TypeScript workspace package.
+- Added immutable board validation for generic 4 × 4, 5 × 5, and 6 × 6 boards,
+  with row-major coordinate helpers and one-to-four-letter uppercase ASCII tile
+  tokens such as `QU`.
+- Added injected-random weighted board generation. Distribution tokens
+  normalize once, normalized duplicates and invalid/non-finite weights fail
+  explicitly, every random value must be finite in `[0, 1)`, and optional
+  quality rejection uses an iterative 1-to-1,000 attempt bound.
+- Added linear path validation for horizontal, vertical, and diagonal
+  adjacency, with candidate-safe errors for empty paths, bad indexes, bounds,
+  reuse, row wrapping, jumps, and oversized paths.
+- Added ASCII-only word normalization, configurable minimum length, exact
+  path-word matching, and an injected synchronous dictionary interface.
+- Added a Set-backed dictionary constructor that normalizes and deduplicates
+  owned input without filesystem or network access.
+- Kept the package disconnected from the client, lobby server, room store, and
+  Socket.IO. No gameplay phase, submission, timer, score, duplicate handling,
+  live board, QR implementation, deployment work, or persistence was added.
+
+### Dictionary evaluation
+
+- Evaluated official ESDB/SCOWL release `rel-2026.02.25` at full commit
+  `7e99edab8e32f9f9ea2b15f249ca8d4d67237410`, including primary-source licence,
+  dialect, size, variant, part-of-speech, inflection, category, deaccenting, and
+  moderation metadata.
+- Reproduced candidate size-60 and size-70 American-plus-Canadian exports in a
+  temporary checkout. The proposed filters produced 79,370 words / 757,056
+  bytes at size 60 and 126,014 words / 1,247,002 bytes at size 70.
+- Downloaded the original archived ENABLE 2K ZIP, verified its public-domain
+  declaration, and proved its 173,528-word `WORD.LST` matches the
+  provenance-preserving mirror after CRLF normalization.
+- Recommended the pinned ESDB size-60 export for Stage 4 because it has direct
+  Canadian/American controls, a documented commonness threshold, reproducible
+  exclusions, active maintenance, and compatible redistribution terms.
+- Committed no external word data. Stage 4 must reproduce the exact command,
+  preserve the full applicable notice, record the output checksum, and perform
+  a play-vocabulary audit before bundling it.
+
+### Coverage
+
+- Board tests cover all supported sizes, malformed structures and tokens,
+  immutability, `QU`, coordinate round trips, neighbour counts, every movement
+  direction, row wrapping, jumps, and reciprocal in-bounds adjacency.
+- Generation tests cover every size, deterministic sequences, exact weighted
+  boundaries, all invalid random classes, invalid weights and totals,
+  normalized duplicates, mutation safety, frozen acceptance inputs, bounded
+  exhaustion, later-attempt success, invalid attempt limits, and deterministic
+  multi-board loops.
+- Path tests cover legal reads, every candidate index failure, reuse,
+  non-adjacency, path bounds, `QU`, snapshots, invalid boards, and full-board
+  snake paths on all sizes.
+- Word and dictionary tests cover trimming/case, ASCII policy, punctuation,
+  spaces, apostrophes, hyphens, accents, control/formatting and Unicode
+  case-expansion characters, length bounds, validation order, exact match,
+  minimum length, membership, malformed dictionary entries, deduplication, and
+  caller input protection.
+
+### Verification
+
+- `npm install` — passed; workspace lock entry added, no engine runtime
+  dependency.
+- `npm run format:check` — passed; all matched files use Prettier formatting.
+- `npm run lint` — passed with no warnings or errors.
+- `npm run typecheck` — passed for client, server, game-engine, and shared
+  workspaces.
+- `npm test` — passed; 244 tests across 14 files:
+  - client: 35 tests across 3 files
+  - server: 59 tests across 3 files
+  - game engine: 130 tests across 5 files
+  - shared: 20 tests across 3 files
+- `npm run build` — passed; Vite transformed 158 modules, and server and
+  game-engine strict TypeScript build boundaries passed.
+- `npm audit --audit-level=high` — passed; 0 vulnerabilities.
+- `npm run dev` — passed; Vite started on `http://localhost:5173` and the Words
+  server started on `http://localhost:6532`, then both processes stopped
+  cleanly.
+- Manual engine invocation — passed; printed deterministic 4 × 4, 5 × 5, and
+  6 × 6 boards, accepted `CAT` and `QUIZ`, and rejected tile reuse,
+  non-adjacent movement, and a path-word mismatch with the expected structured
+  codes.
+
+### Remaining Stage 4 boundary
+
+Reproduce and audit the recommended dictionary, choose a documented
+non-proprietary letter distribution and board-quality policy, define strict
+shared gameplay payloads, and integrate server-owned boards, deadlines,
+submissions, scoring, duplicate handling, results, and round-aware reconnect
+behavior. The display must remain passive and unable to submit words.
+
 ## 2026-07-28 — Stage 2.5 automatic display entry and room isolation
 
 ### Critical product-flow finding

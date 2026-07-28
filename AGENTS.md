@@ -46,6 +46,19 @@ and explain important choices in plain language.
   socket disconnects.
 - Support 4 × 4, 5 × 5, and 6 × 6 grids generically. Never assume a grid has
   exactly 16 tiles.
+- Keep engine paths as row-major tile indexes. Validate every index before tile
+  access, reject reuse, and keep candidate validation linear in path length.
+- Keep canonical board and word alphabets to ASCII A–Z for the current English
+  policy. Preserve complete multi-character tile tokens such as `QU`; tile
+  count is not necessarily word-character count.
+- Require an injected random source for board generation. Never hide
+  `Math.random()` inside engine code, accept non-finite or out-of-range random
+  values, or use an unbounded quality-retry loop.
+- Do not add a default letter distribution without a documented,
+  non-proprietary, reproducible derivation.
+- Pin every production dictionary export to an exact source version, command,
+  checksum, and licence notice. Keep dictionary validity separate from future
+  sensitive-word presentation policy.
 - Preserve port `6532` as the default production port.
 - Preserve `https://words.atlee.io` as the intended public URL.
 - Keep the product name and other shared values centralized where practical.
