@@ -2,7 +2,8 @@
 
 Stage 2.5 has a real network boundary and controller-authority actions. Stage 3
 adds an isolated, defensive game engine without exposing it to the network.
-Stage 3.1 adds read-only hosted verification. This document separates
+Stage 3.1 adds read-only hosted verification. Stage 4A adds verified,
+server-only production data without exposing gameplay. This document separates
 implemented controls from protections still required before public deployment
 and gameplay.
 
@@ -221,6 +222,45 @@ metrics, and test the exact origin and TLS configuration.
 These controls protect pure engine calls. They do not authorize a socket,
 verify room phase, enforce a deadline, or rate-limit network submissions.
 
+## Implemented Stage 4A game-data controls
+
+- The production dictionary source repository, release tag, direct and peeled
+  commit, export arguments, counts, bytes, SHA-256, and metadata-free gzip size
+  are pinned.
+- The complete applicable ESDB permission notice is committed beside the data.
+  Conditional licence branches not selected by the size-60 American/Canadian
+  export are not represented as though they applied.
+- Reproduction fetches only the pinned tag at depth one from the fixed official
+  URL, checks out the pinned commit directly, invokes subprocesses without a
+  shell, accepts no output path, and rejects a source checkout whose remote,
+  tag, peeled commit, `HEAD`, or tracked state differs.
+- Generated dictionary output is length- and count-bounded, written in a
+  same-directory temporary location, verified completely, gzip-measured, and
+  atomically renamed. Symbolic-link output targets are rejected and temporary
+  directories are removed on success and failure.
+- Normal verification is offline. It checks regular file types, exact manifest
+  fields, checksum, bytes, final newline, LF-only endings, BOM absence, ASCII
+  format, per-line length, strict sort order, uniqueness, notice scope, and
+  byte-identical regenerated distribution data.
+- The runtime loader accepts only local file URLs, resolves production files
+  relative to its module rather than the process working directory, bounds
+  error detail, verifies the file before constructing the dictionary, exposes
+  no Set, and has no mutable global cache.
+- Candidate derivation and board audits use fixed sample counts and a clearly
+  non-production seeded generator. Production generation still requires an
+  injected random source and can make at most eight attempts.
+- The dictionary-derived profile has positive safe-integer weights, includes
+  `QU` instead of standalone `Q`, contains no proprietary table, and records
+  zero manual adjustments.
+- The client package has no dependency, import, checksum, or data-file
+  reference for `@words/game-data`. Neither application loads it in Stage 4A.
+- Scripts perform no dynamic code download, runtime external request, secret
+  access, full-dictionary logging, persistence, or gameplay mutation.
+
+The word list is under one megabyte. Loader memory is suitable for a controlled
+one-time startup load, but Stage 4B must not reload it per request, submission,
+player, or room.
+
 ## GitHub Actions security boundary
 
 The Stage 3.1 CI workflow has explicit workflow-level `contents: read`
@@ -253,7 +293,8 @@ When gameplay is added, the server must:
 - reject word submissions from display-bound sockets
 - generate and retain the official board
 - call the Stage 3 path and word engine only with the server-retained board
-- reproduce, notice, checksum, audit, and load the approved pinned dictionary
+- load and retain the Stage 4A verified dictionary once during controlled
+  startup
 - enforce the server deadline and phase
 - rate-limit submissions per player and room
 - calculate scores and duplicate handling from accepted server data

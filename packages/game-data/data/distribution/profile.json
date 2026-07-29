@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "dictionarySha256": "f5f3d22bd07b8f8d2dd8cf4f3caff211b6f3249a24da02c5aa2a21bf2210f352",
+  "generationScriptVersion": "1.0.0",
+  "derivationMethod": "per-word-capped-occurrence-2",
+  "derivationDescription": "Each letter contributes at most twice for each accepted dictionary word.",
+  "quPolicy": "Map the derived Q weight to QU; omit standalone Q; retain U unchanged.",
+  "vowelTokens": [
+    "A",
+    "E",
+    "I",
+    "O",
+    "U"
+  ],
+  "tokenWeights": [
+    {
+      "token": "A",
+      "weight": 49322
+    },
+    {
+      "token": "B",
+      "weight": 13232
+    },
+    {
+      "token": "C",
+      "weight": 27382
+    },
+    {
+      "token": "D",
+      "weight": 25850
+    },
+    {
+      "token": "E",
+      "weight": 74285
+    },
+    {
+      "token": "F",
+      "weight": 9511
+    },
+    {
+      "token": "G",
+      "weight": 20260
+    },
+    {
+      "token": "H",
+      "weight": 15153
+    },
+    {
+      "token": "I",
+      "weight": 56041
+    },
+    {
+      "token": "J",
+      "weight": 1230
+    },
+    {
+      "token": "K",
+      "weight": 6343
+    },
+    {
+      "token": "L",
+      "weight": 35167
+    },
+    {
+      "token": "M",
+      "weight": 18097
+    },
+    {
+      "token": "N",
+      "weight": 46103
+    },
+    {
+      "token": "O",
+      "weight": 40728
+    },
+    {
+      "token": "P",
+      "weight": 19476
+    },
+    {
+      "token": "QU",
+      "weight": 1229
+    },
+    {
+      "token": "R",
+      "weight": 48891
+    },
+    {
+      "token": "S",
+      "weight": 57352
+    },
+    {
+      "token": "T",
+      "weight": 45407
+    },
+    {
+      "token": "U",
+      "weight": 22662
+    },
+    {
+      "token": "V",
+      "weight": 6938
+    },
+    {
+      "token": "W",
+      "weight": 6160
+    },
+    {
+      "token": "X",
+      "weight": 1852
+    },
+    {
+      "token": "Y",
+      "weight": 10652
+    },
+    {
+      "token": "Z",
+      "weight": 2884
+    }
+  ],
+  "totalWeight": 662207,
+  "adjustments": [],
+  "profileSha256": "de7fb14c60d1778fbbe0b9f80cd710a673f486923b581ced46fd61596b5956af"
+}

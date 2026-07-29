@@ -1,6 +1,6 @@
 # Continuous integration
 
-Stage 3.1 adds independent GitHub-hosted verification for the Words repository.
+Stage 3.1 provides independent GitHub-hosted verification for the Words repository.
 The workflow supplements local review; it does not replace running the
 repository checks before requesting review.
 
@@ -35,12 +35,14 @@ The `Quality` job runs on `ubuntu-latest`, has a 20-minute timeout, and sets
    `package-lock.json`;
 3. prints the exact hosted Node.js and npm versions;
 4. runs `npm ci`;
-5. checks formatting;
-6. runs ESLint;
-7. type-checks every workspace;
-8. runs every test;
-9. builds the client and verifies the server and engine build boundaries;
-10. verifies that the commands left no tracked changes or untracked,
+5. verifies the committed production dictionary, notice, manifest, generated
+   distribution data, and client-exclusion boundary without network access;
+6. checks formatting;
+7. runs ESLint;
+8. type-checks every workspace;
+9. runs every test;
+10. builds the client and verifies server, engine, and game-data boundaries;
+11. verifies that the commands left no tracked changes or untracked,
     non-ignored files.
 
 Each verification command has its own step so a failure is visible without
@@ -153,5 +155,6 @@ that GitHub has never observed.
 - This workflow does not run the long-lived development servers, perform
   browser end-to-end testing, publish artifacts, deploy software, build
   containers, or change repository settings.
-- Stage 4 gameplay, production dictionary data, letter distribution, and QR
-  rendering remain deferred.
+- Stage 4A data verification does not rebuild ESDB in CI. The pinned source
+  reproduction command remains an explicit reviewed maintenance operation.
+- Stage 4B gameplay, QR rendering, and production deployment remain deferred.

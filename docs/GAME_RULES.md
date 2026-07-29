@@ -3,7 +3,7 @@
 This document separates current prototype behavior from planned rules and open
 decisions.
 
-## Implemented through Stage 3
+## Implemented through Stage 4A
 
 - The shared lobby can locally preview 4 × 4, 5 × 5, and 6 × 6 layouts.
 - The default preview is 4 × 4.
@@ -19,10 +19,17 @@ decisions.
   path, and are checked through an injected dictionary.
 - Board generation accepts caller-provided weights and randomness with a
   bounded quality-retry limit.
+- The production list contains 79,370 verified American/Canadian ESDB words.
+- The original default distribution derives each letter’s integer weight from
+  per-word occurrences capped at two.
+- `QU` carries the derived Q weight, standalone `Q` is absent from the default
+  profile, and `U` remains independent.
+- Simulated quality profiles set separate vowel and repeat bounds for 4 × 4,
+  5 × 5, and 6 × 6 boards, with at most eight generation attempts.
 
-The Stage 2.5 settings controls remain local previews. The Stage 3 engine is not
-connected to rooms or sockets. There is no live board, timer, production
-dictionary data, network submission, duplicate detection, or scoring.
+The Stage 2.5 settings controls remain local previews. The Stage 3 engine and
+Stage 4A game-data package are not connected to rooms or sockets. There is no
+live board, timer, network submission, duplicate detection, or scoring.
 
 ## Planned board and word rules
 
@@ -31,11 +38,10 @@ dictionary data, network submission, duplicate detection, or scoring.
 - A path may move horizontally, vertically, or diagonally to an adjacent tile.
 - A tile may not be reused within one word.
 - The default minimum word length is 3 letters.
-- The server will use an original, documented weighted letter profile and the
+- The server will use the Stage 4A original, documented weighted profile and
   Stage 3 engine to generate the official grid and validate every traced path.
-- A word must appear in a bundled, openly licensed English dictionary. Stage 4
-  should reproduce the pinned ESDB size-60 American-plus-Canadian export in
-  `DICTIONARY_EVALUATION.md` and retain its required notice.
+- A word must appear in the bundled, openly licensed, pinned ESDB size-60
+  American-plus-Canadian export described in `GAME_DATA.md`.
 - The controller player chooses supported settings; the server validates the
   selection against an allowlist.
 
@@ -80,8 +86,8 @@ normal or reduced points. Stage 2.5 does not score duplicates.
 
 ## Unresolved rules
 
-- Does play testing confirm the recommended ESDB size-60 export, or justify a
-  reviewed adjustment before it is bundled?
+- Does later play testing justify a reviewed versioned change to the dictionary,
+  distribution, or quality profile?
 - Should controller delegation be allowed during an active round?
 - How should custom scoring be configured and bounded?
 - What feedback should distinguish an invalid path, an unknown word, a

@@ -12,10 +12,11 @@ discriminated results. It can be imported by a server, client-side tests, or
 another JavaScript runtime. Its core functions use no DOM or Node-specific
 runtime API.
 
-The current lobby does not import this package. In Stage 4, the server—not a
+Stage 4A adds a separate server-oriented `@words/game-data` caller with a
+verified dictionary, derived default weights, and a bounded quality predicate.
+The current lobby still imports neither package. In Stage 4B, the server—not a
 browser—must generate and retain each official board, authorize each player
-submission, call path and dictionary validation, and calculate any later
-result.
+submission, call path and dictionary validation, and calculate any result.
 
 ## Canonical board and path
 
@@ -95,9 +96,11 @@ candidate is rejected, it returns `NO_ACCEPTABLE_BOARD`; it cannot retry
 forever. A predicate exception is a programmer error and propagates unchanged;
 the engine does not silently treat it as a rejected board.
 
-Stage 3 does not define a production letter distribution or a permanent board
-quality policy. Those require a documented, independently reviewable
-derivation and play testing.
+The engine itself does not define a production distribution or permanent
+quality policy. Stage 4A keeps those independently reviewable in
+`@words/game-data`: dictionary-derived cap-of-two occurrence weights, a `QU`
+token mapped from the Q weight, and simulated vowel/repetition profiles with an
+eight-attempt bound.
 
 ## Words and dictionary
 
@@ -128,23 +131,22 @@ normalization code. Core lookup performs no filesystem or network work.
 - path validation is linear and Set lookup is effectively constant-time;
 - caller-owned arrays are never mutated.
 
-These package limits complement, but do not replace, Stage 4 network payload
+These package limits complement, but do not replace, Stage 4B network payload
 size limits, authorization, phase checks, submission rate limits, and deadline
 enforcement.
 
-## Known limitations and Stage 4 boundary
+## Known limitations and Stage 4B boundary
 
-Stage 3 has no production dictionary data, default letter weights, gameplay
-events, round state, deadline, score, duplicate handling, touch interface, or
-live board. It does not infer a path from a word.
+Stage 4A supplies production dictionary data and default generation inputs in a
+separate server-only package. Neither application imports them. There are
+still no gameplay events, round state, deadline, score, duplicate handling,
+touch interface, or live board. The engine does not infer a path from a word.
 
-Stage 4 should:
+Stage 4B should:
 
-1. reproduce the pinned size-60 American-plus-Canadian dictionary export in
-   [`DICTIONARY_EVALUATION.md`](DICTIONARY_EVALUATION.md), retain its notice,
-   audit the resulting play vocabulary, and load it once on the server;
-2. choose and document a non-proprietary weighted letter distribution and
-   bounded board-quality policy;
+1. load the verified dictionary once during controlled server startup;
+2. inject a cryptographically appropriate production random source into
+   `generateDefaultBoard`;
 3. add strict shared network schemas for traced index paths and words;
 4. make the server own the board, deadline, validation, and scoring;
 5. keep the display passive and reject display-bound submissions;

@@ -2,3 +2,6 @@ node_modules
 dist
 coverage
 package-lock.json
+packages/game-data/data/distribution/candidates.json
+packages/game-data/data/distribution/profile.json
+packages/game-data/src/generated/distribution-data.ts

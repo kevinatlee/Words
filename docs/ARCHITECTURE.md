@@ -1,8 +1,8 @@
 # Architecture
 
-This document describes the completed Stage 2.5 lobby and Stage 3 engine, the
-Stage 3.1 CI workflow in review, and the boundaries later game stages must
-preserve.
+This document describes the completed Stage 2.5 lobby, Stage 3 engine, and
+Stage 3.1 CI, plus the Stage 4A production game-data package in review and the
+boundaries later gameplay must preserve.
 
 ## Runtime pieces
 
@@ -25,8 +25,14 @@ row-major paths, adjacency, word normalization, exact path-word matching, and
 an injected dictionary. It has no runtime dependencies and does not import the
 lobby, browser, Socket.IO, or Node runtime APIs.
 
-The lobby does not import the engine. Stage 3 does not add boards, words,
-scores, or phases to the room store.
+**Game-data package (`packages/game-data`):** Private server-oriented TypeScript
+and committed data for the verified production dictionary, immutable
+dictionary-derived default distribution, simple size-specific board-quality
+profiles, a filesystem loader, and deterministic offline audits. It depends on
+the engine but not on the browser, React, Express, Socket.IO, or room store.
+
+Neither application imports the engine or game data in Stage 4A. No board,
+word, score, deadline, or game phase is added to the room store.
 
 ## Roles
 
@@ -357,15 +363,42 @@ Every random board requires an injected source whose values are finite and in
 iterative and explicitly limited to at most 1,000.
 
 The engine defines neither a default letter distribution nor a production
-dictionary. The recommended Stage 4 dictionary export and its licence
-conditions are in `DICTIONARY_EVALUATION.md`.
+dictionary. Stage 4A keeps those external concerns in `@words/game-data`.
+
+## Server-only production game data
+
+The production loader resolves its package files with `import.meta.url`,
+validates the pinned manifest identity, byte count, SHA-256, canonical lines,
+and word count, and then calls the engine’s Set-backed dictionary constructor.
+It returns a structured failure and has no network access or global mutable
+cache. Stage 4B should call it once during controlled server startup.
+
+The selected default distribution counts each letter at most twice per
+accepted dictionary word. Q’s derived weight becomes the `QU` token;
+standalone `Q` is absent and ordinary `U` remains. There are no manual weight
+adjustments. The profile supports all engine sizes generically.
+
+The quality predicate checks only vowel-token range and maximum occurrence of
+one token. `QU` is not a vowel. Profiles for sizes 4, 5, and 6 use simulated
+thresholds and eight attempts, preserving the engine’s bounded structured
+failure. `generateDefaultBoard({ size, random })` still requires caller-owned
+randomness and never generates during module import.
+
+Reproduction may use the network only in the explicit dictionary-build
+command. Normal data verification, vocabulary audit, distribution derivation,
+board audit, application builds, and runtime lookup use committed local data.
+See [`GAME_DATA.md`](GAME_DATA.md).
 
 ## Hosted verification boundary
 
-Stage 3.1 adds one GitHub Actions workflow with two read-only jobs. `Quality`
+Stage 3.1 provides one GitHub Actions workflow with two read-only jobs. `Quality`
 performs a locked `npm ci` install, formatting, lint, type checking, tests,
 builds, and a final repository-cleanliness check. `Dependency audit` applies the
 high-severity npm advisory threshold independently.
+
+Stage 4A adds a separate `npm run data:verify` Quality step. It verifies the
+committed dictionary, notice, manifest, generated distribution files, and
+client-exclusion boundary without fetching or rebuilding ESDB.
 
 The workflow runs for pull requests targeting `main`, pushes to `main`, and
 manual dispatches. It uses Node.js 24, official actions pinned to immutable
@@ -390,4 +423,4 @@ Words process on port `6532`. That process will serve the built client, health
 API, Socket.IO, game engine, and an openly licensed dictionary.
 
 Container packaging, static serving, tunnel configuration, deployment
-automation, and image publishing are not implemented through Stage 3.1.
+automation, and image publishing are not implemented through Stage 4A.

@@ -40,7 +40,7 @@ Creating the room does not grant the display player membership or controller
 authority. The display never selects or approves a controller. Changing the
 controller must never change the display session.
 
-## Current scope: Stage 3 complete, Stage 3.1 CI in review
+## Current scope: Stage 3.1 complete, Stage 4A game data in review
 
 Stage 2.5 is complete. It extends the secure, server-backed lobby with explicit
 game-host delegation and deterministic automatic succession:
@@ -83,11 +83,26 @@ Stage 3 adds a separate framework-independent `@words/game-engine` package:
 The package has no runtime dependencies and is not imported by the lobby,
 server, or client. Stage 3 does not add gameplay events or live round state.
 
-Stage 3.1 adds a read-only GitHub Actions workflow that independently repeats
+Stage 3.1 provides a read-only GitHub Actions workflow that independently repeats
 the locked dependency install, formatting, lint, type checking, tests, build,
 dependency audit, and repository-cleanliness check. It runs for pull requests
 to `main`, pushes to `main`, and manual dispatch. Hosted CI supplements local
 review and does not add application or deployment behavior.
+
+Stage 4A adds a private server-oriented `@words/game-data` package with:
+
+- a reproducibly generated 79,370-word ESDB/SCOWL size-60 American/Canadian
+  dictionary pinned to one release and commit;
+- its manifest, SHA-256, exact applicable notice, offline verification, and
+  deterministic vocabulary audit;
+- an original per-word capped-occurrence token distribution derived from that
+  dictionary, with `QU` carrying Q’s weight and ordinary `U` retained;
+- simulated vowel and repeat quality profiles for 4 × 4, 5 × 5, and 6 × 6
+  boards;
+- a server-only verified loader and pure injected-random default-board wrapper.
+
+Neither application imports game data in Stage 4A. The lobby, room store,
+network contract, UI, and runtime behavior are unchanged.
 
 ## Stage 2.5 room model
 
@@ -197,14 +212,13 @@ Planned rules remain:
 Traditional scoring gives 1 point for 3–4 letters, 2 for 5, 3 for 6, 5 for 7,
 and 11 for 8 or more. These rules are documentation only in Stage 2.5.
 
-## Non-goals for Stages 3 and 3.1
+## Non-goals through Stage 4A
 
-Stages 3 and 3.1 do not include touch tracing, a live board, production
-dictionary data, a default letter distribution, gameplay network events, room
-game state, scoring, duplicate handling, timers, synchronized rounds, scannable
-QR images, arbitrary or random controller election, persistence, deployment
-automation, production container packaging, image publishing, server
-installation, or tunnel configuration.
+Stages through 4A do not include touch tracing, a live board, gameplay network
+events, room game state, scoring, duplicate handling, timers, synchronized
+rounds, scannable QR images, arbitrary or random controller election,
+persistence, deployment automation, production container packaging, image
+publishing, server installation, or tunnel configuration.
 
 The product also has no database, Redis, accounts, external authentication,
 microservices, paid APIs, analytics, advertisements, payments, unlocks, or
@@ -214,8 +228,10 @@ progression.
 
 Words maintains its own visual identity, wording, colors, assets, and
 interaction design. Public material must not reference commercial games. No
-proprietary dictionary or visual asset is bundled. Every future dictionary and
-third-party asset requires a compatible license and recorded attribution.
+proprietary dictionary or visual asset is bundled. The Stage 4A dictionary is
+a pinned, filtered ESDB derivative with its complete applicable notice. Every
+future data revision and third-party asset requires a compatible licence and
+recorded attribution.
 
 ## Intended production environment
 
@@ -236,11 +252,14 @@ details are future deployment work, not a claim about Stage 2.
 4. **Stage 3 — complete:** framework-independent board generation, path and
    word validation for 4 × 4, 5 × 5, and 6 × 6 grids, plus a pinned,
    licence-reviewed dictionary recommendation.
-5. **Stage 3.1 — in review:** read-only GitHub-hosted locked-install, quality,
+5. **Stage 3.1 — complete:** read-only GitHub-hosted locked-install, quality,
    test, build, audit, and repository-cleanliness checks.
-6. **Stage 4:** synchronized rounds, submissions, validation, scoring,
+6. **Stage 4A — in review:** pinned production dictionary, licence and
+   provenance, offline verification, vocabulary audit, original token
+   distribution, board-quality profiles, loader, and default-board wrapper.
+7. **Stage 4B:** synchronized rounds, submissions, validation, scoring,
    duplicate handling, results, and round-aware reconnection.
-7. **Stage 5:** production hardening, one-container build, image publishing,
+8. **Stage 5:** production hardening, one-container build, image publishing,
    server configuration, and tunnel documentation.
 
 Each stage should remain independently reviewable and must not imply that later
@@ -263,13 +282,14 @@ The eventual MVP must allow:
     player.
 
 Stage 2.5 completes the room-code and authority portions of items 1–3 and 10.
-Stage 3 supplies the isolated engine foundation for items 6–8 without
-connecting it to room or network state.
+Stage 3 supplies the isolated engine foundation and Stage 4A supplies verified
+production inputs for items 6–8 without connecting either to room or network
+state.
 
 ## Decisions deferred to later stages
 
 - Whether controller transfer should be allowed during future non-lobby phases
-- Final Stage 4 dictionary export checksum and play-vocabulary audit
-- Server-owned production letter distribution and board-quality policy
+- Whether later play testing justifies a versioned dictionary, distribution,
+  or quality-profile revision
 - Per-IP production throttling and room-code enumeration responses
 - Custom scoring representation

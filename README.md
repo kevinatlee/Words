@@ -7,10 +7,10 @@ shared-screen browser creates and presents a temporary room. Phone players join
 without accounts, and the first player becomes the initial game host
 (controller).
 
-**Stage 3 is complete. Stage 3.1 GitHub Actions CI is in review.** The secure
-lobby and game-engine foundation work locally. The Stage 3.1 workflow repeats
-the locked install, quality checks, tests, build, and dependency audit on
-GitHub-hosted runners without adding live gameplay or production deployment.
+**Stage 3.1 is complete. Stage 4A production game data is in review.** The
+secure lobby, isolated game engine, and read-only hosted CI are complete.
+Stage 4A adds reproducible server-only dictionary and board-generation data
+without connecting them to live rooms.
 
 ## What works today
 
@@ -40,20 +40,25 @@ GitHub-hosted runners without adding live gameplay or production deployment.
   bounded board rejection, eight-direction adjacency, tile-reuse checks, `QU`
   token reading, ASCII word normalization, exact word/path matching, and
   injected Set-backed dictionary lookup.
-- A pinned, reproducible, openly licensed dictionary export is recommended for
-  Stage 4; no external word data is bundled in Stage 3.
-- Stage 3.1 adds read-only GitHub-hosted checks for pull requests to `main`,
+- `@words/game-data` contains the pinned 79,370-word ESDB/SCOWL production
+  dictionary, its applicable notice and manifest, an original
+  dictionary-derived token distribution, and bounded board-quality profiles.
+- The default Q-bearing tile is `QU`; standalone `Q` is absent from the default
+  distribution while Q-without-U words remain in the master dictionary.
+- The server-only loader verifies the dictionary checksum before constructing
+  the engine’s immutable lookup interface. It is not called by the lobby yet.
+- Stage 3.1 provides read-only GitHub-hosted checks for pull requests to `main`,
   pushes to `main`, and manual runs. Hosted CI supplements local review rather
   than replacing it.
 
 ## What is not implemented
 
-Stage 3.1 changes repository verification only. The engine remains disconnected
-from the lobby, with no gameplay events, live boards, touch tracing,
+Stage 4A remains disconnected from the lobby, with no gameplay events, live
+boards, touch tracing,
 synchronized rounds, word-submission networking, scoring, duplicate handling,
-timers, round starts, production dictionary data, scannable QR codes,
-persistence, deployment workflow, container packaging, image publishing,
-server installation, or tunnel configuration.
+timers, round starts, scannable QR codes, persistence, deployment workflow,
+container packaging, image publishing, server installation, or tunnel
+configuration.
 
 `Start Round` remains disabled. Settings in the lobby are local interface
 previews and are not server actions yet.
@@ -150,6 +155,9 @@ Run these from the repository root:
 
 ```bash
 npm run dev           # Start Vite and the Node lobby server
+npm run data:verify   # Verify committed game data without network access
+npm run data:dictionary:audit
+npm run data:boards:audit
 npm run format        # Format source and documentation
 npm run format:check  # Check formatting without changing files
 npm run lint          # Check code quality
@@ -246,7 +254,8 @@ All lobby payloads, state, acknowledgements, and error codes are defined
 centrally in `packages/shared/src/lobby.ts`. See
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the complete Stage 2.5 flow
 and [`docs/GAME_ENGINE.md`](docs/GAME_ENGINE.md) for the intentionally separate
-Stage 3 engine boundary.
+Stage 3 engine boundary. [`docs/GAME_DATA.md`](docs/GAME_DATA.md) records the
+Stage 4A provenance, derivation, audits, and Stage 4B boundary.
 
 ## Repository structure
 
@@ -257,9 +266,9 @@ Stage 3 engine boundary.
 │   └── server/       # Express, Socket.IO, room store, and server tests
 ├── packages/
 │   ├── shared/       # Product config, Zod schemas, event and state contracts
-│   └── game-engine/  # Pure board, generation, path, word, and dictionary rules
+│   ├── game-engine/  # Pure board, generation, path, word, and dictionary rules
+│   └── game-data/    # Server-only licensed dictionary and generated defaults
 ├── docs/             # Product, architecture, security, and deployment status
-├── data/             # Reserved for a future licensed dictionary
 ├── tests/            # Reserved for future cross-package integration tests
 └── unraid/           # Reserved for later deployment packaging
 ```
@@ -289,18 +298,18 @@ cannot recreate the display.
 
 ## Next stage
 
-After Stage 3.1 CI is reviewed and merged, the recommended Stage 4 is
-server-owned synchronized gameplay. It should reproduce the pinned ESDB size-60
-American-plus-Canadian dictionary export, select and document a
-non-proprietary letter distribution, add strict shared submission contracts,
-and integrate authoritative boards, deadlines, word validation, scoring,
-duplicate handling, results, and round-aware reconnect behavior. The display
-must stay passive and unable to submit words.
+After Stage 4A review, Stage 4B should load the verified dictionary once during
+controlled server startup, inject a cryptographically appropriate random
+source into default board generation, add strict shared gameplay payloads, and
+integrate authoritative phases, boards, deadlines, submissions, validation,
+scoring, duplicate handling, results, and round-aware reconnect behavior. The
+display must stay passive and unable to submit words.
 
 ## License
 
 Words source code is available under the [MIT License](LICENSE). Third-party
-packages retain their own licenses. Stage 3 commits no external dictionary or
-third-party visual asset. Dictionary candidates, exact source versions,
-licence conditions, measurements, and the Stage 4 recommendation are recorded
-in [`docs/DICTIONARY_EVALUATION.md`](docs/DICTIONARY_EVALUATION.md).
+packages retain their own licenses. The generated production dictionary has a
+separate preserved permission notice in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and beside the data.
+Provenance, filtering, checksum, licence scope, and audits are recorded in
+[`docs/GAME_DATA.md`](docs/GAME_DATA.md).

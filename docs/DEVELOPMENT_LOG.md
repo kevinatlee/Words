@@ -3,6 +3,116 @@
 Future meaningful work must add a new chronological entry. Record what changed,
 why, what remains open, and the exact verification results.
 
+## 2026-07-28 — Stage 4A production game data
+
+### Work completed
+
+- Added the private server-oriented `@words/game-data` workspace without
+  connecting it to the client, server startup, lobby, room store, or Socket.IO.
+- Independently verified official ESDB/SCOWL release `rel-2026.02.25` and direct
+  tag/peeled commit
+  `7e99edab8e32f9f9ea2b15f249ca8d4d67237410`.
+- Added a pinned-tag-only, depth-one reproduction script with fixed output,
+  shell-free subprocess arguments, temporary-directory cleanup, safety
+  measurements, mismatch diagnostics, symlink checks, and atomic replacement.
+- Reproduced the exact size-60 American/Canadian export: 79,370 uppercase ASCII
+  words, 757,056 bytes, SHA-256
+  `f5f3d22bd07b8f8d2dd8cf4f3caff211b6f3249a24da02c5aa2a21bf2210f352`.
+- Reproduced metadata-free `gzip -9 -n` output at 212,238 bytes and SHA-256
+  `1dccc79270a4c044e78f5b3c9f1cf6184feb40cab706e809ef6e70a2cac0fc39`.
+- Preserved the complete applicable ESDB copyright, permission, and source
+  credit notice beside the data and added repository-level third-party notice
+  context.
+- Added strict offline verification for the manifest, data bytes and structure,
+  notice scope, regenerated distribution artifacts, and client-exclusion
+  boundary. Added it as a distinct existing `CI / Quality` step without
+  changing workflow or job names.
+- Added a deterministic vocabulary audit. Required inclusion and exclusion
+  fixtures passed. The risk report found one Q-without-U entry (`QWERTY`), six
+  entries above 20 letters, 987 repeated-letter-heavy heuristic matches, nine
+  possible acronym-like entries, and four ambiguous common-word watchlist
+  entries. Sensitive-term counting remains unimplemented because no reliable,
+  compatible, pinned classifier is bundled.
+- Evaluated raw character, per-word presence, and per-word cap-of-two frequency
+  candidates from the committed dictionary. Selected per-word cap-of-two for
+  its 36.701% vowel share, bounded per-word influence, retained repeat evidence,
+  and transparent integer rule.
+- Mapped Q’s derived weight to `QU`, omitted standalone `Q`, retained ordinary
+  `U`, and made no manual weight adjustment. The generated profile has total
+  weight 662,207 and SHA-256
+  `de7fb14c60d1778fbbe0b9f80cd710a673f486923b581ced46fd61596b5956af`.
+- Added simulated quality profiles: vowel range 4–9/max repeat 4 for 4 × 4,
+  6–14/5 for 5 × 5, and 9–20/6 for 6 × 6, each with at most eight attempts.
+- Added `loadProductionDictionary()` and
+  `generateDefaultBoard({ size, random })`. The loader uses stable module
+  paths, verifies before constructing the engine dictionary, exposes no Set or
+  mutable cache, and returns structured failures. Generation remains pure and
+  requires injected randomness.
+- Added 34 package tests across four files for integrity, loader failures,
+  working-directory independence, immutability, distribution metadata and
+  convergence, size-specific quality boundaries, deterministic generation,
+  bounded exhaustion, and QU generation.
+- Added complete game-data documentation and updated architecture, rules,
+  engine, security, CI, product, licence, and roadmap documentation.
+
+### Distribution and board audits
+
+- Candidate simulation — 10,000 raw boards per candidate and size.
+- Selected profile board audit — 10,000 raw plus 10,000 accepted boards for
+  each of 4 × 4, 5 × 5, and 6 × 6.
+- Rejected candidate rates — 19.231%, 17.648%, and 25.278% by ascending size.
+- Mean attempts — 1.2381, 1.2143, and 1.3383.
+- Bounded generation failures — 0 across 30,000 accepted-board calls.
+- Deterministic board-audit report SHA-256 —
+  `2b55a682eab2207020ae639e7b5b6b771758822f3a20f6fe91187fd4f0eda789`.
+- Distribution derivation repeated with byte-identical candidate JSON, profile
+  JSON, and generated TypeScript output.
+
+### Verification
+
+- `npm ci` — passed; installed 407 packages from the committed lockfile.
+- `npm run data:dictionary:build` — passed from a fresh temporary checkout of
+  only the pinned official tag; exact count, bytes, SHA, and gzip measurement
+  reproduced, and the temporary checkout was removed.
+- `npm run data:verify` — passed offline; dictionary, notice, distribution, and
+  client-exclusion boundaries verified.
+- `npm run data:dictionary:audit` — passed; deterministic fixture and risk
+  report SHA-256
+  `454efff74f68e3b2e3989a567eb03b4949e04955f2c76a99e62ca608a296a7b8`.
+- `npm run data:boards:audit` — passed; deterministic 60,000-board primary
+  sample plus repeat-run reproducibility check.
+- `npm run format:check` — passed; all matched files use Prettier formatting.
+- `npm run lint` — passed with no warnings or errors.
+- `npm run typecheck` — passed for client, server, game-data, game-engine, and
+  shared workspaces.
+- `npm test` — passed; 283 tests across 18 files:
+  - client: 35 tests across 3 files
+  - server: 59 tests across 3 files
+  - game data: 34 tests across 4 files
+  - game engine: 135 tests across 5 files
+  - shared: 20 tests across 3 files
+- `npm run build` — passed; Vite transformed 158 modules, and server,
+  game-data, and game-engine strict TypeScript build boundaries passed.
+- `npm audit --audit-level=high` — passed; 0 vulnerabilities.
+- Manual loader invocation — passed with 79,370 words, American and Canadian
+  spelling checks, representative exclusions, and no network request.
+- Manual deterministic generation — passed for all three sizes and an explicit
+  acceptable board containing `QU`.
+- Client build exclusion — passed; no game-data import, dictionary checksum, or
+  dictionary sentinel appeared in the built client.
+- `npm run dev` — passed; Vite and the Words server started, a shared display
+  created a room, one phone player joined and became Game Host, the display
+  updated to `1 / 8`, `Start Round` remained disabled, both browser contexts
+  had no warnings or errors, and both processes stopped cleanly.
+
+### Remaining boundary
+
+Stage 4B must perform the reviewed server integration: one controlled startup
+load, an appropriate cryptographic production random source, strict gameplay
+payloads, server-owned phase/board/deadline/submission/scoring/results state,
+and round-aware reconnection. Stage 4A added no live gameplay, QR rendering,
+deployment, container, persistence, moderation, or repository-setting change.
+
 ## 2026-07-28 — Stage 3.1 controller-succession test reliability
 
 ### Finding and correction

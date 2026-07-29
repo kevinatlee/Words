@@ -44,6 +44,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Verify production game data
+        run: npm run data:verify
+
       - name: Check formatting
         run: npm run format:check
 
