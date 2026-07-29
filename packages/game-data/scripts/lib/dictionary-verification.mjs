@@ -6,6 +6,7 @@ import {
   DICTIONARY_NOTICE_PATH,
   DICTIONARY_PATH,
   EXPECTED_DICTIONARY_MANIFEST,
+  EXPECTED_DICTIONARY_NOTICE_SHA256,
 } from './constants.mjs';
 
 export class DataVerificationError extends Error {
@@ -310,6 +311,15 @@ export async function verifyDictionaryBundle({
     noticePath,
     'data/dictionary/ESDB-NOTICE.txt',
   );
+  const noticeSha256 = sha256(noticeBuffer);
+  if (noticeSha256 !== EXPECTED_DICTIONARY_NOTICE_SHA256) {
+    fail({
+      code: 'NOTICE_SHA256',
+      file: 'data/dictionary/ESDB-NOTICE.txt',
+      expected: EXPECTED_DICTIONARY_NOTICE_SHA256,
+      actual: noticeSha256,
+    });
+  }
   const notice = noticeBuffer.toString('utf8');
   const requiredNoticeFragments = [
     'Copyright 2000-2026 by Kevin Atkinson',
@@ -340,6 +350,6 @@ export async function verifyDictionaryBundle({
     manifest: Object.freeze(manifest),
     words: inspected.words,
     sha256: inspected.sha256,
-    noticeSha256: sha256(noticeBuffer),
+    noticeSha256,
   });
 }

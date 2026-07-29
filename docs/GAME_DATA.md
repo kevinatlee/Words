@@ -13,9 +13,10 @@ APIs for the production loader. It has no browser, React, Express, Socket.IO,
 room-store, persistence, or network runtime behavior.
 
 The framework-independent engine remains unchanged. The client does not depend
-on or import game data. Offline verification scans the client package for
-game-data and dictionary references, and the normal client build contains
-neither the 757,056-byte word list nor its checksum.
+on or import game data. Offline verification scans every transitively
+browser-reachable workspace for game-data and dictionary references and rejects
+symbolic links inside that boundary. The normal client build contains neither
+the 757,056-byte word list nor its checksum.
 
 ## Pinned dictionary
 
@@ -29,6 +30,7 @@ neither the 757,056-byte word list nor its checksum.
 | Bytes         | 757,056                                                            |
 | SHA-256       | `f5f3d22bd07b8f8d2dd8cf4f3caff211b6f3249a24da02c5aa2a21bf2210f352` |
 | Gzip check    | `gzip -9 -n`, 212,238 bytes; compressed file is not committed      |
+| Gzip SHA-256  | `1dccc79270a4c044e78f5b3c9f1cf6184feb40cab706e809ef6e70a2cac0fc39` |
 
 The official published release is neither a draft nor a prerelease. Its tag is
 a direct commit tag; both the tag object and its peeled commit resolve to the
@@ -65,19 +67,24 @@ at size 60. It uses neither the Australian `D`/`AU` selection nor a size above
 80, so the conditional Australian and UK Advanced Cryptics Dictionary branches
 do not apply to this generated list.
 
-The complete applicable notice, including source credits, is preserved
-verbatim in
+The complete applicable notice, including source credits, is preserved with
+one conventional final newline in
 `packages/game-data/data/dictionary/ESDB-NOTICE.txt`. Repository-level context
 is in `THIRD_PARTY_NOTICES.md`. The Words source remains MIT-licensed; the
-dictionary data retains its own notice. No endorsement is claimed.
+dictionary data retains its own notice. No endorsement is claimed. Offline
+verification pins the complete notice bytes at SHA-256
+`2f4e959749bb16da6e62264e33f620b1738a06290a940039eb83968a446b6460`;
+selected-fragment matching is not the root of trust.
 
 ## Reproduction and offline verification
 
 `npm run data:dictionary:build` uses a temporary directory by default, fetches
 only the pinned tag at depth one from the official repository, verifies the tag
-and peeled commit, checks out the pinned SHA directly, invokes the upstream
-`make scowl.db` process and exact export arguments without a shell, validates
-all output, measures `gzip -9 -n`, and atomically replaces the fixed data file.
+and peeled commit, checks out the pinned SHA directly, rejects tracked,
+untracked, or symlinked source checkouts, invokes the upstream `make scowl.db`
+process and exact export arguments without a shell and under the C locale,
+validates all output, verifies both `gzip -9 -n` size and SHA-256, and atomically
+replaces the fixed data file.
 Temporary directories are removed on success and failure. It never uses
 `sudo`, a package installer, a default branch, or a user-controlled output
 path.
@@ -88,15 +95,26 @@ peeled commit, and current `HEAD` all match the pinned official source.
 
 `npm run data:verify` requires no network. It checks:
 
-- the exact manifest schema and every pinned field;
+- the exact manifest schema and every independently pinned field, including the
+  dictionary and metadata-free gzip hashes;
 - a regular non-symlink dictionary and notice;
 - bytes, SHA-256, line count, final newline, LF-only endings, BOM absence,
   ASCII uppercase format, length bounds, bytewise order, and uniqueness;
-- the complete applicable notice markers and absence of irrelevant branches;
+- the complete applicable notice SHA, required markers, and absence of
+  irrelevant branches;
 - byte-for-byte regenerated candidate, profile, and TypeScript distribution
   outputs from the committed dictionary;
 - the profile input and profile hashes;
-- absence of game-data imports and dictionary references from the client.
+- absence of game-data dependencies, imports, aliases, relative paths, and
+  re-exports throughout the client’s transitive workspace graph;
+- absence of symbolic links that could hide source from the client-boundary
+  traversal.
+
+The package export is unavailable under the browser condition, and lint applies
+the same restriction to client and shared TypeScript. After the Vite build, CI
+runs verification again against the emitted bundle, including the dictionary
+hash and representative sentinel words, and rejects symbolic links anywhere in
+that output.
 
 Failures identify a bounded category, affected file, and first field or line
 where safe. The verifier never prints the dictionary.
@@ -182,6 +200,15 @@ method, script version, QU and vowel policies, ordered weights, empty
 adjustments, and profile SHA
 `de7fb14c60d1778fbbe0b9f80cd710a673f486923b581ced46fd61596b5956af`.
 Running `npm run data:distribution:derive` twice produces byte-identical files.
+The generator leaves already-identical outputs untouched, which preserves their
+timestamps and avoids conflict copies on synchronized filesystems. The
+fixed-weight regression independently recounts the dictionary instead of using
+the generation helper, so coordinated generator and artifact drift fails.
+
+This is a word-type distribution, not a real-world usage-frequency corpus.
+Uncommon accepted words therefore influence the profile alongside common
+words. The cap-of-two policy is an explicit, reproducible Stage 4A starting
+point; later play testing may justify a reviewed and versioned replacement.
 
 ## Board-quality profiles and audit
 
@@ -209,6 +236,13 @@ accepted boards were 2.80%, 4.66%, and 6.55%. Observed raw per-token rates
 remain close to generated expectations. Across 30,000 accepted calls, none
 exhausted the eight-attempt bound.
 
+Treating measured candidate rejection as independent between attempts gives
+approximate eight-attempt exhaustion probabilities of 0.000187% for 4 × 4
+(about 1 in 534,528), 0.0000941% for 5 × 5 (about 1 in 1,062,749), and
+0.001667% for 6 × 6 (about 1 in 59,981). Stage 4B must handle the structured
+failure and should revisit the bound with production telemetry rather than
+adding an unbounded retry.
+
 ## Server-only APIs
 
 `loadProductionDictionary()` resolves its manifest and words with
@@ -216,7 +250,13 @@ exhausted the eight-attempt bound.
 and word count, then calls the engine’s `createWordDictionary`. It returns
 either an immutable dictionary interface and frozen manifest or a structured
 failure. It does not use `process.cwd()`, the network, a mutable global cache,
-or an exposed Set.
+or an exposed Set. Runtime loading rejects symlinks and non-regular files, and
+the production path matches every strict manifest field against source-code
+constants rather than trusting the generated manifest alone.
+
+The package build emits a server-targeted JavaScript bundle and smoke-loads it
+from an unrelated working directory. The bundle retains the correct
+module-relative relationship to the committed data files.
 
 `generateDefaultBoard({ size, random })` accepts only a supported size and the
 caller’s `RandomSource`, supplies the immutable selected distribution and

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { lstat, readFile, readdir } from 'node:fs/promises';
+import { lstat, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import {
@@ -18,6 +18,10 @@ import {
   sha256,
   verifyDictionaryBundle,
 } from './lib/dictionary-verification.mjs';
+import {
+  verifyClientBuildExclusion,
+  verifyClientSourceExclusion,
+} from './lib/client-boundary.mjs';
 
 async function readRegularFile(filePath, fileLabel) {
   let details;
@@ -70,54 +74,18 @@ async function verifyGeneratedFile(filePath, fileLabel, expectedText) {
   }
 }
 
-async function listSourceFiles(directory) {
-  const entries = await readdir(directory, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries) {
-    if (['node_modules', 'dist', 'coverage'].includes(entry.name)) {
-      continue;
-    }
-    const entryPath = path.join(directory, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...(await listSourceFiles(entryPath)));
-    } else if (entry.isFile()) {
-      files.push(entryPath);
-    }
+function parseArguments(arguments_) {
+  if (arguments_.length === 0) {
+    return Object.freeze({ verifyClientBuild: false });
   }
-  return files;
-}
-
-async function verifyClientExclusion(dictionarySha256) {
-  const repositoryRoot = path.resolve(PACKAGE_ROOT, '../..');
-  const clientDirectory = path.join(repositoryRoot, 'apps/client');
-  const clientFiles = await listSourceFiles(clientDirectory);
-  const forbidden = [
-    '@words/game-data',
-    'data/dictionary/words.txt',
-    dictionarySha256,
-  ];
-
-  for (const filePath of clientFiles) {
-    if (
-      !/\.(?:json|ts|tsx|js|jsx|html|css|md)$/u.test(filePath) ||
-      filePath.includes(`${path.sep}node_modules${path.sep}`)
-    ) {
-      continue;
-    }
-    const text = await readFile(filePath, 'utf8');
-    const matched = forbidden.find((value) => text.includes(value));
-    if (matched !== undefined) {
-      throw new DataVerificationError({
-        code: 'CLIENT_DATA_IMPORT',
-        file: path.relative(repositoryRoot, filePath),
-        expected: 'no game-data package or dictionary reference',
-        actual: matched,
-      });
-    }
+  if (arguments_.length === 1 && arguments_[0] === '--client-build') {
+    return Object.freeze({ verifyClientBuild: true });
   }
+  throw new Error('USAGE: npm run data:verify -- [--client-build]');
 }
 
 async function main() {
+  const options = parseArguments(process.argv.slice(2));
   const dictionary = await verifyDictionaryBundle();
   console.log(
     `Dictionary verified: ${dictionary.words.length} words, SHA-256 ${dictionary.sha256}.`,
@@ -151,10 +119,21 @@ async function main() {
     `Distribution verified: ${artifacts.profile.derivationMethod}, profile SHA-256 ${artifacts.profile.profileSha256}.`,
   );
 
-  await verifyClientExclusion(dictionary.sha256);
+  const repositoryRoot = path.resolve(PACKAGE_ROOT, '../..');
+  await verifyClientSourceExclusion({
+    repositoryRoot,
+    dictionarySha256: dictionary.sha256,
+  });
   console.log(
-    'Client exclusion verified: production game data is server-only.',
+    'Client source boundary verified: production game data is server-only.',
   );
+  if (options.verifyClientBuild) {
+    await verifyClientBuildExclusion({
+      repositoryRoot,
+      dictionarySha256: dictionary.sha256,
+    });
+    console.log('Client build verified: production game data is absent.');
+  }
 }
 
 try {

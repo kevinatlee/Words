@@ -1,6 +1,14 @@
 #!/usr/bin/env node
 
-import { lstat, mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rename,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import path from 'node:path';
 
 import {
@@ -28,6 +36,24 @@ async function assertReplaceable(targetPath) {
       throw error;
     }
   }
+}
+
+async function replaceIfChanged(pendingPath, targetPath) {
+  const [pending, current] = await Promise.all([
+    readFile(pendingPath),
+    readFile(targetPath).catch((error) => {
+      if (error instanceof Error && error.code === 'ENOENT') {
+        return undefined;
+      }
+      throw error;
+    }),
+  ]);
+
+  if (current?.equals(pending)) {
+    return;
+  }
+
+  await rename(pendingPath, targetPath);
 }
 
 async function main() {
@@ -69,9 +95,12 @@ async function main() {
       assertReplaceable(DISTRIBUTION_PROFILE_PATH),
       assertReplaceable(GENERATED_DISTRIBUTION_PATH),
     ]);
-    await rename(pendingCandidates, DISTRIBUTION_CANDIDATES_PATH);
-    await rename(pendingProfile, DISTRIBUTION_PROFILE_PATH);
-    await rename(pendingTypeScript, GENERATED_DISTRIBUTION_PATH);
+    // Avoid touching byte-identical tracked outputs. Besides preserving useful
+    // timestamps, this prevents synchronized filesystems from creating
+    // conflict copies during repeatable no-op derivations.
+    await replaceIfChanged(pendingCandidates, DISTRIBUTION_CANDIDATES_PATH);
+    await replaceIfChanged(pendingProfile, DISTRIBUTION_PROFILE_PATH);
+    await replaceIfChanged(pendingTypeScript, GENERATED_DISTRIBUTION_PATH);
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });
   }

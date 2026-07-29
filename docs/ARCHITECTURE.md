@@ -368,10 +368,12 @@ dictionary. Stage 4A keeps those external concerns in `@words/game-data`.
 ## Server-only production game data
 
 The production loader resolves its package files with `import.meta.url`,
-validates the pinned manifest identity, byte count, SHA-256, canonical lines,
-and word count, and then calls the engine’s Set-backed dictionary constructor.
-It returns a structured failure and has no network access or global mutable
-cache. Stage 4B should call it once during controlled server startup.
+rejects symlinks and non-regular files, validates every strict manifest field,
+byte count, SHA-256, canonical lines, and word count, and then calls the
+engine’s Set-backed dictionary constructor. It returns a structured failure and
+has no network access or global mutable cache. Its emitted JavaScript is
+smoke-loaded from an unrelated working directory. Stage 4B should call it once
+during controlled server startup.
 
 The selected default distribution counts each letter at most twice per
 accepted dictionary word. Q’s derived weight becomes the `QU` token;
@@ -398,7 +400,10 @@ high-severity npm advisory threshold independently.
 
 Stage 4A adds a separate `npm run data:verify` Quality step. It verifies the
 committed dictionary, notice, manifest, generated distribution files, and
-client-exclusion boundary without fetching or rebuilding ESDB.
+transitive client-source boundary without fetching or rebuilding ESDB.
+Symbolic links are rejected inside both client verification boundaries. After
+the client build, a second invocation verifies the emitted bundle excludes the
+dictionary hash, package identifier, and representative sentinels.
 
 The workflow runs for pull requests targeting `main`, pushes to `main`, and
 manual dispatches. It uses Node.js 24, official actions pinned to immutable

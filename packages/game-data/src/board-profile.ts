@@ -1,5 +1,7 @@
 import {
+  EngineConfigurationError,
   generateBoard,
+  isBoardSize,
   type Board,
   type BoardGenerationResult,
   type BoardSize,
@@ -70,6 +72,12 @@ export interface GenerateDefaultBoardOptions {
 export function generateDefaultBoard(
   options: GenerateDefaultBoardOptions,
 ): BoardGenerationResult {
+  if (!isBoardSize(options.size)) {
+    throw new EngineConfigurationError(
+      'INVALID_BOARD_SIZE',
+      'Board size must be 4, 5, or 6.',
+    );
+  }
   const profile = DEFAULT_BOARD_QUALITY_PROFILES[options.size];
   return generateBoard({
     size: options.size,

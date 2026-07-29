@@ -42,7 +42,10 @@ The `Quality` job runs on `ubuntu-latest`, has a 20-minute timeout, and sets
 8. type-checks every workspace;
 9. runs every test;
 10. builds the client and verifies server, engine, and game-data boundaries;
-11. verifies that the commands left no tracked changes or untracked,
+11. repeats offline verification against the emitted client bundle, checking
+    the package identifier, dictionary checksum, representative sentinels, and
+    absence of symbolic links;
+12. verifies that the commands left no tracked changes or untracked,
     non-ignored files.
 
 Each verification command has its own step so a failure is visible without

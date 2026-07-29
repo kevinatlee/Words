@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -49,6 +49,7 @@ function fixtureManifest(
     sha256: createHash('sha256').update(buffer).digest('hex'),
     gzipCommand: 'gzip -9 -n',
     gzipBytes: 1,
+    gzipSha256: 'b'.repeat(64),
     ...overrides,
   };
 }
@@ -142,9 +143,63 @@ describe('production dictionary loader', () => {
     );
   });
 
+  it('rejects unknown manifest fields', async () => {
+    const paths = await writeFixture(
+      'unknown-field',
+      Buffer.from('CAT\nDOG\n', 'ascii'),
+      { generatedAt: 'unstable' },
+    );
+    const result = await loadDictionaryBundle(paths);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: false,
+        code: 'MANIFEST_INVALID',
+      }),
+    );
+  });
+
+  it('rejects symlinked dictionary and manifest files', async () => {
+    const paths = await writeFixture(
+      'symlink-target',
+      Buffer.from('CAT\nDOG\n', 'ascii'),
+    );
+    const dictionaryLink = path.join(temporaryDirectory, 'dictionary-link.txt');
+    const manifestLink = path.join(temporaryDirectory, 'manifest-link.json');
+    await Promise.all([
+      symlink(paths.dictionaryUrl, dictionaryLink),
+      symlink(paths.manifestUrl, manifestLink),
+    ]);
+
+    await expect(
+      loadDictionaryBundle({
+        dictionaryUrl: pathToFileURL(dictionaryLink),
+        manifestUrl: paths.manifestUrl,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        success: false,
+        code: 'DICTIONARY_UNSAFE_FILE_TYPE',
+      }),
+    );
+    await expect(
+      loadDictionaryBundle({
+        dictionaryUrl: paths.dictionaryUrl,
+        manifestUrl: pathToFileURL(manifestLink),
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        success: false,
+        code: 'MANIFEST_UNSAFE_FILE_TYPE',
+      }),
+    );
+  });
+
   it('does not expose a backing Set or share caller-visible mutable state', async () => {
-    const first = await loadProductionDictionary();
-    const second = await loadProductionDictionary();
+    const [first, second] = await Promise.all([
+      loadProductionDictionary(),
+      loadProductionDictionary(),
+    ]);
 
     expect(first.success).toBe(true);
     expect(second.success).toBe(true);

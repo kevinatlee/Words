@@ -3,6 +3,85 @@
 Future meaningful work must add a new chronological entry. Record what changed,
 why, what remains open, and the exact verification results.
 
+## 2026-07-28 — Stage 4A final review hardening
+
+### Findings and corrections
+
+- Found no Critical issue in the Stage 4A data, generation, or stage boundary.
+- Corrected one High integrity gap by pinning and verifying the complete
+  applicable ESDB notice bytes rather than relying on selected fragments.
+- Added the deterministic gzip SHA-256 to the manifest and root-of-trust
+  constants, and made reproduction validate both compressed size and hash.
+- Hardened dictionary reproduction against dirty or symlinked source checkouts
+  and fixed its subprocess locale to `C`.
+- Made the runtime loader reject symlinks and non-regular files, require an
+  exact manifest schema, and compare every production manifest field against
+  independent constants.
+- Added a real server-targeted JavaScript package build and smoke-loaded its
+  dictionary from an unrelated working directory.
+- Expanded the browser boundary from the client package alone to every
+  transitively reachable workspace, added import lint restrictions, rejected
+  symbolic links in source and built output, and added post-build CI
+  verification.
+- Replaced circular distribution assertions with independent fixed expected
+  weights and a separate dictionary recount.
+- Preserved structured engine errors for invalid runtime board sizes and random
+  values.
+- Changed repeat distribution derivation to leave byte-identical outputs
+  untouched, preventing synchronized filesystems from creating conflict copies.
+
+### Independent reproduction and statistical review
+
+- Resolved official tag `rel-2026.02.25` and its peeled commit independently to
+  `7e99edab8e32f9f9ea2b15f249ca8d4d67237410`.
+- Rebuilt from that exact tag in an isolated checkout and reproduced 79,370
+  words, 757,056 bytes, dictionary SHA-256
+  `f5f3d22bd07b8f8d2dd8cf4f3caff211b6f3249a24da02c5aa2a21bf2210f352`,
+  212,238 deterministic gzip bytes, and gzip SHA-256
+  `1dccc79270a4c044e78f5b3c9f1cf6184feb40cab706e809ef6e70a2cac0fc39`.
+- Independently recounted all 26 capped-at-two letter weights. The total remains
+  662,207, Q maps only to `QU`, and ordinary `U` remains 22,662.
+- Repeated distribution derivation produced the same candidate, profile, and
+  generated TypeScript hashes with no tracked change or conflict copy.
+- Repeated the deterministic 60,000-board audit. Its report SHA-256 remains
+  `2b55a682eab2207020ae639e7b5b6b771758822f3a20f6fe91187fd4f0eda789`,
+  with zero bounded failures in 30,000 accepted-board calls.
+
+### Verification
+
+- `npm ci` — passed; installed 407 packages from the committed lockfile.
+- `npm run data:verify` — passed, including exact notice integrity and the
+  transitive client-source boundary.
+- `npm run data:dictionary:audit` — passed with report SHA-256
+  `454efff74f68e3b2e3989a567eb03b4949e04955f2c76a99e62ca608a296a7b8`.
+- `npm run data:boards:audit` — passed with the unchanged deterministic report.
+- `npm run format:check` — passed.
+- `npm run lint` — passed with no warnings or errors.
+- `npm run typecheck` — passed for all five workspaces.
+- `npm test` — passed; 298 tests across 20 files:
+  - client: 35 tests across 3 files
+  - server: 59 tests across 3 files
+  - game data: 49 tests across 6 files
+  - game engine: 135 tests across 5 files
+  - shared: 20 tests across 3 files
+- `npm run build` — passed; the client built 158 modules and the built
+  game-data JavaScript loader loaded all 79,370 words from an unrelated working
+  directory.
+- `npm run data:verify -- --client-build` — passed; no production game-data
+  package identifier, dictionary checksum, representative word sentinel, or
+  symbolic link appeared in the client output.
+- `npm audit --audit-level=high` — passed; 0 vulnerabilities.
+- `npm run dev` — passed; the client and server started, answered local page and
+  health requests, and stopped with no remaining listeners.
+
+### Remaining boundary
+
+The dictionary is a word-type corpus rather than a real-world usage-frequency
+corpus, and the current quality policy has an eight-attempt bound. Stage 4B must
+handle the structured no-board result and add only the separately reviewed,
+server-authoritative integration described below. No live gameplay, QR,
+deployment, persistence, moderation, or repository-setting behavior was added.
+
 ## 2026-07-28 — Stage 4A production game data
 
 ### Work completed

@@ -199,6 +199,32 @@ describe('default board generation', () => {
     });
   });
 
+  it('preserves the engine configuration error for an unsupported size', () => {
+    expect(() =>
+      generateDefaultBoard({
+        size: 7 as BoardSize,
+        random: seededRandom(0x72a191e4),
+      }),
+    ).toThrowError(
+      expect.objectContaining({
+        code: 'INVALID_BOARD_SIZE',
+      }),
+    );
+  });
+
+  it('preserves invalid random-value failures from the engine', () => {
+    expect(() =>
+      generateDefaultBoard({
+        size: 4,
+        random: { next: () => Number.NaN },
+      }),
+    ).toThrowError(
+      expect.objectContaining({
+        code: 'INVALID_RANDOM_VALUE',
+      }),
+    );
+  });
+
   it('can generate a QU tile on an otherwise acceptable board', () => {
     const tokens = [
       'QU',

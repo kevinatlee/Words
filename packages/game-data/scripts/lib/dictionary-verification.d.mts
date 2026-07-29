@@ -11,6 +11,14 @@ export class DataVerificationError extends Error {
 
 export function sha256(buffer: Buffer): string;
 
+export function verifyDictionaryManifest(
+  candidate: unknown,
+  options?: {
+    readonly expectedManifest?: DictionaryManifestValues;
+    readonly fileLabel?: string;
+  },
+): Readonly<DictionaryManifestValues>;
+
 export function inspectDictionaryBuffer(
   buffer: Buffer,
   options?: {

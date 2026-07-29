@@ -15,10 +15,12 @@ to uppercase, and keep lengths 3 through 64.
 Stage 4A independently reproduced and committed the reviewed export: 79,370
 words, 757,056 bytes, SHA-256
 `f5f3d22bd07b8f8d2dd8cf4f3caff211b6f3249a24da02c5aa2a21bf2210f352`,
-and 212,238 bytes under `gzip -9 -n`. It preserves the complete applicable
-notice and provides offline verification, deterministic vocabulary auditing,
-and a server-only loader. See [`GAME_DATA.md`](GAME_DATA.md) for the final
-manifest, audit findings, distribution derivation, and Stage 4B boundary.
+and 212,238 bytes under `gzip -9 -n`, with compressed SHA-256
+`1dccc79270a4c044e78f5b3c9f1cf6184feb40cab706e809ef6e70a2cac0fc39`. It
+preserves the complete applicable notice and provides offline verification,
+deterministic vocabulary auditing, and a server-only loader. See
+[`GAME_DATA.md`](GAME_DATA.md) for the final manifest, audit findings,
+distribution derivation, and Stage 4B boundary.
 
 ## Product policy
 

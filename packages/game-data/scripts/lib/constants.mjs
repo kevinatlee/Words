@@ -30,6 +30,8 @@ export const SOURCE_REPOSITORY = 'https://github.com/en-wl/wordlist';
 export const SOURCE_GIT_REPOSITORY = `${SOURCE_REPOSITORY}.git`;
 export const SOURCE_RELEASE = 'rel-2026.02.25';
 export const SOURCE_COMMIT = '7e99edab8e32f9f9ea2b15f249ca8d4d67237410';
+export const EXPECTED_DICTIONARY_NOTICE_SHA256 =
+  '2f4e959749bb16da6e62264e33f620b1738a06290a940039eb83968a446b6460';
 
 export const EXPECTED_DICTIONARY_MANIFEST = Object.freeze({
   schemaVersion: 1,
@@ -71,6 +73,8 @@ export const EXPECTED_DICTIONARY_MANIFEST = Object.freeze({
   sha256: 'f5f3d22bd07b8f8d2dd8cf4f3caff211b6f3249a24da02c5aa2a21bf2210f352',
   gzipCommand: 'gzip -9 -n',
   gzipBytes: 212_238,
+  gzipSha256:
+    '1dccc79270a4c044e78f5b3c9f1cf6184feb40cab706e809ef6e70a2cac0fc39',
 });
 
 export const EXACT_EXPORT_ARGUMENTS = Object.freeze([

@@ -14,6 +14,8 @@ above 80, so the additional Australian and UK Advanced Cryptics Dictionary
 licence branches described upstream do not apply to this generated word list.
 The complete applicable copyright and permission notice is preserved in
 [`ESDB-NOTICE.txt`](packages/game-data/data/dictionary/ESDB-NOTICE.txt).
+Its canonical repository copy has SHA-256
+`2f4e959749bb16da6e62264e33f620b1738a06290a940039eb83968a446b6460`.
 
 The Words source code remains available under its repository MIT licence. The
 generated dictionary data is distributed under the notice above. Neither the

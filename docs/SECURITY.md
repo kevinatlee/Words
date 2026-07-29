@@ -226,14 +226,16 @@ verify room phase, enforce a deadline, or rate-limit network submissions.
 
 - The production dictionary source repository, release tag, direct and peeled
   commit, export arguments, counts, bytes, SHA-256, and metadata-free gzip size
-  are pinned.
-- The complete applicable ESDB permission notice is committed beside the data.
+  and SHA-256 are pinned.
+- The complete applicable ESDB permission notice is committed beside the data
+  and verified by an independently pinned full-file SHA-256.
   Conditional licence branches not selected by the size-60 American/Canadian
   export are not represented as though they applied.
 - Reproduction fetches only the pinned tag at depth one from the fixed official
   URL, checks out the pinned commit directly, invokes subprocesses without a
   shell, accepts no output path, and rejects a source checkout whose remote,
-  tag, peeled commit, `HEAD`, or tracked state differs.
+  tag, peeled commit, `HEAD`, tracked state, untracked state, or source-path
+  file type differs.
 - Generated dictionary output is length- and count-bounded, written in a
   same-directory temporary location, verified completely, gzip-measured, and
   atomically renamed. Symbolic-link output targets are rejected and temporary
@@ -244,16 +246,22 @@ verify room phase, enforce a deadline, or rate-limit network submissions.
   byte-identical regenerated distribution data.
 - The runtime loader accepts only local file URLs, resolves production files
   relative to its module rather than the process working directory, bounds
-  error detail, verifies the file before constructing the dictionary, exposes
-  no Set, and has no mutable global cache.
+  error detail, rejects symlinks and non-regular files, validates the exact
+  schema and every pinned manifest field, verifies one read before constructing
+  the dictionary, exposes no Set, and has no mutable global cache. The built
+  JavaScript loader is smoke-tested from an unrelated working directory.
 - Candidate derivation and board audits use fixed sample counts and a clearly
   non-production seeded generator. Production generation still requires an
   injected random source and can make at most eight attempts.
 - The dictionary-derived profile has positive safe-integer weights, includes
   `QU` instead of standalone `Q`, contains no proprietary table, and records
   zero manual adjustments.
-- The client package has no dependency, import, checksum, or data-file
-  reference for `@words/game-data`. Neither application loads it in Stage 4A.
+- Browser-conditioned package resolution is disabled. The client’s transitive
+  workspace graph is checked for game-data dependencies, imports, aliases,
+  relative paths, and re-exports; symbolic links are rejected throughout the
+  scanned source and build boundaries; lint enforces the same source boundary;
+  and post-build CI scans the emitted bundle for the dictionary hash and
+  sentinel words. Neither application loads game data in Stage 4A.
 - Scripts perform no dynamic code download, runtime external request, secret
   access, full-dictionary logging, persistence, or gameplay mutation.
 

@@ -1,14 +1,7 @@
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { lstat, readFile } from 'node:fs/promises';
 
 import { createWordDictionary, type WordDictionary } from '@words/game-engine';
-
-const EXPECTED_SOURCE_RELEASE = 'rel-2026.02.25';
-const EXPECTED_SOURCE_COMMIT = '7e99edab8e32f9f9ea2b15f249ca8d4d67237410';
-const EXPECTED_DICTIONARY_SHA256 =
-  'f5f3d22bd07b8f8d2dd8cf4f3caff211b6f3249a24da02c5aa2a21bf2210f352';
-const EXPECTED_WORD_COUNT = 79_370;
-const EXPECTED_BYTES = 757_056;
 
 const PRODUCTION_DICTIONARY_URL = new URL(
   '../data/dictionary/words.txt',
@@ -41,14 +34,63 @@ export interface ProductionDictionaryManifest {
   readonly sha256: string;
   readonly gzipCommand: string;
   readonly gzipBytes: number;
+  readonly gzipSha256: string;
 }
+
+const EXPECTED_PRODUCTION_MANIFEST: ProductionDictionaryManifest =
+  Object.freeze({
+    schemaVersion: 1,
+    sourceProject: 'English Speller Database / SCOWL',
+    sourceRepository: 'https://github.com/en-wl/wordlist',
+    sourceRelease: 'rel-2026.02.25',
+    sourceCommit: '7e99edab8e32f9f9ea2b15f249ca8d4d67237410',
+    dialects: Object.freeze(['A', 'C']),
+    sizeLevel: 60,
+    variantLevel: 1,
+    deaccented: true,
+    excludedPartsOfSpeech: Object.freeze([
+      'abbr',
+      's',
+      'pre',
+      'suf',
+      'wp',
+      'we',
+      'x',
+    ]),
+    excludedClasses: Object.freeze([
+      'person',
+      'surname',
+      'place',
+      'name',
+      'trademark',
+      'upper',
+      'name?',
+      'upper?',
+      'abbr?',
+    ]),
+    minimumLength: 3,
+    maximumLength: 64,
+    normalization:
+      'lowercase ASCII source entries converted to uppercase ASCII',
+    sorting: 'bytewise ascending (LC_ALL=C equivalent)',
+    lineEndings: 'LF with exactly one final newline',
+    wordCount: 79_370,
+    uncompressedBytes: 757_056,
+    sha256: 'f5f3d22bd07b8f8d2dd8cf4f3caff211b6f3249a24da02c5aa2a21bf2210f352',
+    gzipCommand: 'gzip -9 -n',
+    gzipBytes: 212_238,
+    gzipSha256:
+      '1dccc79270a4c044e78f5b3c9f1cf6184feb40cab706e809ef6e70a2cac0fc39',
+  });
 
 export type ProductionDictionaryLoadErrorCode =
   | 'UNSUPPORTED_DATA_URL'
   | 'MANIFEST_READ_FAILED'
+  | 'MANIFEST_UNSAFE_FILE_TYPE'
   | 'MANIFEST_INVALID'
   | 'MANIFEST_MISMATCH'
   | 'DICTIONARY_READ_FAILED'
+  | 'DICTIONARY_UNSAFE_FILE_TYPE'
   | 'DICTIONARY_BYTE_COUNT_MISMATCH'
   | 'DICTIONARY_HASH_MISMATCH'
   | 'DICTIONARY_FORMAT_INVALID'
@@ -71,14 +113,33 @@ export type ProductionDictionaryLoadResult =
 interface DictionaryBundleOptions {
   readonly dictionaryUrl: URL;
   readonly manifestUrl: URL;
-  readonly expected?: {
-    readonly sourceRelease: string;
-    readonly sourceCommit: string;
-    readonly sha256: string;
-    readonly wordCount: number;
-    readonly uncompressedBytes: number;
-  };
+  readonly expected?: ProductionDictionaryManifest;
 }
+
+const MANIFEST_FIELDS = Object.freeze([
+  'schemaVersion',
+  'sourceProject',
+  'sourceRepository',
+  'sourceRelease',
+  'sourceCommit',
+  'dialects',
+  'sizeLevel',
+  'variantLevel',
+  'deaccented',
+  'excludedPartsOfSpeech',
+  'excludedClasses',
+  'minimumLength',
+  'maximumLength',
+  'normalization',
+  'sorting',
+  'lineEndings',
+  'wordCount',
+  'uncompressedBytes',
+  'sha256',
+  'gzipCommand',
+  'gzipBytes',
+  'gzipSha256',
+] as const);
 
 function failure(
   code: ProductionDictionaryLoadErrorCode,
@@ -104,6 +165,15 @@ function parseManifest(value: unknown): ProductionDictionaryManifest | null {
     return null;
   }
 
+  const actualFields = Object.keys(value).sort();
+  const expectedFields = [...MANIFEST_FIELDS].sort();
+  if (
+    actualFields.length !== expectedFields.length ||
+    actualFields.some((field, index) => field !== expectedFields[index])
+  ) {
+    return null;
+  }
+
   const stringFields = [
     'sourceProject',
     'sourceRepository',
@@ -114,6 +184,7 @@ function parseManifest(value: unknown): ProductionDictionaryManifest | null {
     'lineEndings',
     'sha256',
     'gzipCommand',
+    'gzipSha256',
   ] as const;
   const numberFields = [
     'sizeLevel',
@@ -137,7 +208,8 @@ function parseManifest(value: unknown): ProductionDictionaryManifest | null {
     !isStringArray(value.dialects) ||
     !isStringArray(value.excludedPartsOfSpeech) ||
     !isStringArray(value.excludedClasses) ||
-    !/^[a-f0-9]{64}$/u.test(value.sha256 as string)
+    !/^[a-f0-9]{64}$/u.test(value.sha256 as string) ||
+    !/^[a-f0-9]{64}$/u.test(value.gzipSha256 as string)
   ) {
     return null;
   }
@@ -166,7 +238,34 @@ function parseManifest(value: unknown): ProductionDictionaryManifest | null {
     sha256: value.sha256 as string,
     gzipCommand: value.gzipCommand as string,
     gzipBytes: value.gzipBytes as number,
+    gzipSha256: value.gzipSha256 as string,
   });
+}
+
+function manifestMatches(
+  actual: ProductionDictionaryManifest,
+  expected: ProductionDictionaryManifest,
+): boolean {
+  return MANIFEST_FIELDS.every((field) => {
+    const actualValue = actual[field];
+    const expectedValue = expected[field];
+    return Array.isArray(expectedValue)
+      ? Array.isArray(actualValue) &&
+          actualValue.length === expectedValue.length &&
+          actualValue.every((value, index) => value === expectedValue[index])
+      : actualValue === expectedValue;
+  });
+}
+
+async function inspectFileType(
+  url: URL,
+): Promise<'missing' | 'regular' | 'unsafe'> {
+  try {
+    const details = await lstat(url);
+    return details.isFile() && !details.isSymbolicLink() ? 'regular' : 'unsafe';
+  } catch {
+    return 'missing';
+  }
 }
 
 function validateDictionaryText(
@@ -227,6 +326,13 @@ export async function loadDictionaryBundle(
   }
 
   let manifestText: string;
+  const manifestFileType = await inspectFileType(options.manifestUrl);
+  if (manifestFileType === 'unsafe') {
+    return failure(
+      'MANIFEST_UNSAFE_FILE_TYPE',
+      'Manifest must be a non-symlink regular file.',
+    );
+  }
   try {
     manifestText = await readFile(options.manifestUrl, 'utf8');
   } catch {
@@ -245,14 +351,7 @@ export async function loadDictionaryBundle(
   }
 
   if (options.expected !== undefined) {
-    const expected = options.expected;
-    if (
-      manifest.sourceRelease !== expected.sourceRelease ||
-      manifest.sourceCommit !== expected.sourceCommit ||
-      manifest.sha256 !== expected.sha256 ||
-      manifest.wordCount !== expected.wordCount ||
-      manifest.uncompressedBytes !== expected.uncompressedBytes
-    ) {
+    if (!manifestMatches(manifest, options.expected)) {
       return failure(
         'MANIFEST_MISMATCH',
         'Manifest does not identify the pinned production dictionary.',
@@ -261,6 +360,13 @@ export async function loadDictionaryBundle(
   }
 
   let dictionaryBuffer: Buffer;
+  const dictionaryFileType = await inspectFileType(options.dictionaryUrl);
+  if (dictionaryFileType === 'unsafe') {
+    return failure(
+      'DICTIONARY_UNSAFE_FILE_TYPE',
+      'Dictionary must be a non-symlink regular file.',
+    );
+  }
   try {
     dictionaryBuffer = await readFile(options.dictionaryUrl);
   } catch {
@@ -323,12 +429,6 @@ export function loadProductionDictionary(): Promise<ProductionDictionaryLoadResu
   return loadDictionaryBundle({
     dictionaryUrl: PRODUCTION_DICTIONARY_URL,
     manifestUrl: PRODUCTION_MANIFEST_URL,
-    expected: {
-      sourceRelease: EXPECTED_SOURCE_RELEASE,
-      sourceCommit: EXPECTED_SOURCE_COMMIT,
-      sha256: EXPECTED_DICTIONARY_SHA256,
-      wordCount: EXPECTED_WORD_COUNT,
-      uncompressedBytes: EXPECTED_BYTES,
-    },
+    expected: EXPECTED_PRODUCTION_MANIFEST,
   });
 }

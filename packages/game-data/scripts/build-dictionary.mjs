@@ -33,6 +33,12 @@ import {
   sha256,
 } from './lib/dictionary-verification.mjs';
 
+const DETERMINISTIC_ENVIRONMENT = Object.freeze({
+  ...process.env,
+  LANG: 'C',
+  LC_ALL: 'C',
+});
+
 function parseArguments(arguments_) {
   if (arguments_.length === 0) {
     return Object.freeze({});
@@ -54,7 +60,7 @@ function run(command, arguments_, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, arguments_, {
       cwd: options.cwd,
-      env: options.env ?? process.env,
+      env: options.env ?? DETERMINISTIC_ENVIRONMENT,
       stdio: options.stdio ?? 'inherit',
       shell: false,
     });
@@ -81,6 +87,7 @@ async function capture(command, arguments_, cwd) {
   await new Promise((resolve, reject) => {
     const child = spawn(command, arguments_, {
       cwd,
+      env: DETERMINISTIC_ENVIRONMENT,
       shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -131,6 +138,12 @@ async function assertSafeOutputTarget() {
 }
 
 async function verifyCheckout(sourceDirectory) {
+  const sourceDetails = await lstat(sourceDirectory);
+  if (sourceDetails.isSymbolicLink()) {
+    throw new Error(
+      'SOURCE_DIRECTORY: source path must not be a symbolic link.',
+    );
+  }
   const directoryDetails = await stat(sourceDirectory);
   if (!directoryDetails.isDirectory()) {
     throw new Error('SOURCE_DIRECTORY: source path is not a directory.');
@@ -171,14 +184,14 @@ async function verifyCheckout(sourceDirectory) {
     );
   }
 
-  const trackedChanges = await capture(
+  const worktreeChanges = await capture(
     'git',
-    ['status', '--porcelain', '--untracked-files=no'],
+    ['status', '--porcelain', '--untracked-files=all'],
     canonicalDirectory,
   );
-  if (trackedChanges.length > 0) {
+  if (worktreeChanges.length > 0) {
     throw new Error(
-      'SOURCE_WORKTREE: the pinned source checkout has tracked changes.',
+      'SOURCE_WORKTREE: the pinned source checkout has tracked or untracked changes.',
     );
   }
 
@@ -304,11 +317,18 @@ async function generateFromCheckout(sourceDirectory, buildDirectory) {
   } finally {
     await gzipHandle.close();
   }
-  const gzipDetails = await stat(gzipPath);
-  if (gzipDetails.size !== EXPECTED_DICTIONARY_MANIFEST.gzipBytes) {
+  const gzipBuffer = await readFile(gzipPath);
+  if (gzipBuffer.length !== EXPECTED_DICTIONARY_MANIFEST.gzipBytes) {
     throw new Error(
       `GZIP_BYTE_COUNT: expected ${EXPECTED_DICTIONARY_MANIFEST.gzipBytes}, ` +
-        `received ${gzipDetails.size}.`,
+        `received ${gzipBuffer.length}.`,
+    );
+  }
+  const gzipSha256 = sha256(gzipBuffer);
+  if (gzipSha256 !== EXPECTED_DICTIONARY_MANIFEST.gzipSha256) {
+    throw new Error(
+      `GZIP_SHA256: expected ${EXPECTED_DICTIONARY_MANIFEST.gzipSha256}, ` +
+        `received ${gzipSha256}.`,
     );
   }
 
@@ -357,6 +377,8 @@ async function main() {
     console.log(`Words: ${EXPECTED_DICTIONARY_MANIFEST.wordCount}`);
     console.log(`Bytes: ${EXPECTED_DICTIONARY_MANIFEST.uncompressedBytes}`);
     console.log(`SHA-256: ${EXPECTED_DICTIONARY_MANIFEST.sha256}`);
+    console.log(`Gzip bytes: ${EXPECTED_DICTIONARY_MANIFEST.gzipBytes}`);
+    console.log(`Gzip SHA-256: ${EXPECTED_DICTIONARY_MANIFEST.gzipSha256}`);
   } catch (error) {
     if (error instanceof DataVerificationError) {
       console.error(error.message);

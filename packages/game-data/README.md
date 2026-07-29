@@ -30,7 +30,9 @@ const generated = generateDefaultBoard({
 `loadProductionDictionary()` resolves data relative to the package rather than
 the process working directory. It returns a structured failure instead of
 hiding manifest, file, checksum, format, or engine-construction errors. It does
-not cache a mutable global dictionary.
+not cache a mutable global dictionary. It rejects symlinks and non-regular
+files, and production loading matches every strict manifest field against
+independent source-code constants.
 
 `generateDefaultBoard()` delegates to the pure engine, uses the committed
 distribution and size-specific quality profile, tries at most eight candidates,
@@ -59,7 +61,16 @@ npm run data:dictionary:build -- --source-dir /path/to/pinned/wordlist
 ```
 
 The fixed output location is not configurable. Generated output is checked
-before an atomic replacement, and symbolic-link targets are rejected.
+before an atomic replacement, and symbolic-link targets are rejected. An
+explicit source checkout must have no tracked or untracked changes and must not
+be supplied through a symlink.
+
+`npm run build --workspace @words/game-data` emits a server-targeted JavaScript
+bundle and smoke-loads its verified dictionary from an unrelated working
+directory. Browser-conditioned package resolution is disabled; lint, offline
+source traversal, and post-build bundle inspection reinforce that boundary.
+The source and bundle traversals reject symbolic links that could hide files
+from verification.
 
 See [`docs/GAME_DATA.md`](../../docs/GAME_DATA.md) for the full source,
 licence, filtering, derivation, simulation, audit, and Stage 4B boundary.

@@ -29,5 +29,6 @@
   "uncompressedBytes": 757056,
   "sha256": "f5f3d22bd07b8f8d2dd8cf4f3caff211b6f3249a24da02c5aa2a21bf2210f352",
   "gzipCommand": "gzip -9 -n",
-  "gzipBytes": 212238
+  "gzipBytes": 212238,
+  "gzipSha256": "1dccc79270a4c044e78f5b3c9f1cf6184feb40cab706e809ef6e70a2cac0fc39"
 }

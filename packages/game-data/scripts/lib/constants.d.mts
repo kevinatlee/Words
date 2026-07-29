@@ -20,6 +20,8 @@ export interface DictionaryManifestValues {
   readonly sha256: string;
   readonly gzipCommand: string;
   readonly gzipBytes: number;
+  readonly gzipSha256: string;
 }
 
 export const EXPECTED_DICTIONARY_MANIFEST: Readonly<DictionaryManifestValues>;
+export const EXPECTED_DICTIONARY_NOTICE_SHA256: string;

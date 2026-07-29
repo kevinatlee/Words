@@ -62,6 +62,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify client bundle excludes game data
+        run: npm run data:verify -- --client-build
+
       - name: Confirm repository is unchanged
         run: |
           git diff --exit-code
