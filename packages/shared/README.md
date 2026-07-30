@@ -2,7 +2,7 @@
 
 `@words/shared` is the single source for product configuration, strict Zod
 payloads, Socket.IO event maps, acknowledgements, errors, room state, and the
-Stage 4B round lifecycle.
+Stage 4B round lifecycle and Stage 4C private submission contract.
 
 The room phase is exactly `LOBBY`, `ROUND_ACTIVE`, or `ROUND_ENDED`. A serialized
 room includes a server-owned state version and clock snapshot, authoritative
@@ -16,6 +16,6 @@ The only Stage 4B controller actions are:
 - `controller:start-round` with a strict empty object.
 
 The shared package defines shapes; the server still performs authorization and
-owns every official value. There is no submission, path, word, score, or result
-network schema in Stage 4B. See
-[`../../docs/ROUND_LIFECYCLE.md`](../../docs/ROUND_LIFECYCLE.md).
+owns every official value. `player:submit-word` returns separately versioned
+private state only through player acknowledgements. It never enters
+`RoomState`. See [`../../docs/SUBMISSIONS.md`](../../docs/SUBMISSIONS.md).

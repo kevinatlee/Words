@@ -28,7 +28,7 @@ export function AppShell({
               Join another room
             </a>
           )}
-          <span className="stage-badge">Stage 4B rounds</span>
+          <span className="stage-badge">Stage 4C submissions</span>
         </div>
       </header>
       <main id="main-content">{children}</main>

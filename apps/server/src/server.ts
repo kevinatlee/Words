@@ -16,6 +16,7 @@ import {
   reconnectPlayerInputSchema,
   roomSettingsSchema,
   startRoundInputSchema,
+  submitWordInputSchema,
   transferControllerInputSchema,
   type ClientToServerEvents,
   type ControllerActionAcknowledgement,
@@ -32,6 +33,8 @@ import {
   type RoomErrorCode,
   type ServerToClientEvents,
   type StartRoundInput,
+  type SubmitWordAcknowledgement,
+  type SubmitWordInput,
   type TransferControllerInput,
   type UpdateRoomSettingsInput,
 } from '@words/shared';
@@ -43,7 +46,10 @@ import {
   createCryptoRandomSource,
   type ServerRandomSource,
 } from './crypto-random-source.js';
-import { SocketRateLimiter } from './rate-limiter.js';
+import {
+  PlayerSubmissionRateLimiter,
+  SocketRateLimiter,
+} from './rate-limiter.js';
 import {
   RoomOperationError,
   RoomStore,
@@ -230,6 +236,12 @@ export function createWordsServer(
   const rateLimiter = new SocketRateLimiter(
     config.rateLimitWindowMs,
     config.rateLimitAttempts,
+  );
+  const submissionRateLimiter = new PlayerSubmissionRateLimiter(
+    1_000,
+    10,
+    config.maxRooms * config.maxPlayers,
+    now,
   );
   let gameDataRuntime: Extract<
     ProductionDictionaryLoadResult,
@@ -443,6 +455,7 @@ export function createWordsServer(
             ok: true,
             room: result.room,
             session: result.session,
+            submissionState: result.submissionState,
           });
           socket.to(result.room.code).emit('player:connected', result.player);
           io.to(result.room.code).emit('room:state', result.room);
@@ -489,11 +502,82 @@ export function createWordsServer(
             ok: true,
             room: result.room,
             session: result.session,
+            submissionState: result.submissionState,
           });
           socket.to(result.room.code).emit('player:connected', result.player);
           io.to(result.room.code).emit('room:state', result.room);
         } catch (error) {
           acknowledgeFailure(acknowledge, toRoomError(error));
+        }
+      },
+    );
+
+    socket.on(
+      'player:submit-word',
+      (payload: SubmitWordInput, acknowledge: SubmitWordAcknowledgement) => {
+        const session = socket.data.session;
+        if (session) {
+          try {
+            broadcastDueRound(session.roomCode);
+          } catch {
+            acknowledge({
+              ok: false,
+              error: {
+                code: 'INTERNAL_ERROR',
+                message: 'That word could not be checked.',
+              },
+              state: null,
+            });
+            return;
+          }
+        }
+
+        const parsed = submitWordInputSchema.safeParse(payload);
+        if (!parsed.success) {
+          acknowledge({
+            ok: false,
+            error: {
+              code: 'INVALID_PAYLOAD',
+              message: 'Check that word and try again.',
+            },
+            state: null,
+          });
+          return;
+        }
+        if (!session || session.role !== 'player' || !gameDataRuntime) {
+          acknowledge({
+            ok: false,
+            error: {
+              code: 'UNAUTHORIZED',
+              message: 'That player session cannot submit words.',
+            },
+            state: null,
+          });
+          return;
+        }
+
+        try {
+          const result = roomStore.submitWord(
+            session,
+            socket.id,
+            parsed.data,
+            gameDataRuntime.dictionary,
+            () =>
+              submissionRateLimiter.allow(session.roomCode, session.playerId),
+          );
+          if (result.reconciledRoom) {
+            io.to(session.roomCode).emit('room:state', result.reconciledRoom);
+          }
+          acknowledge(result.response);
+        } catch {
+          acknowledge({
+            ok: false,
+            error: {
+              code: 'INTERNAL_ERROR',
+              message: 'That word could not be checked.',
+            },
+            state: null,
+          });
         }
       },
     );

@@ -7,6 +7,7 @@ import {
   playerActionResponseSchema,
   roomErrorSchema,
   roomStateSchema,
+  submitWordResponseSchema,
   type ClientToServerEvents,
   type ConnectionStatus,
   type ControllerActionResponse,
@@ -19,6 +20,8 @@ import {
   type ReconnectPlayerInput,
   type RoomError,
   type RoomState,
+  type SubmitWordInput,
+  type SubmitWordResponse,
   type ServerToClientEvents,
   type TransferControllerInput,
   type UpdateRoomSettingsInput,
@@ -43,6 +46,7 @@ export type LobbyClient = {
     input: UpdateRoomSettingsInput,
   ) => Promise<ControllerActionResponse>;
   startRound: () => Promise<ControllerActionResponse>;
+  submitWord: (input: SubmitWordInput) => Promise<SubmitWordResponse>;
   onRoomState: (listener: (room: RoomState) => void) => () => void;
   onRoomError: (listener: (error: RoomError) => void) => () => void;
   onConnectionStatus: (
@@ -73,6 +77,15 @@ const leaveConnectionFailure: LeaveSessionResponse = {
 const controllerConnectionFailure: ControllerActionResponse = {
   ok: false,
   error: connectionError,
+};
+
+const submissionConnectionFailure: SubmitWordResponse = {
+  ok: false,
+  error: {
+    code: 'INTERNAL_ERROR',
+    message: connectionError.message,
+  },
+  state: null,
 };
 
 export class SocketLobbyClient implements LobbyClient {
@@ -255,6 +268,25 @@ export class SocketLobbyClient implements LobbyClient {
           resolve(
             error || !parsed.success
               ? controllerConnectionFailure
+              : parsed.data,
+          );
+        });
+    });
+  }
+
+  async submitWord(input: SubmitWordInput): Promise<SubmitWordResponse> {
+    if (!this.socket.connected) {
+      return submissionConnectionFailure;
+    }
+
+    return new Promise((resolve) => {
+      this.socket
+        .timeout(5_000)
+        .emit('player:submit-word', input, (error, response) => {
+          const parsed = submitWordResponseSchema.safeParse(response);
+          resolve(
+            error || !parsed.success
+              ? submissionConnectionFailure
               : parsed.data,
           );
         });

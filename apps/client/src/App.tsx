@@ -9,10 +9,13 @@ import {
 import {
   normalizeRoomCode,
   type ConnectionStatus,
+  type PlayerRoundSubmissionState,
   type RoomError,
   type RoomErrorCode,
   type RoomSettings,
   type RoomState,
+  type SubmitWordInput,
+  type SubmitWordResponse,
 } from '@words/shared';
 
 import { AppShell } from './components/AppShell';
@@ -77,6 +80,13 @@ function isSameSession(
         left.playerId === right.playerId;
 }
 
+function submissionStatesMatch(
+  left: PlayerRoundSubmissionState,
+  right: PlayerRoundSubmissionState,
+): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 export function App({
   routePath,
   client = defaultLobbyClient,
@@ -91,9 +101,12 @@ export function App({
     client.getConnectionStatus(),
   );
   const [roomError, setRoomError] = useState<RoomError | null>(null);
+  const [submissionState, setSubmissionState] =
+    useState<PlayerRoundSubmissionState | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
   const [displayStarting, setDisplayStarting] = useState(false);
   const sessionRef = useRef<StoredLobbySession | null>(null);
+  const roomRef = useRef<RoomState | null>(null);
   const reconnectNeededRef = useRef(false);
   const reconnectingRef = useRef(false);
   const pendingReconnectRef = useRef<StoredLobbySession | null>(null);
@@ -111,21 +124,42 @@ export function App({
         return;
       }
 
-      setRoom((currentRoom) => {
-        if (currentRoom?.code !== nextRoom.code) {
-          return nextRoom;
-        }
-        if (nextRoom.stateVersion < currentRoom.stateVersion) {
-          return currentRoom;
-        }
-        if (
-          nextRoom.stateVersion === currentRoom.stateVersion &&
-          Date.parse(nextRoom.serverTime) < Date.parse(currentRoom.serverTime)
-        ) {
-          return currentRoom;
-        }
-        return nextRoom;
-      });
+      const currentRoom = roomRef.current;
+      if (
+        currentRoom?.code === nextRoom.code &&
+        (nextRoom.stateVersion < currentRoom.stateVersion ||
+          (nextRoom.stateVersion === currentRoom.stateVersion &&
+            Date.parse(nextRoom.serverTime) <
+              Date.parse(currentRoom.serverTime)))
+      ) {
+        return;
+      }
+
+      roomRef.current = nextRoom;
+      setRoom(nextRoom);
+
+      if (currentSession.role === 'player' && nextRoom.round) {
+        const currentRound = nextRoom.round;
+        const isParticipant = currentRound.participants.some(
+          (participant) => participant.playerId === currentSession.playerId,
+        );
+        setSubmissionState((current) =>
+          isParticipant
+            ? current?.roundId === currentRound.id &&
+              current?.playerId === currentSession.playerId
+              ? current
+              : {
+                  roundId: currentRound.id,
+                  playerId: currentSession.playerId,
+                  submissionVersion: 0,
+                  acceptedWords: [],
+                  provisionalScore: 0,
+                }
+            : null,
+        );
+      } else {
+        setSubmissionState(null);
+      }
     },
     [],
   );
@@ -145,7 +179,26 @@ export function App({
       sessionStore.save(nextSession);
       sessionRef.current = nextSession;
       setSession(nextSession);
+      roomRef.current = nextRoom;
       setRoom(nextRoom);
+      if (nextSession.role === 'player' && nextRoom.round) {
+        const isParticipant = nextRoom.round.participants.some(
+          (participant) => participant.playerId === nextSession.playerId,
+        );
+        setSubmissionState(
+          isParticipant
+            ? {
+                roundId: nextRoom.round.id,
+                playerId: nextSession.playerId,
+                submissionVersion: 0,
+                acceptedWords: [],
+                provisionalScore: 0,
+              }
+            : null,
+        );
+      } else {
+        setSubmissionState(null);
+      }
       setRoomError(null);
       attemptedRoomCodeRef.current = nextRoom.code;
       if (nextSession.role === 'player') {
@@ -155,6 +208,48 @@ export function App({
       }
     },
     [currentPath, navigate, sessionStore],
+  );
+
+  const acceptSubmissionState = useCallback(
+    (
+      nextState: PlayerRoundSubmissionState,
+      expectedSession: StoredLobbySession,
+      expectedRoundId: string,
+    ) => {
+      const currentSession = sessionRef.current;
+      const currentRoom = roomRef.current;
+      if (
+        currentSession?.role !== 'player' ||
+        expectedSession.role !== 'player' ||
+        !isSameSession(currentSession, expectedSession) ||
+        currentRoom?.code !== currentSession.roomCode ||
+        currentRoom.round?.id !== expectedRoundId ||
+        nextState.roundId !== expectedRoundId ||
+        nextState.playerId !== currentSession.playerId
+      ) {
+        return;
+      }
+
+      setSubmissionState((current) => {
+        if (
+          current?.roundId !== nextState.roundId ||
+          current.playerId !== nextState.playerId
+        ) {
+          return nextState;
+        }
+        if (nextState.submissionVersion < current.submissionVersion) {
+          return current;
+        }
+        if (
+          nextState.submissionVersion === current.submissionVersion &&
+          !submissionStatesMatch(current, nextState)
+        ) {
+          return current;
+        }
+        return nextState;
+      });
+    },
+    [],
   );
 
   const reconnectSession = useCallback(
@@ -203,7 +298,9 @@ export function App({
             sessionStore.clear(requestedSession);
             sessionRef.current = null;
             setSession(null);
+            roomRef.current = null;
             setRoom(null);
+            setSubmissionState(null);
             setRoomError(response.error);
             return;
           }
@@ -217,6 +314,7 @@ export function App({
               roomCode: response.room.code,
               ...response.session,
             });
+            setSubmissionState(null);
             return;
           }
 
@@ -224,12 +322,26 @@ export function App({
             requestedSession.role === 'player' &&
             'playerId' in response.session
           ) {
-            rememberSession(response.room, {
+            const nextSession: StoredLobbySession = {
               role: 'player',
               roomCode: response.room.code,
               ...response.session,
               displayName: requestedSession.displayName,
-            });
+            };
+            rememberSession(response.room, nextSession);
+            if (
+              'submissionState' in response &&
+              response.submissionState &&
+              response.room.round
+            ) {
+              acceptSubmissionState(
+                response.submissionState,
+                nextSession,
+                response.room.round.id,
+              );
+            } else {
+              setSubmissionState(null);
+            }
             return;
           }
         }
@@ -239,7 +351,7 @@ export function App({
         setReconnecting(false);
       }
     },
-    [client, rememberSession, sessionStore],
+    [acceptSubmissionState, client, rememberSession, sessionStore],
   );
 
   const startDisplay = useCallback(async () => {
@@ -266,6 +378,7 @@ export function App({
           roomCode: reconnected.room.code,
           ...reconnected.session,
         });
+        setSubmissionState(null);
         return;
       }
 
@@ -293,6 +406,7 @@ export function App({
       roomCode: created.room.code,
       ...created.session,
     });
+    setSubmissionState(null);
   }, [client, rememberSession, sessionStore]);
 
   useEffect(() => {
@@ -308,7 +422,9 @@ export function App({
         sessionStore.clear(sessionRef.current);
         sessionRef.current = null;
         setSession(null);
+        roomRef.current = null;
         setRoom(null);
+        setSubmissionState(null);
       }
     });
     const stopConnectionStatus = client.onConnectionStatus((status) => {
@@ -423,6 +539,7 @@ export function App({
       ...response.session,
       displayName: playerName,
     });
+    setSubmissionState(response.submissionState);
     return null;
   };
 
@@ -445,7 +562,9 @@ export function App({
     sessionStore.clear(currentSession);
     sessionRef.current = null;
     setSession(null);
+    roomRef.current = null;
     setRoom(null);
+    setSubmissionState(null);
     setRoomError(null);
     attemptedRoomCodeRef.current = null;
     navigate(currentSession.role === 'display' ? '/' : '/join');
@@ -508,6 +627,42 @@ export function App({
     return null;
   };
 
+  const submitWord = async (
+    input: SubmitWordInput,
+  ): Promise<SubmitWordResponse> => {
+    const actionSession = sessionRef.current;
+    if (actionSession?.role !== 'player') {
+      return {
+        ok: false,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'That player session cannot submit words.',
+        },
+        state: null,
+      };
+    }
+
+    const response = await client.submitWord(input);
+    if (
+      !isSameSession(sessionRef.current, actionSession) ||
+      roomRef.current?.round?.id !== input.roundId
+    ) {
+      return {
+        ok: false,
+        error: {
+          code: 'ROUND_MISMATCH',
+          message: 'That word belongs to a different round.',
+        },
+        state: null,
+      };
+    }
+
+    if (response.state) {
+      acceptSubmissionState(response.state, actionSession, input.roundId);
+    }
+    return response;
+  };
+
   let page: ReactNode;
   let pageClassName: string;
   const routeRoomCode = roomCodeFromPath(currentPath);
@@ -519,6 +674,7 @@ export function App({
         <>
           <LobbyError error={roomError} />
           <RoomLobby
+            key={`${room.code}:${room.round?.id ?? 'lobby'}:display`}
             room={room}
             sessionRole="display"
             currentPlayerId={null}
@@ -527,6 +683,8 @@ export function App({
             onTransferController={transferController}
             onUpdateSettings={updateSettings}
             onStartRound={startRound}
+            submissionState={null}
+            onSubmitWord={submitWord}
           />
         </>
       );
@@ -579,6 +737,7 @@ export function App({
         <>
           <LobbyError error={roomError} />
           <RoomLobby
+            key={`${room.code}:${room.round?.id ?? 'lobby'}:${session.role}:${session.role === 'player' ? session.playerId : 'display'}`}
             room={room}
             sessionRole={session.role}
             currentPlayerId={
@@ -589,6 +748,8 @@ export function App({
             onTransferController={transferController}
             onUpdateSettings={updateSettings}
             onStartRound={startRound}
+            submissionState={submissionState}
+            onSubmitWord={submitWord}
           />
         </>
       );

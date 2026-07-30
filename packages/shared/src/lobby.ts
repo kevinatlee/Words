@@ -89,6 +89,16 @@ export const leaveSessionInputSchema = z.object({}).strict();
 export const startRoundInputSchema = z.object({}).strict();
 
 export const playerIdSchema = z.string().max(36).uuid();
+export const roundIdSchema = z.string().max(36).uuid();
+
+export const submitWordInputSchema = z
+  .object({
+    roundId: roundIdSchema,
+    word: z.string().max(64),
+    path: z.array(z.number().int().min(0).max(35)).min(1).max(36).readonly(),
+  })
+  .strict()
+  .readonly();
 
 export const transferControllerInputSchema = z
   .object({
@@ -324,6 +334,139 @@ export const playerSessionCredentialsSchema = z
   })
   .strict();
 
+export const maximumAcceptedWordsPerPlayerPerRound =
+  productConfig.maximumAcceptedWordsPerPlayerPerRound;
+
+export const acceptedWordSchema = z
+  .object({
+    sequence: z.number().int().positive().safe(),
+    word: z
+      .string()
+      .min(3)
+      .max(64)
+      .regex(/^[A-Z]+$/),
+    points: z.union([
+      z.literal(1),
+      z.literal(2),
+      z.literal(3),
+      z.literal(5),
+      z.literal(11),
+    ]),
+    acceptedAt: z.string().datetime(),
+  })
+  .strict()
+  .readonly();
+
+export const playerRoundSubmissionStateSchema = z
+  .object({
+    roundId: roundIdSchema,
+    playerId: playerIdSchema,
+    submissionVersion: z
+      .number()
+      .int()
+      .nonnegative()
+      .safe()
+      .max(maximumAcceptedWordsPerPlayerPerRound),
+    acceptedWords: z
+      .array(acceptedWordSchema)
+      .max(maximumAcceptedWordsPerPlayerPerRound)
+      .readonly(),
+    provisionalScore: z
+      .number()
+      .int()
+      .nonnegative()
+      .safe()
+      .max(maximumAcceptedWordsPerPlayerPerRound * 11),
+  })
+  .strict()
+  .superRefine((state, context) => {
+    if (state.submissionVersion !== state.acceptedWords.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Submission version must equal accepted-word count.',
+        path: ['submissionVersion'],
+      });
+    }
+
+    const words = new Set<string>();
+    let score = 0;
+    state.acceptedWords.forEach((acceptedWord, index) => {
+      if (acceptedWord.sequence !== index + 1) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Accepted-word sequences must be contiguous.',
+          path: ['acceptedWords', index, 'sequence'],
+        });
+      }
+      if (words.has(acceptedWord.word)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Accepted words must be unique for one player.',
+          path: ['acceptedWords', index, 'word'],
+        });
+      }
+      words.add(acceptedWord.word);
+      score += acceptedWord.points;
+    });
+
+    if (state.provisionalScore !== score) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Provisional score must equal the accepted-word total.',
+        path: ['provisionalScore'],
+      });
+    }
+  })
+  .readonly();
+
+export const submissionErrorCodeSchema = z.enum([
+  'INVALID_PAYLOAD',
+  'UNAUTHORIZED',
+  'ROUND_NOT_ACTIVE',
+  'ROUND_MISMATCH',
+  'NOT_ROUND_PARTICIPANT',
+  'INVALID_PATH',
+  'INVALID_WORD_FORMAT',
+  'WORD_TOO_SHORT',
+  'PATH_WORD_MISMATCH',
+  'WORD_NOT_IN_DICTIONARY',
+  'ALREADY_SUBMITTED',
+  'SUBMISSION_LIMIT_REACHED',
+  'RATE_LIMITED',
+  'INTERNAL_ERROR',
+]);
+
+export const submissionErrorSchema = z
+  .object({
+    code: submissionErrorCodeSchema,
+    message: z.string().min(1).max(180),
+  })
+  .strict()
+  .readonly();
+
+const submitWordSuccessSchema = z
+  .object({
+    ok: z.literal(true),
+    acceptedWord: acceptedWordSchema,
+    state: playerRoundSubmissionStateSchema,
+  })
+  .strict()
+  .readonly();
+
+const submitWordFailureSchema = z
+  .object({
+    ok: z.literal(false),
+    error: submissionErrorSchema,
+    state: playerRoundSubmissionStateSchema.nullable(),
+  })
+  .strict()
+  .readonly();
+
+export const submitWordResponseSchema = z.discriminatedUnion('ok', [
+  submitWordSuccessSchema,
+  submitWordFailureSchema,
+]);
+
 export const roomErrorCodeSchema = z.enum([
   'INVALID_PAYLOAD',
   'INVALID_NAME',
@@ -377,6 +520,7 @@ const playerActionSuccessSchema = z
     ok: z.literal(true),
     room: roomStateSchema,
     session: playerSessionCredentialsSchema,
+    submissionState: playerRoundSubmissionStateSchema.nullable(),
   })
   .strict();
 
@@ -406,6 +550,7 @@ export type ReconnectDisplayInput = z.infer<typeof reconnectDisplayInputSchema>;
 export type ReconnectPlayerInput = z.infer<typeof reconnectPlayerInputSchema>;
 export type LeaveSessionInput = z.infer<typeof leaveSessionInputSchema>;
 export type StartRoundInput = z.infer<typeof startRoundInputSchema>;
+export type SubmitWordInput = z.infer<typeof submitWordInputSchema>;
 export type TransferControllerInput = z.infer<
   typeof transferControllerInputSchema
 >;
@@ -427,6 +572,13 @@ export type DisplaySessionCredentials = z.infer<
 export type PlayerSessionCredentials = z.infer<
   typeof playerSessionCredentialsSchema
 >;
+export type AcceptedWord = z.infer<typeof acceptedWordSchema>;
+export type PlayerRoundSubmissionState = z.infer<
+  typeof playerRoundSubmissionStateSchema
+>;
+export type SubmissionErrorCode = z.infer<typeof submissionErrorCodeSchema>;
+export type SubmissionError = z.infer<typeof submissionErrorSchema>;
+export type SubmitWordResponse = z.infer<typeof submitWordResponseSchema>;
 export type RoomErrorCode = z.infer<typeof roomErrorCodeSchema>;
 export type RoomError = z.infer<typeof roomErrorSchema>;
 export type RoomActionFailure = z.infer<typeof roomActionFailureSchema>;
@@ -450,6 +602,7 @@ export type LeaveSessionAcknowledgement = (
 export type ControllerActionAcknowledgement = (
   response: ControllerActionResponse,
 ) => void;
+export type SubmitWordAcknowledgement = (response: SubmitWordResponse) => void;
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 
 export interface ClientToServerEvents {
@@ -476,6 +629,10 @@ export interface ClientToServerEvents {
   'player:leave': (
     payload: LeaveSessionInput,
     acknowledge: LeaveSessionAcknowledgement,
+  ) => void;
+  'player:submit-word': (
+    payload: SubmitWordInput,
+    acknowledge: SubmitWordAcknowledgement,
   ) => void;
   'controller:transfer': (
     payload: TransferControllerInput,

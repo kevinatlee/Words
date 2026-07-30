@@ -40,7 +40,7 @@ Creating the room does not grant the display player membership or controller
 authority. The display never selects or approves a controller. Changing the
 controller must never change the display session.
 
-## Current scope: Stage 4A complete, Stage 4B rounds in review
+## Current scope: Stage 4B complete, Stage 4C submissions in review
 
 Stage 2.5 is complete. It extends the secure, server-backed lobby with explicit
 game-host delegation and deterministic automatic succession:
@@ -108,9 +108,9 @@ The server owns the generated board, connected-participant snapshot, start,
 deadline, phase, and automatic ending. Every session reconnects to the same
 current round.
 
-Stage 4B deliberately has no word or path submission, dictionary socket lookup,
-duplicate handling, scoring, rankings, winners, results, persistence, or
-deployment behavior. See `ROUND_LIFECYCLE.md`.
+Stage 4C adds private current-participant word/path validation and traditional
+provisional scoring. Cross-player duplicate handling, final results, rankings,
+winners, persistence, and deployment remain later work. See `SUBMISSIONS.md`.
 
 ## Stage 4B room model
 
@@ -136,8 +136,8 @@ players, socket attempts, session maps, and recent-code tombstones. No browser
 can submit its own session ID, controller role, room ownership, or room state.
 
 The display never appears in the player array or player count. It cannot use
-player reconnect or controller events. Stage 4B contains no word-submission
-event for any role.
+player reconnect or controller events. Only the player role has the Stage 4C
+submission event, and only a current participant can use it.
 
 Only the connected controller can atomically update complete settings in the
 lobby or after a round, and only that controller can start a round. The display
@@ -269,12 +269,13 @@ details are future deployment work, not a claim about Stage 2.
 6. **Stage 4A — complete:** pinned production dictionary, licence and
    provenance, offline verification, vocabulary audit, original token
    distribution, board-quality profiles, loader, and default-board wrapper.
-7. **Stage 4B — in review:** controlled dictionary startup, cryptographic board
+7. **Stage 4B — complete:** controlled dictionary startup, cryptographic board
    generation, controller-owned settings, authoritative boards, participant
    snapshots, deadlines, automatic ending, and round-aware reconnection.
-8. **Stage 4C:** player-only submissions and server-owned path and dictionary
-   validation. Scoring, duplicate handling, and results require explicit
-   reviewed scope.
+8. **Stage 4C — in review:** player-only submissions, server-owned path and
+   dictionary validation, private accepted-word recovery, and traditional
+   provisional scoring. Cross-player duplicate handling and final results
+   remain Stage 4D.
 9. **Stage 5:** production hardening, one-container build, image publishing,
    server configuration, and tunnel documentation.
 

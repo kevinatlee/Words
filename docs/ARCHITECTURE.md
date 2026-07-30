@@ -1,8 +1,7 @@
 # Architecture
 
-This document describes the completed lobby, Stage 3 engine, Stage 3.1 CI,
-completed Stage 4A production game data, and the Stage 4B authoritative round
-lifecycle now in review.
+This document describes the completed lobby, engine, CI, production game data,
+authoritative rounds, and Stage 4C player-private submissions now in review.
 
 ## Runtime pieces
 
@@ -34,8 +33,9 @@ the engine but not on the browser, React, Express, Socket.IO, or room store.
 
 The Stage 4B server imports game data and uses its bounded default board
 generator. The client still imports neither game data nor the engine.
-Dictionary contents remain private to the server. No word submission, score,
-or result state exists.
+Dictionary contents remain private to the server. Stage 4C uses them through
+one player-only action while accepted words and provisional scores stay out of
+public room state.
 
 ## Roles
 
@@ -257,6 +257,7 @@ Rooms are keyed by normalized room code. Each internal room holds:
 - a bounded map of zero to eight players
 - authoritative next-round settings
 - at most one current immutable round snapshot
+- one bounded private submission map for current-round participants
 
 The internal display holds a server UUID, connection status, creation time,
 current socket ID, reconnect-token reference, and disconnect deadline.
@@ -338,6 +339,19 @@ mutations synchronously. Each action rechecks the current server binding and
 room state, so two requests from a formerly authorized socket cannot both win.
 A stale replaced socket cannot disconnect the newest valid socket. Room TTL
 still bounds every room, including one with no connected controller candidate.
+
+## Player-private submission boundary
+
+Immutable public round metadata is separate from mutable private submission
+runtime. A new round creates one empty state for each participant. `RoomState`
+serialization cannot reach this map; reconnect selects it only through the
+bound player ID. Display acknowledgements and room broadcasts never carry it.
+Successful words do not change public state version, activity, or TTL.
+
+`player:submit-word` carries only a round UUID, derived word, and bounded path.
+It uses the server's official board and private dictionary. The dedicated
+room/player limiter survives socket replacement and has bounded, age-pruned
+keys without another timer. See [`SUBMISSIONS.md`](SUBMISSIONS.md).
 
 ## Server-authority boundary
 

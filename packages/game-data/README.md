@@ -13,8 +13,8 @@ The package contains:
 - offline reproduction, verification, audit, and derivation scripts.
 
 It contains no browser, React, Express, Socket.IO, room-store, persistence, or
-network runtime code. Stage 4A does not import this package from either
-application. The future server integration belongs to Stage 4B.
+network runtime code. Only the server imports it for authoritative board
+generation and private Stage 4C dictionary validation.
 
 ## Public API
 

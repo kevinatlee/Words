@@ -42,6 +42,10 @@ export {
   type PathValidationResult,
 } from './path.js';
 export {
+  scoreTraditionalWord,
+  type TraditionalScoringResult,
+} from './scoring.js';
+export {
   DEFAULT_MINIMUM_WORD_LENGTH,
   validateWordPath,
   type ValidateWordPathOptions,

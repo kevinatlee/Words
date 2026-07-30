@@ -3,7 +3,7 @@
 This document separates current prototype behavior from planned rules and open
 decisions.
 
-## Implemented through Stage 4B review
+## Implemented through Stage 4C review
 
 - The controller can set authoritative 4 × 4, 5 × 5, and 6 × 6 layouts.
 - The default preview is 4 × 4.
@@ -15,6 +15,11 @@ decisions.
 - Canonical paths use row-major tile indexes and enforce horizontal, vertical,
   or diagonal adjacency without tile reuse.
 - Complete tile tokens are concatenated, so `QU` is one tile and two letters.
+- Current participants can submit one adjacent path before the server deadline.
+- Personal duplicates are rejected. Traditional provisional scoring awards
+  1 point for 3–4 letters, 2 for 5, 3 for 6, 5 for 7, and 11 for 8 or more.
+- Personal words and points remain private; shared-word cancellation and final
+  results are not implemented yet.
 - Submitted words normalize to uppercase ASCII, must exactly match the supplied
   path, and are checked through an injected dictionary.
 - Board generation accepts caller-provided weights and randomness with a
@@ -82,15 +87,15 @@ Traditional scoring is the initial default:
 | 7 letters            |       5 |
 | 8 or more letters    |      11 |
 
-Scoring belongs in future server-owned game logic, not UI components.
-Alternative future modes may award one point per valid word, one point per
-letter, or use a custom table.
+Traditional scoring is implemented in pure server-used engine code, not UI
+components. No alternative scoring mode is implemented.
 
 ## Planned duplicate behavior
 
 By default, a word submitted by more than one player will score zero for every
 player who submitted it. Future configuration may allow shared words to receive
-normal or reduced points. Stage 4B does not accept words or score duplicates.
+normal or reduced points. Stage 4C deliberately performs no cross-player
+duplicate calculation.
 
 ## Unresolved rules
 

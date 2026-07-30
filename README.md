@@ -7,11 +7,11 @@ shared-screen browser creates and presents a temporary room. Phone players join
 without accounts, and the first player becomes the initial game host
 (controller).
 
-**Stage 4A is complete. Stage 4B authoritative rounds are in review.** The
+**Stage 4B is complete. Stage 4C player-private submissions are in review.** The
 secure lobby, isolated game engine, read-only hosted CI, and reproducible
-server-only game data are complete. Stage 4B connects settings and bounded
-board generation to a server-owned round lifecycle without adding word
-submissions, scoring, or results.
+server-only game data are complete. Stage 4C connects participant phone paths
+to server-authoritative validation and private provisional scoring without
+adding shared-word cancellation or final results.
 
 ## What works today
 
@@ -40,6 +40,12 @@ submissions, scoring, or results.
   extend it.
 - Browser countdowns use `serverTime` plus a monotonic elapsed clock; only the
   server changes the phase.
+- Current participants can tap/click adjacent unused tiles and privately submit
+  the derived word and path before the server deadline.
+- The server validates against the official board and private dictionary,
+  rejects personal duplicates, and calculates traditional provisional points.
+- Accepted words recover only for that player and never enter `RoomState` or a
+  display broadcast.
 - Display and player tabs use separate, temporary reconnect credentials.
 - A display or controller disconnect does not immediately close the room.
 - Rooms and credentials live only in bounded server memory.
@@ -59,20 +65,19 @@ submissions, scoring, or results.
 - The default Q-bearing tile is `QU`; standalone `Q` is absent from the default
   distribution while Q-without-U words remain in the master dictionary.
 - The server-only loader verifies the dictionary checksum before constructing
-  the engine’s immutable lookup interface. Stage 4B retains that dictionary
-  privately for Stage 4C; no entries reach room state or the browser.
+  the engine’s immutable lookup interface. Stage 4C queries it only on the
+  server; no entries reach room state or the browser.
 - Stage 3.1 provides read-only GitHub-hosted checks for pull requests to `main`,
   pushes to `main`, and manual runs. Hosted CI supplements local review rather
   than replacing it.
 
 ## What is not implemented
 
-Stage 4B deliberately stops at authoritative settings and rounds. There is no
-touch tracing, word-entry or word-submission event, dictionary lookup from a
-socket action, duplicate handling, scoring, rankings, winner selection, or
-results phase. Scannable QR codes, persistence, deployment workflow, container
-packaging, image publishing, server installation, and tunnel configuration also
-remain unimplemented.
+Stage 4C deliberately stops at personal provisional scoring. There is no
+cross-player duplicate cancellation, final scoring, rankings, winner
+selection, or results phase. Scannable QR codes, persistence, deployment
+workflow, container packaging, image publishing, server installation, and
+tunnel configuration also remain unimplemented.
 
 ## Roles and authority
 
@@ -256,6 +261,9 @@ Player requests:
 - `player:join`
 - `player:reconnect`
 - `player:leave`
+- `player:submit-word` — current-round participants submit one bounded
+  row-major path and its derived word; the acknowledgement returns only that
+  player's private submission state
 
 Controller requests:
 
@@ -276,6 +284,8 @@ The server broadcasts:
 All lobby payloads, state, acknowledgements, and error codes are defined
 centrally in `packages/shared/src/lobby.ts`. See
 [`docs/ROUND_LIFECYCLE.md`](docs/ROUND_LIFECYCLE.md) for the Stage 4B contract,
+[`docs/SUBMISSIONS.md`](docs/SUBMISSIONS.md) for the Stage 4C private
+submission contract,
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the complete system flow,
 and [`docs/GAME_DATA.md`](docs/GAME_DATA.md) for Stage 4A provenance and
 derivation.
@@ -321,11 +331,9 @@ cannot recreate the display.
 
 ## Next stage
 
-Stage 4C may add server-authoritative word submissions and engine validation
-against the privately loaded dictionary. It must preserve role authorization,
-round participant semantics, deadline ownership, and strict shared schemas.
-Scoring, duplicate resolution, and results remain separate later work unless a
-reviewed Stage 4C specification explicitly includes them.
+Stage 4D may reconcile words shared by multiple players and produce final
+round results from accepted server records. It must preserve the Stage 4C
+privacy boundary. See [`docs/SUBMISSIONS.md`](docs/SUBMISSIONS.md).
 
 ## License
 

@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import {
   buildJoinUrl,
   type ConnectionStatus,
   type RoomError,
+  type PlayerRoundSubmissionState,
   type RoomSettings,
   type RoomState,
+  type SubmitWordInput,
+  type SubmitWordResponse,
 } from '@words/shared';
 
 import { useRoundCountdown } from '../useRoundCountdown';
@@ -34,6 +37,8 @@ type RoomLobbyProps = {
   onTransferController: (targetPlayerId: string) => Promise<RoomError | null>;
   onUpdateSettings: (settings: RoomSettings) => Promise<RoomError | null>;
   onStartRound: () => Promise<RoomError | null>;
+  submissionState: PlayerRoundSubmissionState | null;
+  onSubmitWord: (input: SubmitWordInput) => Promise<SubmitWordResponse>;
 };
 
 export function RoomLobby({
@@ -45,9 +50,17 @@ export function RoomLobby({
   onTransferController,
   onUpdateSettings,
   onStartRound,
+  submissionState,
+  onSubmitWord,
 }: RoomLobbyProps) {
   const [actionPending, setActionPending] = useState(false);
   const [actionError, setActionError] = useState<RoomError | null>(null);
+  const [selectedPath, setSelectedPath] = useState<number[]>([]);
+  const [submissionPending, setSubmissionPending] = useState(false);
+  const [submissionMessage, setSubmissionMessage] = useState<string | null>(
+    null,
+  );
+  const activeRoundIdRef = useRef(room.round?.id);
   const currentPlayer = room.players.find(
     (player) => player.id === currentPlayerId,
   );
@@ -74,6 +87,73 @@ export function RoomLobby({
     room.round?.participants.some(
       (participant) => participant.playerId === currentPlayerId,
     );
+  const canBuildWord =
+    sessionRole === 'player' &&
+    roundIsActive &&
+    isRoundParticipant &&
+    connectionStatus === 'connected' &&
+    currentPlayer?.connected === true &&
+    (countdownMs ?? 0) > 0;
+  const candidateWord = selectedPath
+    .map((tileIndex) => letters[tileIndex] ?? '')
+    .join('');
+
+  const selectTile = (tileIndex: number) => {
+    if (!canBuildWord || submissionPending) {
+      return;
+    }
+    setSubmissionMessage(null);
+    setSelectedPath((current) => {
+      if (current.includes(tileIndex)) {
+        return current;
+      }
+      const previous = current.at(-1);
+      if (previous !== undefined) {
+        const previousRow = Math.floor(previous / boardSize);
+        const previousColumn = previous % boardSize;
+        const nextRow = Math.floor(tileIndex / boardSize);
+        const nextColumn = tileIndex % boardSize;
+        if (
+          Math.abs(previousRow - nextRow) > 1 ||
+          Math.abs(previousColumn - nextColumn) > 1
+        ) {
+          return current;
+        }
+      }
+      return [...current, tileIndex];
+    });
+  };
+
+  const submitSelection = async () => {
+    const roundId = room.round?.id;
+    if (
+      !canBuildWord ||
+      submissionPending ||
+      !roundId ||
+      selectedPath.length === 0
+    ) {
+      return;
+    }
+    setSubmissionPending(true);
+    setSubmissionMessage(null);
+    const response = await onSubmitWord({
+      roundId,
+      word: candidateWord,
+      path: selectedPath,
+    });
+    if (activeRoundIdRef.current !== roundId) {
+      return;
+    }
+    if (response.ok) {
+      setSelectedPath([]);
+      setSubmissionMessage(
+        `${response.acceptedWord.word} accepted for ${response.acceptedWord.points} ${response.acceptedWord.points === 1 ? 'point' : 'points'}.`,
+      );
+    } else {
+      setSubmissionMessage(response.error.message);
+    }
+    setSubmissionPending(false);
+  };
 
   const heading = isDisplay
     ? roundIsActive
@@ -273,7 +353,106 @@ export function RoomLobby({
               letters={letters}
               size={boardSize}
               label={`${boardSize} by ${boardSize} ${room.round ? 'official' : 'demonstration'} letter grid`}
+              selectedIndices={selectedPath}
+              interactive={
+                sessionRole === 'player' &&
+                roundIsActive &&
+                Boolean(isRoundParticipant)
+              }
+              disabled={!canBuildWord || submissionPending}
+              onSelect={selectTile}
             />
+            {sessionRole === 'player' &&
+              roundIsActive &&
+              isRoundParticipant && (
+                <section
+                  className="word-entry"
+                  aria-labelledby="word-entry-title"
+                >
+                  <div>
+                    <span className="eyebrow">Your word</span>
+                    <h3 id="word-entry-title">
+                      {candidateWord || 'Select adjacent tiles'}
+                    </h3>
+                  </div>
+                  <div className="word-entry__actions">
+                    <button
+                      className="button button--secondary"
+                      type="button"
+                      disabled={
+                        !canBuildWord ||
+                        submissionPending ||
+                        selectedPath.length === 0
+                      }
+                      onClick={() =>
+                        setSelectedPath((current) => current.slice(0, -1))
+                      }
+                    >
+                      Undo
+                    </button>
+                    <button
+                      className="button button--secondary"
+                      type="button"
+                      disabled={
+                        !canBuildWord ||
+                        submissionPending ||
+                        selectedPath.length === 0
+                      }
+                      onClick={() => setSelectedPath([])}
+                    >
+                      Clear
+                    </button>
+                    <button
+                      className="button button--primary"
+                      type="button"
+                      disabled={
+                        !canBuildWord ||
+                        submissionPending ||
+                        selectedPath.length === 0
+                      }
+                      onClick={() => void submitSelection()}
+                    >
+                      {submissionPending ? 'Checking…' : 'Submit Word'}
+                    </button>
+                  </div>
+                  {submissionMessage && (
+                    <p className="word-entry__message" role="status">
+                      {submissionMessage}
+                    </p>
+                  )}
+                </section>
+              )}
+            {sessionRole === 'player' && submissionState && (
+              <section
+                className="personal-score"
+                aria-labelledby="personal-score-title"
+              >
+                <div className="panel-heading">
+                  <div>
+                    <span className="eyebrow">Private round progress</span>
+                    <h3 id="personal-score-title">Your accepted words</h3>
+                  </div>
+                  <strong>
+                    Provisional points: {submissionState.provisionalScore}
+                  </strong>
+                </div>
+                {submissionState.acceptedWords.length === 0 ? (
+                  <p>No accepted words yet.</p>
+                ) : (
+                  <ol className="accepted-word-list">
+                    {submissionState.acceptedWords.map((acceptedWord) => (
+                      <li key={acceptedWord.sequence}>
+                        <span>{acceptedWord.word}</span>
+                        <strong>+{acceptedWord.points}</strong>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                <small>
+                  Shared-word reconciliation is not implemented yet.
+                </small>
+              </section>
+            )}
             <div className="round-action">
               <p>
                 {roundIsActive

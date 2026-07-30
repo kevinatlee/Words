@@ -23,6 +23,8 @@ import type {
   RoomSettings,
   RoomState,
   ServerToClientEvents,
+  SubmitWordInput,
+  SubmitWordResponse,
   TransferControllerInput,
 } from '@words/shared';
 
@@ -41,7 +43,9 @@ const successfulDictionaryLoad: Extract<
   { success: true }
 > = {
   success: true,
-  dictionary: {} as never,
+  dictionary: {
+    has: (word: string) => ['ABC', 'CAT', 'DOG', 'QUIZ'].includes(word),
+  },
   wordCount: 79_370,
   manifest: PRODUCTION_DICTIONARY_IDENTITY as never,
 };
@@ -126,6 +130,15 @@ function emitStartRound(
 ): Promise<ControllerActionResponse> {
   return new Promise((resolve) =>
     client.emit('controller:start-round', payload, resolve),
+  );
+}
+
+function emitSubmitWord(
+  client: TestClient,
+  payload: SubmitWordInput,
+): Promise<SubmitWordResponse> {
+  return new Promise((resolve) =>
+    client.emit('player:submit-word', payload, resolve),
   );
 }
 
@@ -1490,6 +1503,125 @@ describe('Words Stage 4B server', () => {
     expect(server.roomStore.getRoomState(created.room.code)).toMatchObject({
       phase: 'LOBBY',
       round: null,
+    });
+  });
+
+  it('keeps successful submissions private to the requesting player', async () => {
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) throw new Error('Display creation failed.');
+    const first = await connectClient();
+    const firstJoin = await emitJoinPlayer(first, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+    const second = await connectClient();
+    const secondJoin = await emitJoinPlayer(second, {
+      roomCode: created.room.code,
+      displayName: 'Amber Kite',
+    });
+    const started = await emitStartRound(first);
+    if (!started.ok || !started.room.round || !firstJoin.ok || !secondJoin.ok) {
+      throw new Error('Round setup failed.');
+    }
+    const publicVersion = started.room.stateVersion;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const publicBroadcasts: RoomState[] = [];
+    display.on('room:state', (room) => publicBroadcasts.push(room));
+
+    const response = await emitSubmitWord(first, {
+      roundId: started.room.round.id,
+      word: 'ABC',
+      path: [0, 1, 2],
+    });
+    expect(response).toMatchObject({
+      ok: true,
+      acceptedWord: { word: 'ABC', points: 1 },
+      state: {
+        playerId: firstJoin.session.playerId,
+        submissionVersion: 1,
+        provisionalScore: 1,
+      },
+    });
+    expect(response).not.toHaveProperty('room');
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(publicBroadcasts).toHaveLength(0);
+    expect(server.roomStore.getRoomState(created.room.code)?.stateVersion).toBe(
+      publicVersion,
+    );
+
+    second.disconnect();
+    const reconnectedSecond = await connectClient();
+    const recovered = await emitReconnectPlayer(reconnectedSecond, {
+      roomCode: created.room.code,
+      playerReconnectToken: secondJoin.session.playerReconnectToken,
+    });
+    expect(recovered).toMatchObject({
+      ok: true,
+      submissionState: {
+        playerId: secondJoin.session.playerId,
+        submissionVersion: 0,
+        acceptedWords: [],
+      },
+    });
+  });
+
+  it('rejects display submissions and never returns player-private state', async () => {
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) throw new Error('Display creation failed.');
+    const response = await emitSubmitWord(display, {
+      roundId: '00000000-0000-4000-8000-000000000500',
+      word: 'ABC',
+      path: [0, 1, 2],
+    });
+    expect(response).toEqual({
+      ok: false,
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'That player session cannot submit words.',
+      },
+      state: null,
+    });
+  });
+
+  it('broadcasts an exact-deadline transition before rejecting malformed input', async () => {
+    await server.stop();
+    let now = Date.parse('2026-07-30T20:00:00.000Z');
+    server = createWordsServer(
+      { port: 0, cleanupIntervalMs: 60_000 },
+      { ...testDependencies, now: () => now },
+    );
+    port = await server.start(0);
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) throw new Error('Display creation failed.');
+    const player = await connectClient();
+    await emitJoinPlayer(player, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+    const started = await emitStartRound(player);
+    if (!started.ok || !started.room.round) {
+      throw new Error('Round start failed.');
+    }
+    const ended = nextRoomState(
+      display,
+      (room) => room.phase === 'ROUND_ENDED',
+    );
+    now = Date.parse(started.room.round.deadlineAt);
+    const response = await new Promise<SubmitWordResponse>((resolve) => {
+      player.emit(
+        'player:submit-word',
+        { roundId: 'bad', word: 'ABC', path: [0, 1, 2] } as never,
+        resolve,
+      );
+    });
+    expect((await ended).round?.endedAt).toBe(started.room.round.deadlineAt);
+    expect(response).toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_PAYLOAD' },
+      state: null,
     });
   });
 });
