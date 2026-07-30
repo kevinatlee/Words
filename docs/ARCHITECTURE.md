@@ -349,9 +349,11 @@ bound player ID. Display acknowledgements and room broadcasts never carry it.
 Successful words do not change public state version, activity, or TTL.
 
 `player:submit-word` carries only a round UUID, derived word, and bounded path.
-It uses the server's official board and private dictionary. The dedicated
-room/player limiter survives socket replacement and has bounded, age-pruned
-keys without another timer. See [`SUBMISSIONS.md`](SUBMISSIONS.md).
+One captured server receipt time controls deadline acceptance and
+`acceptedAt`. A disconnect-cleared per-socket gate bounds every event before
+parsing; the separate room/player limiter survives socket replacement and has
+bounded, age-pruned keys without another timer. The server then uses its
+official board and private dictionary. See [`SUBMISSIONS.md`](SUBMISSIONS.md).
 
 ## Server-authority boundary
 

@@ -53,17 +53,22 @@ export function LetterGrid({
             : letter;
 
         return interactive ? (
-          <button
-            className={`${className} letter-tile--button`}
+          <div
+            className="letter-grid__cell"
             role="gridcell"
-            type="button"
-            aria-label={ariaLabel}
-            disabled={disabled}
-            onClick={() => onSelect?.(index)}
             key={`${letter}-${index}`}
           >
-            {content}
-          </button>
+            <button
+              className={`${className} letter-tile--button`}
+              type="button"
+              aria-label={ariaLabel}
+              aria-pressed={order !== undefined}
+              disabled={disabled}
+              onClick={() => onSelect?.(index)}
+            >
+              {content}
+            </button>
+          </div>
         ) : (
           <div
             className={className}

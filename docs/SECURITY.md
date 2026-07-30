@@ -213,7 +213,10 @@ payload in Stage 4B.
   discards paths, stores no rejection history, and never logs submitted words.
 - Personal duplicates, the 256-word cap, scoring, and the complete strict next
   state are checked before one atomic commit.
-- The 10-per-1,000-ms limiter is keyed by room/player and survives refresh.
+- A 20-per-1,000-ms per-socket submission limiter runs before parsing, bounds
+  malformed and unauthenticated events, and clears on disconnect.
+- The stricter 10-per-1,000-ms limiter is keyed by room/player, survives
+  refresh, and remains separate from controller-action capacity.
 - Exact-deadline processing publishes the ended transition even for malformed,
   rejected, or rate-limited submissions.
 

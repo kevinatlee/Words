@@ -807,6 +807,10 @@ button:disabled {
   gap: clamp(0.35rem, 1.2vw, 0.75rem);
 }
 
+.letter-grid__cell {
+  min-width: 0;
+}
+
 .letter-tile {
   position: relative;
   display: grid;
@@ -824,6 +828,10 @@ button:disabled {
 }
 
 .letter-tile:nth-child(5n + 2) {
+  background: #edf7e9;
+}
+
+.letter-grid > :nth-child(5n + 2) .letter-tile--button {
   background: #edf7e9;
 }
 

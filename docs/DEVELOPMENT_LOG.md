@@ -1,5 +1,21 @@
 # Development log
 
+## 2026-07-30 — Stage 4C final focused review
+
+- Added a separate disconnect-cleared per-socket submission gate so malformed,
+  unauthenticated, display, stale, and otherwise rejected events are bounded
+  before strict parsing without consuming controller-action capacity.
+- Captured one receipt time for deadline acceptance, stable limiting, and
+  `acceptedAt`; added exact-boundary and dependency-failure publication tests.
+- Required submit success acknowledgements to match the final committed
+  private entry and added serialized public/private boundary coverage.
+- Preserved native button semantics inside accessible grid cells, bounded the
+  local candidate at 64 letters, and made unexpected client failures restore
+  submission controls without losing the selected path.
+- Expanded limiter validation, lifecycle isolation, immutable-copy, scoring,
+  Socket.IO hostile-input, and UI regression coverage. Stage 4D behavior
+  remains deferred.
+
 ## 2026-07-30 — Stage 4C player-private submissions
 
 - Added the strict `player:submit-word` event and separately versioned private

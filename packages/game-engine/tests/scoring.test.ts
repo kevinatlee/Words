@@ -27,6 +27,17 @@ describe('traditional scoring', () => {
     });
   });
 
+  it.each([
+    [' cat ', 'CAT', 1],
+    ['quiz', 'QUIZ', 1],
+  ] as const)('normalizes %j before scoring', (candidate, word, points) => {
+    expect(scoreTraditionalWord(candidate)).toEqual({
+      valid: true,
+      word,
+      points,
+    });
+  });
+
   it('returns a safe structured failure for a two-letter word', () => {
     expect(scoreTraditionalWord('AT')).toEqual({
       valid: false,
@@ -34,7 +45,7 @@ describe('traditional scoring', () => {
     });
   });
 
-  it.each(['', "CAN'T", 'TWO WORDS', 42, null])(
+  it.each(['', '   ', "CAN'T", 'TWO WORDS', 'CAFÉ', 'A'.repeat(65), 42, null])(
     'returns a safe structured failure for malformed input %j',
     (candidate) => {
       expect(scoreTraditionalWord(candidate)).toEqual({

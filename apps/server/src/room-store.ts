@@ -697,13 +697,14 @@ export class RoomStore {
     input: SubmitWordInput,
     dictionary: WordDictionary,
     allowAttempt: () => boolean,
+    receivedAt = this.now(),
   ): SubmitWordResult {
     const room = this.rooms.get(session.roomCode);
     if (!room) {
       return this.submissionFailure('UNAUTHORIZED', null, null);
     }
 
-    const now = this.now();
+    const now = receivedAt;
     if (room.expiresAt <= now) {
       this.deleteRoom(room, now, true);
       return this.submissionFailure('UNAUTHORIZED', null, null);
@@ -1065,13 +1066,16 @@ export class RoomStore {
     return updatedRoomCodes;
   }
 
-  reconcileDueRound(roomCode: string): RoomState | null {
+  reconcileDueRound(
+    roomCode: string,
+    receivedAt = this.now(),
+  ): RoomState | null {
     const room = this.rooms.get(roomCode);
     if (!room) {
       return null;
     }
 
-    const now = this.now();
+    const now = receivedAt;
     if (room.expiresAt <= now || !this.reconcileRound(room, now)) {
       return null;
     }

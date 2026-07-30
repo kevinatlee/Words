@@ -1,3 +1,9 @@
+function requirePositiveInteger(value: number, label: string): void {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${label} must be a positive safe integer.`);
+  }
+}
+
 export class SocketRateLimiter {
   private readonly attemptsBySocket = new Map<string, number[]>();
 
@@ -5,10 +11,14 @@ export class SocketRateLimiter {
     private readonly windowMs: number,
     private readonly maximumAttempts: number,
     private readonly now: () => number = Date.now,
-  ) {}
+  ) {
+    requirePositiveInteger(windowMs, 'Rate-limit window');
+    requirePositiveInteger(maximumAttempts, 'Maximum attempts');
+  }
 
-  allow(socketId: string): boolean {
-    const cutoff = this.now() - this.windowMs;
+  allow(socketId: string, attemptedAt = this.now()): boolean {
+    const now = attemptedAt;
+    const cutoff = now - this.windowMs;
     const attempts = (this.attemptsBySocket.get(socketId) ?? []).filter(
       (attemptedAt) => attemptedAt > cutoff,
     );
@@ -18,7 +28,7 @@ export class SocketRateLimiter {
       return false;
     }
 
-    attempts.push(this.now());
+    attempts.push(now);
     this.attemptsBySocket.set(socketId, attempts);
     return true;
   }
@@ -41,10 +51,14 @@ export class PlayerSubmissionRateLimiter {
     private readonly maximumAttempts = 10,
     private readonly maximumKeys = 4_000,
     private readonly now: () => number = Date.now,
-  ) {}
+  ) {
+    requirePositiveInteger(windowMs, 'Submission rate-limit window');
+    requirePositiveInteger(maximumAttempts, 'Maximum submission attempts');
+    requirePositiveInteger(maximumKeys, 'Maximum submission keys');
+  }
 
-  allow(roomCode: string, playerId: string): boolean {
-    const now = this.now();
+  allow(roomCode: string, playerId: string, attemptedAt = this.now()): boolean {
+    const now = attemptedAt;
     const cutoff = now - this.windowMs;
     this.prune(cutoff);
     const key = `${roomCode}:${playerId}`;

@@ -131,6 +131,74 @@ describe('private submission contracts', () => {
     ).toBe(true);
   });
 
+  it('requires a success acknowledgement to describe the final committed word', () => {
+    const validState = state();
+    for (const acceptedWord of [
+      { ...accepted(), word: 'DOG' },
+      { ...accepted(), points: 2 },
+      { ...accepted(), sequence: 2 },
+      {
+        ...accepted(),
+        acceptedAt: '2026-07-30T20:00:02.000Z',
+      },
+    ]) {
+      expect(
+        submitWordResponseSchema.safeParse({
+          ok: true,
+          acceptedWord,
+          state: validState,
+        }).success,
+      ).toBe(false);
+    }
+  });
+
+  it('rejects submission fields from serialized public response types', () => {
+    const room = {
+      code: 'ABC234',
+      phase: 'LOBBY',
+      stateVersion: 0,
+      serverTime: '2026-07-30T20:00:00.000Z',
+      createdAt: '2026-07-30T20:00:00.000Z',
+      lastActivityAt: '2026-07-30T20:00:00.000Z',
+      expiresAt: '2026-07-30T22:00:00.000Z',
+      maxPlayers: 8,
+      display: {
+        connected: true,
+        createdAt: '2026-07-30T20:00:00.000Z',
+      },
+      controllerStatus: 'none',
+      controllerPlayerId: null,
+      players: [],
+      settings: {
+        gridSize: 4,
+        roundDurationSeconds: 180,
+        scoringMode: 'traditional',
+      },
+      round: null,
+    };
+    const publicJson = JSON.stringify({
+      room: roomStateSchema.parse(room),
+      display: displayActionResponseSchema.parse({
+        ok: true,
+        room,
+        session: {
+          displaySessionId: roundId,
+          displayReconnectToken: 'a'.repeat(43),
+        },
+      }),
+    });
+
+    for (const privateField of [
+      'submissionState',
+      'submissionVersion',
+      'acceptedWords',
+      'provisionalScore',
+      'acceptedAt',
+    ]) {
+      expect(publicJson).not.toContain(privateField);
+    }
+  });
+
   it('keeps the dedicated error model bounded and strict', () => {
     expect(
       submissionErrorSchema.safeParse({

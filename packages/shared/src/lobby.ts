@@ -94,7 +94,7 @@ export const roundIdSchema = z.string().max(36).uuid();
 export const submitWordInputSchema = z
   .object({
     roundId: roundIdSchema,
-    word: z.string().max(64),
+    word: z.string().max(productConfig.maximumSubmittedWordLength),
     path: z.array(z.number().int().min(0).max(35)).min(1).max(36).readonly(),
   })
   .strict()
@@ -451,6 +451,24 @@ const submitWordSuccessSchema = z
     state: playerRoundSubmissionStateSchema,
   })
   .strict()
+  .superRefine((response, context) => {
+    const finalWord = response.state.acceptedWords.at(-1);
+    if (
+      !finalWord ||
+      finalWord.sequence !== response.acceptedWord.sequence ||
+      finalWord.word !== response.acceptedWord.word ||
+      finalWord.points !== response.acceptedWord.points ||
+      finalWord.acceptedAt !== response.acceptedWord.acceptedAt ||
+      response.acceptedWord.sequence !== response.state.submissionVersion
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'The accepted word must be the final committed submission-state entry.',
+        path: ['acceptedWord'],
+      });
+    }
+  })
   .readonly();
 
 const submitWordFailureSchema = z

@@ -6,6 +6,19 @@ import {
 } from '../src/rate-limiter.js';
 
 describe('SocketRateLimiter', () => {
+  it.each([
+    [0, 1],
+    [-1, 1],
+    [Number.NaN, 1],
+    [Number.POSITIVE_INFINITY, 1],
+    [1.5, 1],
+    [1, 0],
+    [1, -1],
+    [1, 1.5],
+  ])('rejects invalid constructor values %#', (windowMs, maximumAttempts) => {
+    expect(() => new SocketRateLimiter(windowMs, maximumAttempts)).toThrow();
+  });
+
   it('bounds lobby attempts per socket and releases them after the window', () => {
     let now = 1_000;
     const limiter = new SocketRateLimiter(10_000, 2, () => now);
@@ -30,6 +43,30 @@ describe('SocketRateLimiter', () => {
 });
 
 describe('PlayerSubmissionRateLimiter', () => {
+  it.each([
+    [0, 1, 1],
+    [1, 0, 1],
+    [1, 1, 0],
+    [Number.NaN, 1, 1],
+    [1, Number.POSITIVE_INFINITY, 1],
+    [1, 1, -1],
+    [1.5, 1, 1],
+    [1, 1.5, 1],
+    [1, 1, 1.5],
+  ])(
+    'rejects invalid constructor values %#',
+    (windowMs, maximumAttempts, maximumKeys) => {
+      expect(
+        () =>
+          new PlayerSubmissionRateLimiter(
+            windowMs,
+            maximumAttempts,
+            maximumKeys,
+          ),
+      ).toThrow();
+    },
+  );
+
   it('uses stable room and player identity rather than socket identity', () => {
     const limiter = new PlayerSubmissionRateLimiter(1_000, 2, 8, () => 1_000);
 
@@ -48,5 +85,20 @@ describe('PlayerSubmissionRateLimiter', () => {
     expect(limiter.allow('ABC234', 'player-two')).toBe(false);
     now = 2_001;
     expect(limiter.allow('ABC234', 'player-two')).toBe(true);
+  });
+
+  it('uses an exact sliding-window cutoff without extending rejected keys', () => {
+    let now = 1_000;
+    const limiter = new PlayerSubmissionRateLimiter(1_000, 2, 1, () => now);
+
+    expect(limiter.allow('ABC234', 'player-one')).toBe(true);
+    now = 1_001;
+    expect(limiter.allow('ABC234', 'player-one')).toBe(true);
+    now = 1_999;
+    expect(limiter.allow('ABC234', 'player-one')).toBe(false);
+    now = 2_000;
+    expect(limiter.allow('ABC234', 'player-one')).toBe(true);
+    now = 2_001;
+    expect(limiter.allow('ABC234', 'player-one')).toBe(true);
   });
 });

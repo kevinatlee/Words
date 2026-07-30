@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 
 import {
   buildJoinUrl,
+  productConfig,
   type ConnectionStatus,
   type RoomError,
   type PlayerRoundSubmissionState,
@@ -103,6 +104,15 @@ export function RoomLobby({
       return;
     }
     setSubmissionMessage(null);
+    if (
+      candidateWord.length + (letters[tileIndex]?.length ?? 0) >
+      productConfig.maximumSubmittedWordLength
+    ) {
+      setSubmissionMessage(
+        `Words can contain at most ${productConfig.maximumSubmittedWordLength} letters.`,
+      );
+      return;
+    }
     setSelectedPath((current) => {
       if (current.includes(tileIndex)) {
         return current;
@@ -136,23 +146,34 @@ export function RoomLobby({
     }
     setSubmissionPending(true);
     setSubmissionMessage(null);
-    const response = await onSubmitWord({
-      roundId,
-      word: candidateWord,
-      path: selectedPath,
-    });
-    if (activeRoundIdRef.current !== roundId) {
-      return;
+    try {
+      const response = await onSubmitWord({
+        roundId,
+        word: candidateWord,
+        path: [...selectedPath],
+      });
+      if (activeRoundIdRef.current !== roundId) {
+        return;
+      }
+      if (response.ok) {
+        setSelectedPath([]);
+        setSubmissionMessage(
+          `${response.acceptedWord.word} accepted for ${response.acceptedWord.points} ${response.acceptedWord.points === 1 ? 'point' : 'points'}.`,
+        );
+      } else {
+        setSubmissionMessage(response.error.message);
+      }
+    } catch {
+      if (activeRoundIdRef.current === roundId) {
+        setSubmissionMessage(
+          'That word could not be checked. Your selection is still here.',
+        );
+      }
+    } finally {
+      if (activeRoundIdRef.current === roundId) {
+        setSubmissionPending(false);
+      }
     }
-    if (response.ok) {
-      setSelectedPath([]);
-      setSubmissionMessage(
-        `${response.acceptedWord.word} accepted for ${response.acceptedWord.points} ${response.acceptedWord.points === 1 ? 'point' : 'points'}.`,
-      );
-    } else {
-      setSubmissionMessage(response.error.message);
-    }
-    setSubmissionPending(false);
   };
 
   const heading = isDisplay

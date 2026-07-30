@@ -33,12 +33,13 @@ result, validity flag, or unknown field. The phone derives the word from the
 selected official tile tokens, but the server still requires an exact
 path/word match.
 
-The server checks the current player-bound newest socket, reconciles the
-deadline, requires the active matching round and immutable participant
-membership, applies the dedicated limiter, calls `validateWordPath()`, rejects
-personal duplicates and the 256-word bound, calculates traditional points,
-and validates the complete next private state. Only then does one atomic
-private commit occur.
+The server captures one receipt time, applies a separate 20-per-1,000-ms
+socket submission limit before payload parsing, checks the current
+player-bound newest socket, reconciles the deadline, requires the active
+matching round and immutable participant membership, and then applies the
+10-per-1,000-ms stable room/player limiter before `validateWordPath()`.
+Personal duplicates, the 256-word bound, traditional points, and the complete
+next private state are validated before one atomic private commit.
 
 At `now >= deadlineAt`, the room first transitions to `ROUND_ENDED` with
 `endedAt === deadlineAt`, publishes that transition exactly once, and rejects
@@ -53,17 +54,22 @@ word event.
 
 ## Bounds and phone behavior
 
-Submission attempts are limited to 10 per 1,000 ms by room code and player ID,
-so reconnecting does not reset the window. Keys are bounded by room/player
-limits and stale windows are pruned during later attempts without a timer.
-Each participant retains at most 256 unique accepted words for only the current
-round.
+All submission events, including malformed and unbound events, are limited to
+20 per 1,000 ms per socket. Authenticated participant attempts also consume a
+10-per-1,000-ms allowance keyed by room code and player ID, so reconnecting
+does not reset that stricter window. Neither allowance consumes controller
+action capacity. Socket entries are cleared on disconnect; stable keys are
+bounded by room/player limits and stale windows are pruned during later
+attempts without a timer. Each participant retains at most 256 unique accepted
+words for only the current round.
 
 Only a connected current participant receives interactive board buttons during
 an active round. Taps/clicks add an adjacent unused tile, preserve complete
 tokens such as `QU`, and show selection order. Undo removes the latest tile;
 Clear removes the path. Success clears the selection, while rejection retains
-it consistently for revision or retry.
+it consistently for revision or retry. Native buttons remain inside accessible
+grid cells for keyboard activation, and selection stops with local feedback
+before the derived candidate exceeds the 64-letter wire bound.
 
 The phone shows only **Your accepted words** and **Provisional points**, plus
 “Shared-word reconciliation is not implemented yet.” Provisional totals are

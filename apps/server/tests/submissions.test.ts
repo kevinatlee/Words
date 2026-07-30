@@ -153,6 +153,29 @@ describe('RoomStore private submissions', () => {
     expect(game.store.getRoomState(game.display.room.code)).toEqual(before);
   });
 
+  it('returns copies that cannot mutate committed private state', () => {
+    const game = setup();
+    const result = game.store.submitWord(
+      game.firstSession,
+      'player-one-socket',
+      { roundId: game.roundId, word: 'CAT', path: [0, 1, 2] },
+      dictionary(['CAT']),
+      () => true,
+    );
+    if (!result.response.ok) throw new Error('Submission setup failed.');
+
+    Reflect.set(result.response.acceptedWord, 'word', 'DOG');
+    Reflect.set(result.response.state.acceptedWords[0] ?? {}, 'word', 'DOG');
+    const reconnected = game.store.reconnectPlayer(
+      game.display.room.code,
+      game.first.session.playerReconnectToken,
+      'player-one-new',
+    );
+    expect(reconnected.submissionState?.acceptedWords).toMatchObject([
+      { word: 'CAT' },
+    ]);
+  });
+
   it('rejects a personal duplicate without changing private state', () => {
     const game = setup();
     const submit = () =>
@@ -275,6 +298,57 @@ describe('RoomStore private submissions', () => {
     });
   });
 
+  it('keeps explicitly left and grace-expired private state inaccessible', () => {
+    const explicit = setup();
+    explicit.store.submitWord(
+      explicit.firstSession,
+      'player-one-socket',
+      { roundId: explicit.roundId, word: 'CAT', path: [0, 1, 2] },
+      dictionary(['CAT']),
+      () => true,
+    );
+    expect(
+      explicit.store.leave(explicit.firstSession, 'player-one-socket'),
+    ).not.toBeNull();
+    const replacement = explicit.store.joinPlayer(
+      explicit.display.room.code,
+      'Silver Owl',
+      'replacement-socket',
+    );
+    expect(replacement.session.playerId).not.toBe(
+      explicit.first.session.playerId,
+    );
+    expect(replacement.submissionState).toBeNull();
+    expect(() =>
+      explicit.store.reconnectPlayer(
+        explicit.display.room.code,
+        explicit.first.session.playerReconnectToken,
+        'stale-reconnect',
+      ),
+    ).toThrow();
+
+    const expired = setup();
+    expired.store.submitWord(
+      expired.firstSession,
+      'player-one-socket',
+      { roundId: expired.roundId, word: 'CAT', path: [0, 1, 2] },
+      dictionary(['CAT']),
+      () => true,
+    );
+    expired.store.disconnect(expired.firstSession, 'player-one-socket');
+    expired.setNow(Date.parse('2026-07-30T20:01:00.001Z'));
+    expired.store.cleanupExpired();
+    const afterGrace = expired.store.joinPlayer(
+      expired.display.room.code,
+      'Silver Owl',
+      'after-grace-socket',
+    );
+    expect(afterGrace.session.playerId).not.toBe(
+      expired.first.session.playerId,
+    );
+    expect(afterGrace.submissionState).toBeNull();
+  });
+
   it('reconciles and reports the ended room at the exact deadline', () => {
     const game = setup();
     const deadline = Date.parse(
@@ -286,7 +360,10 @@ describe('RoomStore private submissions', () => {
       'player-one-socket',
       { roundId: game.roundId, word: 'CAT', path: [0, 1, 2] },
       dictionary(['CAT']),
-      () => true,
+      () => {
+        throw new Error('The limiter must not run after reconciliation.');
+      },
+      deadline,
     );
     expect(result.reconciledRoom).toMatchObject({
       phase: 'ROUND_ENDED',
@@ -295,6 +372,55 @@ describe('RoomStore private submissions', () => {
     expect(result.response).toMatchObject({
       ok: false,
       error: { code: 'ROUND_NOT_ACTIVE' },
+    });
+  });
+
+  it('uses one receipt time for deadline acceptance and acceptedAt', () => {
+    const game = setup();
+    const round = game.store.getRoomState(game.display.room.code)?.round;
+    if (!round) throw new Error('Round setup failed.');
+    const startedAt = Date.parse(round.startedAt);
+    const deadline = Date.parse(round.deadlineAt);
+
+    const atStart = game.store.submitWord(
+      game.firstSession,
+      'player-one-socket',
+      { roundId: game.roundId, word: 'CAT', path: [0, 1, 2] },
+      dictionary(['CAT']),
+      () => true,
+      startedAt,
+    );
+    const repeatedMillisecond = game.store.submitWord(
+      game.firstSession,
+      'player-one-socket',
+      { roundId: game.roundId, word: 'DOG', path: [4, 5, 6] },
+      dictionary(['DOG']),
+      () => true,
+      startedAt,
+    );
+    const beforeDeadline = game.store.submitWord(
+      game.firstSession,
+      'player-one-socket',
+      { roundId: game.roundId, word: 'QUIZ', path: [8, 9, 10] },
+      dictionary(['QUIZ']),
+      () => true,
+      deadline - 1,
+    );
+
+    expect(atStart.response).toMatchObject({
+      ok: true,
+      acceptedWord: { sequence: 1, acceptedAt: round.startedAt },
+    });
+    expect(repeatedMillisecond.response).toMatchObject({
+      ok: true,
+      acceptedWord: { sequence: 2, acceptedAt: round.startedAt },
+    });
+    expect(beforeDeadline.response).toMatchObject({
+      ok: true,
+      acceptedWord: {
+        sequence: 3,
+        acceptedAt: new Date(deadline - 1).toISOString(),
+      },
     });
   });
 
