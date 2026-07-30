@@ -1,5 +1,12 @@
 import { createServer as createHttpServer } from 'node:http';
+import { randomUUID } from 'node:crypto';
 
+import {
+  generateDefaultBoard,
+  loadProductionDictionary,
+  PRODUCTION_DICTIONARY_IDENTITY,
+  type ProductionDictionaryLoadResult,
+} from '@words/game-data';
 import {
   createDisplayInputSchema,
   joinPlayerInputSchema,
@@ -7,6 +14,8 @@ import {
   productConfig,
   reconnectDisplayInputSchema,
   reconnectPlayerInputSchema,
+  roomSettingsSchema,
+  startRoundInputSchema,
   transferControllerInputSchema,
   type ClientToServerEvents,
   type ControllerActionAcknowledgement,
@@ -22,18 +31,26 @@ import {
   type RoomError,
   type RoomErrorCode,
   type ServerToClientEvents,
+  type StartRoundInput,
   type TransferControllerInput,
+  type UpdateRoomSettingsInput,
 } from '@words/shared';
 import express from 'express';
 import { Server as SocketServer, type Socket } from 'socket.io';
 
 import { createServerConfig, type ServerConfig } from './config.js';
+import {
+  createCryptoRandomSource,
+  type ServerRandomSource,
+} from './crypto-random-source.js';
 import { SocketRateLimiter } from './rate-limiter.js';
 import {
   RoomOperationError,
   RoomStore,
   type BoundSession,
+  type RoomPresenceResult,
 } from './room-store.js';
+import { createSafeClock } from './safe-clock.js';
 
 type SocketData = {
   session?: BoundSession;
@@ -50,6 +67,52 @@ type FailureAcknowledgement = (response: RoomActionFailure) => void;
 
 export type WordsServer = ReturnType<typeof createWordsServer>;
 
+type LifecycleTimer = ReturnType<typeof setInterval>;
+
+export type WordsServerDependencies = {
+  now?: () => number;
+  roundIdGenerator?: () => string;
+  dictionaryLoader?: () => Promise<ProductionDictionaryLoadResult>;
+  boardGenerator?: typeof generateDefaultBoard;
+  randomSource?: ServerRandomSource;
+  lifecycleIntervalMs?: number;
+  setInterval?: (callback: () => void, milliseconds: number) => LifecycleTimer;
+  clearInterval?: (timer: LifecycleTimer) => void;
+  listen?: (
+    httpServer: ReturnType<typeof createHttpServer>,
+    port: number,
+  ) => Promise<number>;
+};
+
+type WordsServerStartupErrorCode =
+  | 'GAME_DATA_STARTUP_FAILED'
+  | 'SERVER_LISTEN_FAILED'
+  | 'SERVER_LIFECYCLE_FAILED';
+
+export class WordsServerStartupError extends Error {
+  constructor(
+    readonly code: WordsServerStartupErrorCode = 'GAME_DATA_STARTUP_FAILED',
+  ) {
+    super(
+      code === 'GAME_DATA_STARTUP_FAILED'
+        ? 'Words server startup failed because production game data is unavailable.'
+        : code === 'SERVER_LISTEN_FAILED'
+          ? 'Words server startup failed while opening its network port.'
+          : 'Words server startup failed while scheduling room lifecycle work.',
+    );
+    this.name = 'WordsServerStartupError';
+  }
+}
+
+export class WordsServerStoppedError extends Error {
+  readonly code = 'SERVER_STOPPED';
+
+  constructor() {
+    super('Words server startup was cancelled because the server was stopped.');
+    this.name = 'WordsServerStoppedError';
+  }
+}
+
 const publicErrorMessages: Record<RoomErrorCode, string> = {
   INVALID_PAYLOAD: 'Check the information you entered and try again.',
   INVALID_NAME: 'Choose a valid display name and try again.',
@@ -64,6 +127,9 @@ const publicErrorMessages: Record<RoomErrorCode, string> = {
   RECONNECT_FAILED: 'That temporary reconnect session is no longer valid.',
   RATE_LIMITED: 'Too many requests were sent. Wait a moment and try again.',
   SERVER_BUSY: 'The server is busy. Try again shortly.',
+  ROUND_IN_PROGRESS: 'A round is already in progress.',
+  BOARD_GENERATION_FAILED:
+    'A playable board could not be generated. Try again.',
   INTERNAL_ERROR: 'The request could not be completed.',
 };
 
@@ -88,7 +154,10 @@ function acknowledgeFailure(
   acknowledge({ ok: false, error });
 }
 
-export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
+export function createWordsServer(
+  overrides: Partial<ServerConfig> = {},
+  dependencies: WordsServerDependencies = {},
+): {
   app: express.Express;
   config: ServerConfig;
   httpServer: ReturnType<typeof createHttpServer>;
@@ -103,6 +172,30 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
   stop: () => Promise<void>;
 } {
   const config = { ...createServerConfig(), ...overrides };
+  const now = createSafeClock(dependencies.now ?? Date.now, () => {
+    return new RoomOperationError(
+      'INTERNAL_ERROR',
+      'The server clock is unavailable.',
+    );
+  });
+  const dictionaryLoader =
+    dependencies.dictionaryLoader ?? loadProductionDictionary;
+  const boardGenerator = dependencies.boardGenerator ?? generateDefaultBoard;
+  const randomSource = dependencies.randomSource ?? createCryptoRandomSource();
+  const lifecycleIntervalMs = dependencies.lifecycleIntervalMs ?? 250;
+  if (
+    !Number.isInteger(lifecycleIntervalMs) ||
+    !Number.isFinite(lifecycleIntervalMs) ||
+    lifecycleIntervalMs < 250 ||
+    lifecycleIntervalMs > 500
+  ) {
+    throw new Error(
+      'The lifecycle interval must be from 250 to 500 milliseconds.',
+    );
+  }
+  const scheduleInterval = dependencies.setInterval ?? setInterval;
+  const cancelInterval = dependencies.clearInterval ?? clearInterval;
+  let acceptingRooms = false;
   const app = express();
   const httpServer = createHttpServer(app);
   const io = new SocketServer<
@@ -125,11 +218,37 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
     maxRooms: config.maxRooms,
     roomTtlMs: config.roomTtlMs,
     reconnectGraceMs: config.reconnectGraceMs,
+    now,
+    roundIdGenerator: dependencies.roundIdGenerator ?? randomUUID,
+    roundBoardGenerator: (size) =>
+      boardGenerator({
+        size,
+        random: randomSource,
+      }),
+    canCreateRooms: () => acceptingRooms,
   });
   const rateLimiter = new SocketRateLimiter(
     config.rateLimitWindowMs,
     config.rateLimitAttempts,
   );
+  let gameDataRuntime: Extract<
+    ProductionDictionaryLoadResult,
+    { success: true }
+  > | null = null;
+  let lifecycleTimer: LifecycleTimer | null = null;
+  let startupPromise: Promise<number> | null = null;
+  let stopPromise: Promise<void> | null = null;
+  let lifecycleState:
+    'created' | 'starting' | 'listening' | 'failed' | 'stopping' | 'stopped' =
+    'created';
+  let nextCleanupAt = now() + config.cleanupIntervalMs;
+
+  const broadcastDueRound = (roomCode: string): void => {
+    const room = roomStore.reconcileDueRound(roomCode);
+    if (room) {
+      io.to(roomCode).emit('room:state', room);
+    }
+  };
 
   const closeConnectedRoom = (roomCode: string, error: RoomError): void => {
     const socketIds = io.sockets.adapter.rooms.get(roomCode);
@@ -175,6 +294,7 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
       status: 'ok',
       service: productConfig.productName,
       version: productConfig.version,
+      gameDataReady: gameDataRuntime !== null,
     });
   });
 
@@ -264,6 +384,7 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
         }
 
         try {
+          broadcastDueRound(parsed.data.roomCode);
           const result = roomStore.reconnectDisplay(
             parsed.data.roomCode,
             parsed.data.displayReconnectToken,
@@ -306,6 +427,7 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
         }
 
         try {
+          broadcastDueRound(parsed.data.roomCode);
           const result = roomStore.joinPlayer(
             parsed.data.roomCode,
             parsed.data.displayName,
@@ -350,6 +472,7 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
         }
 
         try {
+          broadcastDueRound(parsed.data.roomCode);
           const result = roomStore.reconnectPlayer(
             parsed.data.roomCode,
             parsed.data.playerReconnectToken,
@@ -402,6 +525,12 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
           });
           return;
         }
+        try {
+          broadcastDueRound(session.roomCode);
+        } catch (error) {
+          acknowledgeFailure(acknowledge, toRoomError(error));
+          return;
+        }
         if (session.role !== 'player') {
           acknowledgeFailure(acknowledge, {
             code: 'NOT_CONTROLLER',
@@ -416,6 +545,112 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
             parsed.data.targetPlayerId,
             socket.id,
           );
+          acknowledge({ ok: true, room: result.room });
+          io.to(session.roomCode).emit('room:state', result.room);
+        } catch (error) {
+          acknowledgeFailure(acknowledge, toRoomError(error));
+        }
+      },
+    );
+
+    socket.on(
+      'controller:update-settings',
+      (
+        payload: UpdateRoomSettingsInput,
+        acknowledge: ControllerActionAcknowledgement,
+      ) => {
+        if (!checkRateLimit(acknowledge)) {
+          return;
+        }
+
+        const parsed = roomSettingsSchema.safeParse(payload);
+        if (!parsed.success) {
+          acknowledgeFailure(acknowledge, {
+            code: 'INVALID_PAYLOAD',
+            message: publicErrorMessages.INVALID_PAYLOAD,
+          });
+          return;
+        }
+
+        const session = socket.data.session;
+        if (!session) {
+          acknowledgeFailure(acknowledge, {
+            code: 'UNAUTHORIZED',
+            message: publicErrorMessages.UNAUTHORIZED,
+          });
+          return;
+        }
+        try {
+          broadcastDueRound(session.roomCode);
+        } catch (error) {
+          acknowledgeFailure(acknowledge, toRoomError(error));
+          return;
+        }
+        if (session.role !== 'player') {
+          acknowledgeFailure(acknowledge, {
+            code: 'NOT_CONTROLLER',
+            message: publicErrorMessages.NOT_CONTROLLER,
+          });
+          return;
+        }
+
+        try {
+          const result = roomStore.updateSettings(
+            session,
+            parsed.data,
+            socket.id,
+          );
+          acknowledge({ ok: true, room: result.room });
+          io.to(session.roomCode).emit('room:state', result.room);
+        } catch (error) {
+          acknowledgeFailure(acknowledge, toRoomError(error));
+        }
+      },
+    );
+
+    socket.on(
+      'controller:start-round',
+      (
+        payload: StartRoundInput,
+        acknowledge: ControllerActionAcknowledgement,
+      ) => {
+        if (!checkRateLimit(acknowledge)) {
+          return;
+        }
+
+        const parsed = startRoundInputSchema.safeParse(payload);
+        if (!parsed.success) {
+          acknowledgeFailure(acknowledge, {
+            code: 'INVALID_PAYLOAD',
+            message: publicErrorMessages.INVALID_PAYLOAD,
+          });
+          return;
+        }
+
+        const session = socket.data.session;
+        if (!session) {
+          acknowledgeFailure(acknowledge, {
+            code: 'UNAUTHORIZED',
+            message: publicErrorMessages.UNAUTHORIZED,
+          });
+          return;
+        }
+        try {
+          broadcastDueRound(session.roomCode);
+        } catch (error) {
+          acknowledgeFailure(acknowledge, toRoomError(error));
+          return;
+        }
+        if (session.role !== 'player') {
+          acknowledgeFailure(acknowledge, {
+            code: 'NOT_CONTROLLER',
+            message: publicErrorMessages.NOT_CONTROLLER,
+          });
+          return;
+        }
+
+        try {
+          const result = roomStore.startRound(session, socket.id);
           acknowledge({ ok: true, room: result.room });
           io.to(session.roomCode).emit('room:state', result.room);
         } catch (error) {
@@ -441,6 +676,12 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
           return;
         }
 
+        try {
+          broadcastDueRound(session.roomCode);
+        } catch (error) {
+          acknowledgeFailure(acknowledge, toRoomError(error));
+          return;
+        }
         const result = roomStore.leave(session, socket.id);
         if (!result || result.role !== 'display') {
           acknowledgeFailure(acknowledge, {
@@ -475,6 +716,12 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
           return;
         }
 
+        try {
+          broadcastDueRound(session.roomCode);
+        } catch (error) {
+          acknowledgeFailure(acknowledge, toRoomError(error));
+          return;
+        }
         const result = roomStore.leave(session, socket.id);
         if (!result || result.role !== 'player') {
           acknowledgeFailure(acknowledge, {
@@ -500,7 +747,13 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
         return;
       }
 
-      const result = roomStore.disconnect(session, socket.id);
+      let result: RoomPresenceResult | null;
+      try {
+        broadcastDueRound(session.roomCode);
+        result = roomStore.disconnect(session, socket.id);
+      } catch {
+        return;
+      }
       if (!result) {
         return;
       }
@@ -516,24 +769,131 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
     });
   });
 
-  const cleanupTimer = setInterval(() => {
-    const cleanup = roomStore.cleanupExpired();
+  const runLifecycleSweep = (): void => {
+    const updatedRoomCodes = new Set(roomStore.advanceDueRounds());
+    const currentTime = now();
 
-    for (const roomCode of cleanup.updatedRoomCodes) {
+    if (currentTime >= nextCleanupAt) {
+      const cleanup = roomStore.cleanupExpired();
+      for (const roomCode of cleanup.updatedRoomCodes) {
+        updatedRoomCodes.add(roomCode);
+      }
+      for (const roomCode of cleanup.deletedRoomCodes) {
+        updatedRoomCodes.delete(roomCode);
+        closeConnectedRoom(roomCode, {
+          code: 'ROOM_EXPIRED',
+          message: 'This temporary room has expired.',
+        });
+      }
+      nextCleanupAt = currentTime + config.cleanupIntervalMs;
+    }
+
+    for (const roomCode of updatedRoomCodes) {
       const room = roomStore.getRoomState(roomCode);
       if (room) {
         io.to(roomCode).emit('room:state', room);
       }
     }
+  };
 
-    for (const roomCode of cleanup.deletedRoomCodes) {
-      closeConnectedRoom(roomCode, {
-        code: 'ROOM_EXPIRED',
-        message: 'This temporary room has expired.',
-      });
+  const beginLifecycleSweep = (): void => {
+    if (lifecycleTimer !== null) {
+      return;
     }
-  }, config.cleanupIntervalMs);
-  cleanupTimer.unref();
+    lifecycleTimer = scheduleInterval(() => {
+      try {
+        runLifecycleSweep();
+      } catch {
+        // A later bounded sweep retries; timer callbacks must not crash the process.
+      }
+    }, lifecycleIntervalMs);
+    lifecycleTimer.unref?.();
+  };
+
+  const listenHttpServer = (port: number): Promise<number> =>
+    new Promise((resolve, reject) => {
+      const onError = (error: Error) => {
+        httpServer.off('listening', onListening);
+        reject(error);
+      };
+      const onListening = () => {
+        httpServer.off('error', onError);
+        const address = httpServer.address();
+        resolve(typeof address === 'object' && address ? address.port : port);
+      };
+      httpServer.once('error', onError);
+      httpServer.once('listening', onListening);
+      httpServer.listen(port);
+    });
+  const listen = dependencies.listen ?? ((_, port) => listenHttpServer(port));
+
+  const closeHttpServerIfListening = (): Promise<void> =>
+    new Promise((resolve) => {
+      if (!httpServer.listening) {
+        resolve();
+        return;
+      }
+      httpServer.close(() => resolve());
+    });
+
+  const stop = (): Promise<void> => {
+    if (stopPromise !== null) {
+      return stopPromise;
+    }
+
+    lifecycleState = 'stopping';
+    acceptingRooms = false;
+    if (lifecycleTimer !== null) {
+      cancelInterval(lifecycleTimer);
+      lifecycleTimer = null;
+    }
+
+    stopPromise = new Promise((resolve) => {
+      io.close(() => {
+        void closeHttpServerIfListening().then(() => {
+          lifecycleState = 'stopped';
+          resolve();
+        });
+      });
+    });
+    return stopPromise;
+  };
+
+  const isExpectedProductionDictionary = (
+    loaded: unknown,
+  ): loaded is Extract<ProductionDictionaryLoadResult, { success: true }> => {
+    if (
+      typeof loaded !== 'object' ||
+      loaded === null ||
+      Array.isArray(loaded)
+    ) {
+      return false;
+    }
+
+    const result = loaded as Record<string, unknown>;
+    if (result.success !== true || result.wordCount !== 79_370) {
+      return false;
+    }
+
+    const manifest = result.manifest;
+    if (
+      typeof manifest !== 'object' ||
+      manifest === null ||
+      Array.isArray(manifest)
+    ) {
+      return false;
+    }
+
+    const fields = manifest as Record<string, unknown>;
+    return (
+      fields.wordCount === PRODUCTION_DICTIONARY_IDENTITY.wordCount &&
+      fields.sha256 === PRODUCTION_DICTIONARY_IDENTITY.sha256 &&
+      fields.sourceRelease === PRODUCTION_DICTIONARY_IDENTITY.sourceRelease &&
+      fields.sourceCommit === PRODUCTION_DICTIONARY_IDENTITY.sourceCommit
+    );
+  };
+  const isStoppingOrStopped = (): boolean =>
+    lifecycleState === 'stopping' || lifecycleState === 'stopped';
 
   return {
     app,
@@ -541,26 +901,75 @@ export function createWordsServer(overrides: Partial<ServerConfig> = {}): {
     httpServer,
     io,
     roomStore,
-    start: (port = config.port) =>
-      new Promise((resolve, reject) => {
-        httpServer.once('error', reject);
-        httpServer.listen(port, () => {
-          httpServer.off('error', reject);
-          const address = httpServer.address();
-          resolve(typeof address === 'object' && address ? address.port : port);
-        });
-      }),
-    stop: () =>
-      new Promise((resolve) => {
-        clearInterval(cleanupTimer);
-        io.close(() => {
-          if (!httpServer.listening) {
-            resolve();
-            return;
-          }
+    start: (port = config.port) => {
+      if (isStoppingOrStopped()) {
+        return Promise.reject(new WordsServerStoppedError());
+      }
+      if (startupPromise !== null) {
+        return startupPromise;
+      }
 
-          httpServer.close(() => resolve());
-        });
-      }),
+      lifecycleState = 'starting';
+      startupPromise ??= (async () => {
+        let loaded: unknown;
+        try {
+          loaded = await dictionaryLoader();
+        } catch {
+          if (isStoppingOrStopped()) {
+            throw new WordsServerStoppedError();
+          }
+          lifecycleState = 'failed';
+          throw new WordsServerStartupError();
+        }
+
+        if (lifecycleState !== 'starting') {
+          throw new WordsServerStoppedError();
+        }
+
+        if (!isExpectedProductionDictionary(loaded)) {
+          lifecycleState = 'failed';
+          throw new WordsServerStartupError();
+        }
+
+        gameDataRuntime = loaded;
+        let listeningPort: number;
+        try {
+          listeningPort = await listen(httpServer, port);
+        } catch {
+          if (isStoppingOrStopped()) {
+            if (stopPromise !== null) {
+              await stopPromise;
+            }
+            await closeHttpServerIfListening();
+            throw new WordsServerStoppedError();
+          }
+          lifecycleState = 'failed';
+          throw new WordsServerStartupError('SERVER_LISTEN_FAILED');
+        }
+
+        if (lifecycleState !== 'starting') {
+          if (stopPromise !== null) {
+            await stopPromise;
+          }
+          await closeHttpServerIfListening();
+          throw new WordsServerStoppedError();
+        }
+
+        acceptingRooms = true;
+        lifecycleState = 'listening';
+        try {
+          beginLifecycleSweep();
+        } catch {
+          acceptingRooms = false;
+          lifecycleState = 'failed';
+          const error = new WordsServerStartupError('SERVER_LIFECYCLE_FAILED');
+          await stop();
+          throw error;
+        }
+        return listeningPort;
+      })();
+      return startupPromise;
+    },
+    stop,
   };
 }

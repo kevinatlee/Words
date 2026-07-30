@@ -867,6 +867,27 @@ button:disabled {
   min-width: 10rem;
 }
 
+.round-clock {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.round-clock small {
+  color: var(--paper-muted);
+}
+
+.round-clock strong {
+  color: var(--paper);
+  font-size: clamp(1.2rem, 3vw, 1.8rem);
+}
+
 /* Player view */
 
 .player-page__intro {
@@ -1064,7 +1085,7 @@ button:disabled {
   margin-top: 1.5rem;
 }
 
-/* Stage 2.5 lobby */
+/* Server-backed room and round lifecycle */
 
 .form-page {
   display: grid;

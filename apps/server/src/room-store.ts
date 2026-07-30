@@ -2,17 +2,25 @@ import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 
 import {
   productConfig,
+  maximumRoundGenerationAttempts,
   roomCodeAlphabet,
   roomCodeSchema,
+  roomSettingsSchema,
+  roundStateSchema,
   type ControllerStatus,
   type DisplaySessionCredentials,
   type DisplayState,
+  type GridSize,
   type PlayerSessionCredentials,
   type PlayerState,
+  type RoomPhase,
   type RoomErrorCode,
   type RoomSettings,
   type RoomState,
+  type RoundState,
 } from '@words/shared';
+
+import { createSafeClock } from './safe-clock.js';
 
 type InternalDisplay = {
   id: string;
@@ -35,7 +43,8 @@ type InternalPlayer = {
 
 type InternalRoom = {
   code: string;
-  phase: 'LOBBY';
+  phase: RoomPhase;
+  stateVersion: number;
   createdAt: number;
   lastActivityAt: number;
   expiresAt: number;
@@ -44,7 +53,41 @@ type InternalRoom = {
   controllerPlayerId: string | null;
   players: Map<string, InternalPlayer>;
   settings: RoomSettings;
+  round: InternalRound | null;
 };
+
+type InternalRound = {
+  id: string;
+  number: number;
+  settings: RoomSettings;
+  board: {
+    size: GridSize;
+    tiles: readonly string[];
+  };
+  participants: readonly {
+    playerId: string;
+    displayName: string;
+  }[];
+  startedAt: number;
+  deadlineAt: number;
+  endedAt: number | null;
+  generationAttempts: number;
+};
+
+export type RoundBoardGenerationResult =
+  | {
+      readonly success: true;
+      readonly board: {
+        readonly size: GridSize;
+        readonly tiles: readonly string[];
+      };
+      readonly attempts: number;
+    }
+  | {
+      readonly success: false;
+      readonly code: 'NO_ACCEPTABLE_BOARD';
+      readonly attempts: number;
+    };
 
 type DisplaySessionReference = {
   roomCode: string;
@@ -128,7 +171,10 @@ export type RoomStoreOptions = {
   roomCodeGenerator?: () => string;
   displaySessionIdGenerator?: () => string;
   playerIdGenerator?: () => string;
+  roundIdGenerator?: () => string;
   reconnectTokenGenerator?: () => string;
+  roundBoardGenerator?: (size: GridSize) => RoundBoardGenerationResult;
+  canCreateRooms?: () => boolean;
 };
 
 export class RoomOperationError extends Error {
@@ -160,6 +206,43 @@ function comparePlayersByJoinOrder(
   return joinedAtDifference || left.id.localeCompare(right.id);
 }
 
+function isValidRoundBoardGenerationResult(
+  generated: unknown,
+  expectedSize: GridSize,
+): generated is Extract<RoundBoardGenerationResult, { success: true }> {
+  if (
+    typeof generated !== 'object' ||
+    generated === null ||
+    Array.isArray(generated)
+  ) {
+    return false;
+  }
+
+  const result = generated as Record<string, unknown>;
+  const board = result.board;
+  if (
+    result.success !== true ||
+    !Number.isInteger(result.attempts) ||
+    (result.attempts as number) < 1 ||
+    (result.attempts as number) > maximumRoundGenerationAttempts ||
+    typeof board !== 'object' ||
+    board === null ||
+    Array.isArray(board)
+  ) {
+    return false;
+  }
+
+  const boardResult = board as Record<string, unknown>;
+  return (
+    boardResult.size === expectedSize &&
+    Array.isArray(boardResult.tiles) &&
+    boardResult.tiles.length === expectedSize * expectedSize &&
+    boardResult.tiles.every(
+      (tile) => typeof tile === 'string' && /^[A-Z]{1,4}$/.test(tile),
+    )
+  );
+}
+
 export class RoomStore {
   private readonly rooms = new Map<string, InternalRoom>();
   private readonly displaySessions = new Map<string, DisplaySessionReference>();
@@ -169,20 +252,37 @@ export class RoomStore {
   private readonly roomCodeGenerator: () => string;
   private readonly displaySessionIdGenerator: () => string;
   private readonly playerIdGenerator: () => string;
+  private readonly roundIdGenerator: () => string;
   private readonly reconnectTokenGenerator: () => string;
+  private readonly roundBoardGenerator:
+    ((size: GridSize) => RoundBoardGenerationResult) | undefined;
 
   constructor(private readonly options: RoomStoreOptions) {
-    this.now = options.now ?? Date.now;
+    this.now = createSafeClock(options.now ?? Date.now, () => {
+      return new RoomOperationError(
+        'INTERNAL_ERROR',
+        'The server clock is unavailable.',
+      );
+    });
     this.roomCodeGenerator =
       options.roomCodeGenerator ?? defaultRoomCodeGenerator;
     this.displaySessionIdGenerator =
       options.displaySessionIdGenerator ?? randomUUID;
     this.playerIdGenerator = options.playerIdGenerator ?? randomUUID;
+    this.roundIdGenerator = options.roundIdGenerator ?? randomUUID;
     this.reconnectTokenGenerator =
       options.reconnectTokenGenerator ?? defaultReconnectTokenGenerator;
+    this.roundBoardGenerator = options.roundBoardGenerator;
   }
 
   createDisplay(socketId: string): DisplaySessionResult {
+    if (this.options.canCreateRooms && !this.options.canCreateRooms()) {
+      throw new RoomOperationError(
+        'SERVER_BUSY',
+        'The server is not ready to create rooms yet.',
+      );
+    }
+
     if (this.rooms.size >= this.options.maxRooms) {
       throw new RoomOperationError(
         'SERVER_BUSY',
@@ -196,6 +296,7 @@ export class RoomStore {
     const room: InternalRoom = {
       code,
       phase: 'LOBBY',
+      stateVersion: 0,
       createdAt: now,
       lastActivityAt: now,
       expiresAt: now + this.options.roomTtlMs,
@@ -208,6 +309,7 @@ export class RoomStore {
         roundDurationSeconds: productConfig.defaultRoundDurationSeconds,
         scoringMode: productConfig.defaultScoringMode,
       },
+      round: null,
     };
 
     this.rooms.set(code, room);
@@ -284,24 +386,7 @@ export class RoomStore {
     socketId: string,
   ): ControllerActionResult {
     const room = this.requireActiveRoom(session.roomCode);
-    const requester = room.players.get(session.playerId);
-
-    if (!requester || !requester.connected || requester.socketId !== socketId) {
-      throw new RoomOperationError(
-        'UNAUTHORIZED',
-        'That player session is no longer authorized for this room.',
-      );
-    }
-
-    if (
-      room.controllerStatus !== 'assigned' ||
-      room.controllerPlayerId !== requester.id
-    ) {
-      throw new RoomOperationError(
-        'NOT_CONTROLLER',
-        'Only the current game host can transfer control.',
-      );
-    }
+    const requester = this.requireConnectedController(room, session, socketId);
 
     const target = room.players.get(targetPlayerId);
     if (!target) {
@@ -328,6 +413,125 @@ export class RoomStore {
     room.controllerPlayerId = target.id;
     room.controllerStatus = 'assigned';
     this.touch(room, this.now());
+
+    return { room: this.toRoomState(room) };
+  }
+
+  updateSettings(
+    session: BoundPlayerSession,
+    settings: RoomSettings,
+    socketId: string,
+  ): ControllerActionResult {
+    const room = this.requireActiveRoom(session.roomCode);
+    this.requireConnectedController(room, session, socketId);
+
+    if (room.phase === 'ROUND_ACTIVE') {
+      throw new RoomOperationError(
+        'ROUND_IN_PROGRESS',
+        'Room settings cannot change during an active round.',
+      );
+    }
+
+    const parsedSettings = roomSettingsSchema.safeParse(settings);
+    if (!parsedSettings.success) {
+      throw new RoomOperationError(
+        'INVALID_PAYLOAD',
+        'Choose supported room settings and try again.',
+      );
+    }
+
+    if (
+      room.settings.gridSize === parsedSettings.data.gridSize &&
+      room.settings.roundDurationSeconds ===
+        parsedSettings.data.roundDurationSeconds &&
+      room.settings.scoringMode === parsedSettings.data.scoringMode
+    ) {
+      return { room: this.toRoomState(room) };
+    }
+
+    room.settings = Object.freeze({ ...parsedSettings.data });
+    this.touch(room, this.now());
+
+    return { room: this.toRoomState(room) };
+  }
+
+  startRound(
+    session: BoundPlayerSession,
+    socketId: string,
+  ): ControllerActionResult {
+    const room = this.requireActiveRoom(session.roomCode);
+    this.requireConnectedController(room, session, socketId);
+
+    if (room.phase === 'ROUND_ACTIVE') {
+      throw new RoomOperationError(
+        'ROUND_IN_PROGRESS',
+        'A round is already in progress.',
+      );
+    }
+
+    let generated: unknown;
+    try {
+      generated = this.roundBoardGenerator?.(room.settings.gridSize);
+    } catch {
+      throw new RoomOperationError(
+        'BOARD_GENERATION_FAILED',
+        'A playable board could not be generated. Try starting the round again.',
+      );
+    }
+    if (!isValidRoundBoardGenerationResult(generated, room.settings.gridSize)) {
+      throw new RoomOperationError(
+        'BOARD_GENERATION_FAILED',
+        'A playable board could not be generated. Try starting the round again.',
+      );
+    }
+
+    const now = this.now();
+    const settings = Object.freeze({ ...room.settings });
+    const participants = Object.freeze(
+      [...room.players.values()]
+        .filter((player) => player.connected)
+        .sort(comparePlayersByJoinOrder)
+        .map((player) =>
+          Object.freeze({
+            playerId: player.id,
+            displayName: player.displayName,
+          }),
+        ),
+    );
+    const board = Object.freeze({
+      size: generated.board.size,
+      tiles: Object.freeze([...generated.board.tiles]),
+    });
+    let round: InternalRound;
+    try {
+      round = Object.freeze({
+        id: this.roundIdGenerator(),
+        number: (room.round?.number ?? 0) + 1,
+        settings,
+        board,
+        participants,
+        startedAt: now,
+        deadlineAt: now + settings.roundDurationSeconds * 1_000,
+        endedAt: null,
+        generationAttempts: generated.attempts,
+      });
+
+      if (
+        round.id === room.round?.id ||
+        !roundStateSchema.safeParse(this.toRoundState(round)).success
+      ) {
+        throw new Error('Invalid authoritative round identity or state.');
+      }
+    } catch {
+      throw new RoomOperationError(
+        'INTERNAL_ERROR',
+        'The authoritative round could not be created.',
+      );
+    }
+
+    room.round = round;
+    room.phase = 'ROUND_ACTIVE';
+    this.touch(room, now);
 
     return { room: this.toRoomState(room) };
   }
@@ -367,6 +571,7 @@ export class RoomStore {
     }
 
     const replacedSocketId = display.socketId;
+    const wasConnected = display.connected;
     this.displaySessions.delete(displayReconnectToken);
     display.reconnectToken = this.createReconnectToken(displayReconnectToken);
     display.socketId = socketId;
@@ -376,7 +581,11 @@ export class RoomStore {
       roomCode: room.code,
       displaySessionId: display.id,
     });
-    this.touch(room, now);
+    if (wasConnected) {
+      this.refreshActivity(room, now);
+    } else {
+      this.touch(room, now);
+    }
 
     return this.createDisplayResult(room, display, replacedSocketId);
   }
@@ -412,6 +621,8 @@ export class RoomStore {
     }
 
     const replacedSocketId = player.socketId;
+    const wasConnected = player.connected;
+    const previousControllerPlayerId = room.controllerPlayerId;
     this.playerSessions.delete(playerReconnectToken);
     player.reconnectToken = this.createReconnectToken(playerReconnectToken);
     player.socketId = socketId;
@@ -424,7 +635,14 @@ export class RoomStore {
     if (room.controllerPlayerId === null) {
       this.assignEarliestConnectedController(room);
     }
-    this.touch(room, now);
+    if (
+      wasConnected &&
+      previousControllerPlayerId === room.controllerPlayerId
+    ) {
+      this.refreshActivity(room, now);
+    } else {
+      this.touch(room, now);
+    }
 
     return this.createPlayerResult(room, player, replacedSocketId);
   }
@@ -440,6 +658,7 @@ export class RoomStore {
     }
 
     const now = this.now();
+    this.reconcileRound(room, now);
 
     if (session.role === 'display') {
       const display = room.display;
@@ -485,6 +704,8 @@ export class RoomStore {
     if (!room) {
       return null;
     }
+
+    this.reconcileRound(room, this.now());
 
     if (session.role === 'display') {
       const display = room.display;
@@ -548,8 +769,13 @@ export class RoomStore {
     this.pruneExpiredCodeTombstones(now);
 
     for (const room of [...this.rooms.values()]) {
+      if (this.reconcileRound(room, now)) {
+        updatedRoomCodes.add(room.code);
+      }
+
       if (room.expiresAt <= now) {
         deletedRoomCodes.push(room.code);
+        updatedRoomCodes.delete(room.code);
         this.deleteRoom(room, now, true);
         continue;
       }
@@ -565,7 +791,6 @@ export class RoomStore {
         }
         display.reconnectToken = null;
         display.disconnectExpiresAt = null;
-        updatedRoomCodes.add(room.code);
       }
 
       const expiredPlayers = [...room.players.values()].filter(
@@ -590,6 +815,9 @@ export class RoomStore {
       if (removedController) {
         this.assignEarliestConnectedController(room);
       }
+      if (expiredPlayers.length > 0) {
+        room.stateVersion += 1;
+      }
 
       if (
         room.players.size === 0 &&
@@ -610,7 +838,37 @@ export class RoomStore {
 
   getRoomState(roomCode: string): RoomState | null {
     const room = this.rooms.get(roomCode);
+    if (room) {
+      this.reconcileRound(room, this.now());
+    }
     return room ? this.toRoomState(room) : null;
+  }
+
+  advanceDueRounds(): string[] {
+    const now = this.now();
+    const updatedRoomCodes: string[] = [];
+
+    for (const room of this.rooms.values()) {
+      if (this.reconcileRound(room, now)) {
+        updatedRoomCodes.push(room.code);
+      }
+    }
+
+    return updatedRoomCodes;
+  }
+
+  reconcileDueRound(roomCode: string): RoomState | null {
+    const room = this.rooms.get(roomCode);
+    if (!room) {
+      return null;
+    }
+
+    const now = this.now();
+    if (room.expiresAt <= now || !this.reconcileRound(room, now)) {
+      return null;
+    }
+
+    return this.toRoomState(room);
   }
 
   get roomCount(): number {
@@ -704,6 +962,7 @@ export class RoomStore {
       );
     }
 
+    this.reconcileRound(room, now);
     return room;
   }
 
@@ -754,9 +1013,12 @@ export class RoomStore {
   }
 
   private toRoomState(room: InternalRoom): RoomState {
+    const now = this.now();
     return {
       code: room.code,
       phase: room.phase,
+      stateVersion: room.stateVersion,
+      serverTime: new Date(now).toISOString(),
       createdAt: new Date(room.createdAt).toISOString(),
       lastActivityAt: new Date(room.lastActivityAt).toISOString(),
       expiresAt: new Date(room.expiresAt).toISOString(),
@@ -767,7 +1029,28 @@ export class RoomStore {
       players: [...room.players.values()]
         .sort(comparePlayersByJoinOrder)
         .map((player) => this.toPlayerState(room, player)),
-      settings: room.settings,
+      settings: { ...room.settings },
+      round: room.round ? this.toRoundState(room.round) : null,
+    };
+  }
+
+  private toRoundState(round: InternalRound): RoundState {
+    return {
+      id: round.id,
+      number: round.number,
+      settings: { ...round.settings },
+      board: {
+        size: round.board.size,
+        tiles: [...round.board.tiles],
+      },
+      participants: round.participants.map((participant) => ({
+        ...participant,
+      })),
+      startedAt: new Date(round.startedAt).toISOString(),
+      deadlineAt: new Date(round.deadlineAt).toISOString(),
+      endedAt:
+        round.endedAt === null ? null : new Date(round.endedAt).toISOString(),
+      generationAttempts: round.generationAttempts,
     };
   }
 
@@ -792,8 +1075,59 @@ export class RoomStore {
   }
 
   private touch(room: InternalRoom, now: number): void {
+    this.refreshActivity(room, now);
+    room.stateVersion += 1;
+  }
+
+  private refreshActivity(room: InternalRoom, now: number): void {
     room.lastActivityAt = now;
     room.expiresAt = now + this.options.roomTtlMs;
+  }
+
+  private reconcileRound(room: InternalRoom, now: number): boolean {
+    const round = room.round;
+    if (
+      room.phase !== 'ROUND_ACTIVE' ||
+      round === null ||
+      now < round.deadlineAt
+    ) {
+      return false;
+    }
+
+    room.phase = 'ROUND_ENDED';
+    room.round = Object.freeze({
+      ...round,
+      endedAt: round.deadlineAt,
+    });
+    room.stateVersion += 1;
+    return true;
+  }
+
+  private requireConnectedController(
+    room: InternalRoom,
+    session: BoundPlayerSession,
+    socketId: string,
+  ): InternalPlayer {
+    const requester = room.players.get(session.playerId);
+
+    if (!requester || !requester.connected || requester.socketId !== socketId) {
+      throw new RoomOperationError(
+        'UNAUTHORIZED',
+        'That player session is no longer authorized for this room.',
+      );
+    }
+
+    if (
+      room.controllerStatus !== 'assigned' ||
+      room.controllerPlayerId !== requester.id
+    ) {
+      throw new RoomOperationError(
+        'NOT_CONTROLLER',
+        'Only the current game host can do that.',
+      );
+    }
+
+    return requester;
   }
 
   private assignEarliestConnectedController(room: InternalRoom): void {

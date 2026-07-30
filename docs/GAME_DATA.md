@@ -1,16 +1,18 @@
 # Production game data
 
-Stage 3.1 read-only CI is complete. Stage 4A production game data is in review.
-This stage supplies reproducible server-only assets and pure defaults; it does
-not connect a dictionary, board, round, timer, submission, or score to the
-live lobby.
+Stage 3.1 read-only CI and Stage 4A production game data are complete. Stage 4B
+authoritative rounds are in review.
+Stage 4A supplies reproducible server-only assets and pure defaults. Stage 4B
+now loads and privately retains the verified dictionary before listening and
+uses the documented board generator for authoritative rounds. No socket action
+queries the dictionary, and no submission or score is connected to the room.
 
 ## Package boundary
 
 `packages/game-data` is the private `@words/game-data` workspace. It depends
 only on `@words/game-engine` at runtime and uses Node.js filesystem and crypto
 APIs for the production loader. It has no browser, React, Express, Socket.IO,
-room-store, persistence, or network runtime behavior.
+submission, scoring, persistence, or deployment behavior.
 
 The framework-independent engine remains unchanged. The client does not depend
 on or import game data. Offline verification scans every transitively
@@ -275,23 +277,23 @@ secret, log of word contents, or client bundle path.
 
 The complete list occupies under one megabyte on disk. Loading temporarily
 holds the file, parsed entries, and the engine Set; the loader retains only the
-Set-backed interface afterward. Stage 4B should call it once during controlled
-server startup rather than repeatedly per room or request.
+Set-backed interface afterward. Stage 4B calls it once during controlled server
+startup rather than repeatedly per room or request.
 
-## Stage 4B boundary
+## Stage 4B integration and Stage 4C boundary
 
-Stage 4B should:
+Stage 4B:
 
 1. load and retain the verified dictionary once during controlled server
    startup;
 2. provide an appropriate cryptographic server-owned `RandomSource`;
 3. generate and retain the authoritative board and deadline in room state;
-4. define strict shared Zod gameplay payloads;
+4. defines strict shared Zod settings and round-state payloads;
 5. authorize settings and round starts against the connected controller player;
-6. reject display submissions and validate player membership, path, word,
-   phase, deadline, rate limits, scoring, duplicates, and results on the server;
-7. add round-aware reconnect behavior and regression tests.
+6. keeps the display passive and exposes no submission action;
+7. adds round-aware reconnect behavior and regression tests.
 
-Stage 4A deliberately implements none of those live-room, Socket.IO, timer,
-submission, scoring, result, touch-tracing, QR, deployment, container,
-persistence, or moderation behaviors.
+Stage 4C may add server-authoritative current-participant word and path
+validation against the privately retained dictionary. Submission, scoring,
+results, touch tracing, QR, deployment, container, persistence, and moderation
+remain outside Stage 4B.

@@ -42,6 +42,22 @@ const thirdPlayer: PlayerState = {
   isController: false,
 };
 
+const otherRoomController: PlayerState = {
+  id: '00000000-0000-4000-8000-000000000010',
+  displayName: 'Violet Heron',
+  connected: true,
+  joinedAt: '2026-07-27T20:04:00.000Z',
+  isController: true,
+};
+
+function deferred<T>() {
+  let resolvePromise: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve;
+  });
+  return { promise, resolve: resolvePromise };
+}
+
 function createRoom(
   players: PlayerState[] = [],
   controllerStatus: RoomState['controllerStatus'] = players.length
@@ -51,6 +67,8 @@ function createRoom(
   return {
     code: 'ABC234',
     phase: 'LOBBY',
+    stateVersion: 1,
+    serverTime: '2026-07-27T20:02:00.000Z',
     createdAt: '2026-07-27T20:00:00.000Z',
     lastActivityAt: '2026-07-27T20:02:00.000Z',
     expiresAt: '2026-07-27T22:02:00.000Z',
@@ -69,6 +87,62 @@ function createRoom(
       gridSize: 4,
       roundDurationSeconds: 180,
       scoringMode: 'traditional',
+    },
+    round: null,
+  };
+}
+
+function createRoundRoom(
+  players: PlayerState[] = [controllerPlayer, ordinaryPlayer],
+  participants: PlayerState[] = players,
+): RoomState {
+  return {
+    ...createRoom(players),
+    phase: 'ROUND_ACTIVE',
+    stateVersion: 3,
+    serverTime: '2026-07-27T20:03:00.000Z',
+    settings: {
+      gridSize: 4,
+      roundDurationSeconds: 30,
+      scoringMode: 'traditional',
+    },
+    round: {
+      id: '00000000-0000-4000-8000-000000000200',
+      number: 1,
+      settings: {
+        gridSize: 4,
+        roundDurationSeconds: 30,
+        scoringMode: 'traditional',
+      },
+      board: {
+        size: 4,
+        tiles: [
+          'QU',
+          'A',
+          'B',
+          'C',
+          'D',
+          'E',
+          'F',
+          'G',
+          'H',
+          'I',
+          'J',
+          'K',
+          'L',
+          'M',
+          'N',
+          'O',
+        ],
+      },
+      participants: participants.map((player) => ({
+        playerId: player.id,
+        displayName: player.displayName,
+      })),
+      startedAt: '2026-07-27T20:03:00.000Z',
+      deadlineAt: '2026-07-27T20:03:30.000Z',
+      endedAt: null,
+      generationAttempts: 1,
     },
   };
 }
@@ -115,6 +189,18 @@ const awaitingAutomaticRoom = createRoom(
   'none',
 );
 
+const otherRoomSuccess: PlayerActionResponse = {
+  ok: true,
+  room: {
+    ...createRoom([otherRoomController]),
+    code: 'DEF567',
+  },
+  session: {
+    playerId: otherRoomController.id,
+    playerReconnectToken: 'z'.repeat(43),
+  },
+};
+
 function createFakeClient(overrides: Partial<LobbyClient> = {}): LobbyClient {
   return {
     getConnectionStatus: () => 'connected' as ConnectionStatus,
@@ -140,6 +226,14 @@ function createFakeClient(overrides: Partial<LobbyClient> = {}): LobbyClient {
       ok: true,
       room: transferredRoom,
     })),
+    updateSettings: vi.fn(async (): Promise<ControllerActionResponse> => ({
+      ok: true,
+      room: createRoom([controllerPlayer]),
+    })),
+    startRound: vi.fn(async (): Promise<ControllerActionResponse> => ({
+      ok: true,
+      room: createRoom([controllerPlayer]),
+    })),
     onRoomState: () => () => undefined,
     onRoomError: () => () => undefined,
     onConnectionStatus: () => () => undefined,
@@ -158,8 +252,10 @@ function createFakeSessionStore(
   };
 }
 
-function createStatefulSessionStore(): LobbySessionStore {
-  let storedSession: StoredLobbySession | null = null;
+function createStatefulSessionStore(
+  initialSession: StoredLobbySession | null = null,
+): LobbySessionStore {
+  let storedSession = initialSession;
 
   return {
     save: (session) => {
@@ -177,7 +273,7 @@ function createStatefulSessionStore(): LobbySessionStore {
   };
 }
 
-describe('Stage 2.5 display and player lobby routes', () => {
+describe('Stage 4B display and player room routes', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/');
   });
@@ -321,6 +417,9 @@ describe('Stage 2.5 display and player lobby routes', () => {
       screen.queryByRole('button', { name: 'Assign Game Host' }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start Round' })).toBeDisabled();
+    expect(screen.queryByText('Score zero')).not.toBeInTheDocument();
+    expect(screen.queryByText('Scoring mode')).not.toBeInTheDocument();
+    expect(screen.queryByText(/traditional scoring/i)).not.toBeInTheDocument();
   });
 
   it.each(['/display', '/host'])(
@@ -834,6 +933,58 @@ describe('Stage 2.5 display and player lobby routes', () => {
     expect(client.reconnectDisplay).not.toHaveBeenCalled();
   });
 
+  it('releases a stale reconnect before restoring the newer route session', async () => {
+    const firstReconnect = deferred<PlayerActionResponse>();
+    const firstStored: StoredLobbySession = {
+      role: 'player',
+      roomCode: 'ABC234',
+      playerId: controllerPlayer.id,
+      playerReconnectToken: 's'.repeat(43),
+      displayName: controllerPlayer.displayName,
+    };
+    const secondStored: StoredLobbySession = {
+      role: 'player',
+      roomCode: 'DEF567',
+      playerId: otherRoomController.id,
+      playerReconnectToken: 't'.repeat(43),
+      displayName: otherRoomController.displayName,
+    };
+    const sessionStore: LobbySessionStore = {
+      save: vi.fn(),
+      load: vi.fn((roomCode) =>
+        roomCode === firstStored.roomCode ? firstStored : secondStored,
+      ),
+      loadDisplay: vi.fn(() => null),
+      clear: vi.fn(),
+    };
+    const reconnectPlayer = vi
+      .fn<() => Promise<PlayerActionResponse>>()
+      .mockImplementationOnce(() => firstReconnect.promise)
+      .mockResolvedValueOnce(otherRoomSuccess);
+    const client = createFakeClient({ reconnectPlayer });
+    window.history.replaceState({}, '', '/room/ABC234');
+
+    render(<App client={client} sessionStore={sessionStore} />);
+    await waitFor(() => expect(reconnectPlayer).toHaveBeenCalledTimes(1));
+
+    act(() => {
+      window.history.pushState({}, '', '/room/DEF567');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    await waitFor(() =>
+      expect(sessionStore.load).toHaveBeenCalledWith('DEF567'),
+    );
+    await act(async () => {
+      firstReconnect.resolve(controllerWithPlayersSuccess);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(reconnectPlayer).toHaveBeenCalledTimes(2));
+    expect(client.leavePlayer).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('DEF567')).toBeInTheDocument();
+    expect(screen.getByText('Violet Heron (you)')).toBeInTheDocument();
+  });
+
   it('renders live player updates on the shared display', async () => {
     let reportRoomState: ((room: RoomState) => void) | undefined;
     const client = createFakeClient({
@@ -944,6 +1095,478 @@ describe('Stage 2.5 display and player lobby routes', () => {
       expect.objectContaining({ role: 'display' }),
     );
     expect(client.createDisplay).not.toHaveBeenCalled();
+  });
+
+  it('lets the connected controller save a complete authoritative settings object', async () => {
+    const updatedRoom = {
+      ...createRoom([controllerPlayer, ordinaryPlayer]),
+      stateVersion: 2,
+      settings: {
+        gridSize: 5 as const,
+        roundDurationSeconds: 180 as const,
+        scoringMode: 'traditional' as const,
+      },
+    };
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(
+        async (): Promise<PlayerActionResponse> => controllerWithPlayersSuccess,
+      ),
+      updateSettings: vi.fn(async (): Promise<ControllerActionResponse> => ({
+        ok: true,
+        room: updatedRoom,
+      })),
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'i'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+
+    const fiveByFive = await screen.findByRole('button', { name: '5 × 5' });
+    expect(fiveByFive).toBeEnabled();
+    await userEvent.click(fiveByFive);
+
+    expect(client.updateSettings).toHaveBeenCalledWith({
+      gridSize: 5,
+      roundDurationSeconds: 180,
+      scoringMode: 'traditional',
+    });
+    await waitFor(() =>
+      expect(fiveByFive).toHaveAttribute('aria-pressed', 'true'),
+    );
+  });
+
+  it('retains authoritative values after a failed settings acknowledgement', async () => {
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(
+        async (): Promise<PlayerActionResponse> => controllerWithPlayersSuccess,
+      ),
+      updateSettings: vi.fn(async (): Promise<ControllerActionResponse> => ({
+        ok: false,
+        error: {
+          code: 'ROUND_IN_PROGRESS',
+          message: 'A round is already in progress.',
+        },
+      })),
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'j'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: '5 × 5' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'A round is already in progress.',
+    );
+    expect(screen.getByRole('button', { name: '4 × 4' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('does not let a stale acknowledgement replace a newer broadcast', async () => {
+    let reportRoomState: ((room: RoomState) => void) | undefined;
+    let resolveUpdate:
+      ((response: ControllerActionResponse) => void) | undefined;
+    const staleRoom = {
+      ...createRoom([controllerPlayer, ordinaryPlayer]),
+      stateVersion: 2,
+      settings: {
+        gridSize: 5 as const,
+        roundDurationSeconds: 180 as const,
+        scoringMode: 'traditional' as const,
+      },
+    };
+    const newerRoom = {
+      ...createRoom([controllerPlayer, ordinaryPlayer]),
+      stateVersion: 3,
+      settings: {
+        gridSize: 6 as const,
+        roundDurationSeconds: 180 as const,
+        scoringMode: 'traditional' as const,
+      },
+    };
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(
+        async (): Promise<PlayerActionResponse> => controllerWithPlayersSuccess,
+      ),
+      updateSettings: vi.fn(
+        () =>
+          new Promise<ControllerActionResponse>((resolve) => {
+            resolveUpdate = resolve;
+          }),
+      ),
+      onRoomState: (listener) => {
+        reportRoomState = listener;
+        return () => undefined;
+      },
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'k'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: '5 × 5' }));
+    act(() => reportRoomState?.(newerRoom));
+    await act(async () => {
+      resolveUpdate?.({ ok: true, room: staleRoom });
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('button', { name: '6 × 6' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it.each([
+    {
+      label: 'controller transfer',
+      buttonName: 'Make Game Host',
+      method: 'transferController',
+      oldRoom: transferredRoom,
+    },
+    {
+      label: 'settings update',
+      buttonName: '5 × 5',
+      method: 'updateSettings',
+      oldRoom: {
+        ...createRoom([controllerPlayer, ordinaryPlayer]),
+        stateVersion: 2,
+        settings: {
+          gridSize: 5 as const,
+          roundDurationSeconds: 180 as const,
+          scoringMode: 'traditional' as const,
+        },
+      },
+    },
+    {
+      label: 'round start',
+      buttonName: 'Start Round',
+      method: 'startRound',
+      oldRoom: createRoundRoom(),
+    },
+  ] as const)(
+    'ignores a delayed $label acknowledgement after joining another room',
+    async ({ buttonName, method, oldRoom }) => {
+      const user = userEvent.setup();
+      const pendingAction = deferred<ControllerActionResponse>();
+      const action = vi.fn(() => pendingAction.promise);
+      const client = createFakeClient({
+        reconnectPlayer: vi.fn(
+          async (): Promise<PlayerActionResponse> =>
+            controllerWithPlayersSuccess,
+        ),
+        joinPlayer: vi.fn(
+          async (): Promise<PlayerActionResponse> => otherRoomSuccess,
+        ),
+        [method]: action,
+      } as Partial<LobbyClient>);
+
+      render(
+        <App
+          routePath="/room/ABC234"
+          client={client}
+          sessionStore={createStatefulSessionStore({
+            role: 'player',
+            roomCode: 'ABC234',
+            playerId: controllerPlayer.id,
+            playerReconnectToken: 'q'.repeat(43),
+            displayName: controllerPlayer.displayName,
+          })}
+        />,
+      );
+
+      await user.click(await screen.findByRole('button', { name: buttonName }));
+      await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+      await user.click(screen.getByRole('button', { name: 'Leave room' }));
+      await user.type(
+        await screen.findByRole('textbox', { name: 'Room code' }),
+        'DEF567',
+      );
+      await user.type(
+        screen.getByRole('textbox', { name: 'Display name' }),
+        otherRoomController.displayName,
+      );
+      await user.click(screen.getByRole('button', { name: 'Join Room' }));
+      expect(await screen.findByText('DEF567')).toBeInTheDocument();
+      expect(screen.getByText('Violet Heron (you)')).toBeInTheDocument();
+
+      await act(async () => {
+        pendingAction.resolve({ ok: true, room: oldRoom });
+        await Promise.resolve();
+      });
+
+      expect(screen.getByText('DEF567')).toBeInTheDocument();
+      expect(screen.getByText('Violet Heron (you)')).toBeInTheDocument();
+    },
+  );
+
+  it('rejects an equal-version snapshot with an older server timestamp', async () => {
+    let reportRoomState: ((room: RoomState) => void) | undefined;
+    const newerRoom: RoomState = {
+      ...createRoom([controllerPlayer, ordinaryPlayer]),
+      stateVersion: 2,
+      serverTime: '2026-07-27T20:02:05.000Z',
+      settings: {
+        gridSize: 6,
+        roundDurationSeconds: 180,
+        scoringMode: 'traditional',
+      },
+    };
+    const olderRoom: RoomState = {
+      ...newerRoom,
+      serverTime: '2026-07-27T20:02:04.000Z',
+      settings: {
+        ...newerRoom.settings,
+        gridSize: 5,
+      },
+    };
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(
+        async (): Promise<PlayerActionResponse> => controllerWithPlayersSuccess,
+      ),
+      onRoomState: (listener) => {
+        reportRoomState = listener;
+        return () => undefined;
+      },
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'r'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+    await screen.findByRole('button', { name: '4 × 4' });
+
+    act(() => reportRoomState?.(newerRoom));
+    act(() => reportRoomState?.(olderRoom));
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '6 × 6' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      ),
+    );
+  });
+
+  it('starts an authoritative round and renders the exact server board', async () => {
+    const activeRoom = createRoundRoom();
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(
+        async (): Promise<PlayerActionResponse> => controllerWithPlayersSuccess,
+      ),
+      startRound: vi.fn(async (): Promise<ControllerActionResponse> => ({
+        ok: true,
+        room: activeRoom,
+      })),
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'l'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Start Round' }),
+    );
+
+    expect(client.startRound).toHaveBeenCalledWith();
+    expect(await screen.findByText('Official board')).toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: 'QU' })).toBeInTheDocument();
+    expect(screen.getAllByText('30 seconds')).toHaveLength(2);
+    expect(screen.getByRole('timer')).toHaveAttribute('aria-live', 'off');
+    expect(screen.queryByRole('textbox', { name: /word/i })).toBeNull();
+  });
+
+  it('keeps the ended board visible and offers the controller the next round', async () => {
+    const activeRoom = createRoundRoom();
+    const endedRoom: RoomState = {
+      ...activeRoom,
+      phase: 'ROUND_ENDED',
+      stateVersion: 4,
+      serverTime: activeRoom.round?.deadlineAt ?? activeRoom.serverTime,
+      round: activeRoom.round
+        ? {
+            ...activeRoom.round,
+            endedAt: activeRoom.round.deadlineAt,
+          }
+        : null,
+    };
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+        ...controllerSuccess,
+        room: endedRoom,
+      })),
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'n'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+
+    expect(await screen.findByText('Official board')).toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: 'QU' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Start Next Round' }),
+    ).toBeEnabled();
+    expect(screen.getByText('Round complete')).toBeInTheDocument();
+    expect(screen.getByRole('timer')).toHaveAttribute('aria-live', 'polite');
+  });
+
+  it('disables controller actions while disconnected', async () => {
+    const client = createFakeClient({
+      getConnectionStatus: () => 'disconnected',
+      reconnectPlayer: vi.fn(
+        async (): Promise<PlayerActionResponse> => controllerWithPlayersSuccess,
+      ),
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'o'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+
+    expect(
+      await screen.findByRole('button', { name: 'Start Round' }),
+    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: '5 × 5' })).toBeDisabled();
+  });
+
+  it('prevents duplicate controller actions while one is pending', async () => {
+    let resolveStart:
+      ((response: ControllerActionResponse) => void) | undefined;
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(
+        async (): Promise<PlayerActionResponse> => controllerWithPlayersSuccess,
+      ),
+      startRound: vi.fn(
+        () =>
+          new Promise<ControllerActionResponse>((resolve) => {
+            resolveStart = resolve;
+          }),
+      ),
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'p'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+
+    const start = await screen.findByRole('button', { name: 'Start Round' });
+    await userEvent.click(start);
+    expect(screen.getByRole('button', { name: 'Working…' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Working…' }));
+    expect(client.startRound).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolveStart?.({ ok: true, room: createRoundRoom() });
+      await Promise.resolve();
+    });
+  });
+
+  it('shows a mid-round joiner as waiting for the next round', async () => {
+    const activeRoom = createRoundRoom(
+      [controllerPlayer, ordinaryPlayer],
+      [controllerPlayer],
+    );
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+        ...ordinarySuccess,
+        room: activeRoom,
+      })),
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: ordinaryPlayer.id,
+          playerReconnectToken: 'm'.repeat(43),
+          displayName: ordinaryPlayer.displayName,
+        })}
+      />,
+    );
+
+    expect(
+      await screen.findByText(/joined after this round began/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start Round' })).toBeDisabled();
   });
 
   it('renders a useful not-found page', () => {

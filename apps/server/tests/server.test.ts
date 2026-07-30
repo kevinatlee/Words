@@ -1,10 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import {
   io as createClient,
   type Socket as ClientSocket,
 } from 'socket.io-client';
 
+import {
+  PRODUCTION_DICTIONARY_IDENTITY,
+  type ProductionDictionaryLoadResult,
+} from '@words/game-data';
 import type {
   ClientToServerEvents,
   ControllerActionResponse,
@@ -16,16 +20,45 @@ import type {
   ReconnectDisplayInput,
   ReconnectPlayerInput,
   RoomError,
+  RoomSettings,
   RoomState,
   ServerToClientEvents,
   TransferControllerInput,
 } from '@words/shared';
 
-import { createWordsServer, type WordsServer } from '../src/server.js';
+import {
+  createWordsServer,
+  type WordsServer,
+  type WordsServerDependencies,
+} from '../src/server.js';
 
 type TestClient = ClientSocket<ServerToClientEvents, ClientToServerEvents>;
 
 const socketEventTimeoutMs = 2_000;
+
+const successfulDictionaryLoad: Extract<
+  ProductionDictionaryLoadResult,
+  { success: true }
+> = {
+  success: true,
+  dictionary: {} as never,
+  wordCount: 79_370,
+  manifest: PRODUCTION_DICTIONARY_IDENTITY as never,
+};
+
+const testDependencies = {
+  dictionaryLoader: async () => successfulDictionaryLoad,
+  boardGenerator: ({ size }: { size: 4 | 5 | 6 }) => ({
+    success: true as const,
+    board: {
+      size,
+      tiles: Array.from({ length: size * size }, (_, index) =>
+        String.fromCharCode(65 + (index % 26)),
+      ),
+    },
+    attempts: 1,
+  }),
+};
 
 function emitCreateDisplay(
   client: TestClient,
@@ -75,6 +108,24 @@ function emitTransferController(
 ): Promise<ControllerActionResponse> {
   return new Promise((resolve) =>
     client.emit('controller:transfer', payload, resolve),
+  );
+}
+
+function emitUpdateSettings(
+  client: TestClient,
+  payload: RoomSettings,
+): Promise<ControllerActionResponse> {
+  return new Promise((resolve) =>
+    client.emit('controller:update-settings', payload, resolve),
+  );
+}
+
+function emitStartRound(
+  client: TestClient,
+  payload: Record<string, never> = {},
+): Promise<ControllerActionResponse> {
+  return new Promise((resolve) =>
+    client.emit('controller:start-round', payload, resolve),
   );
 }
 
@@ -150,17 +201,20 @@ function nextRoomError(client: TestClient): Promise<RoomError> {
   });
 }
 
-describe('Words Stage 2.5 server', () => {
+describe('Words Stage 4B server', () => {
   let server: WordsServer;
   let port: number;
   let clients: TestClient[];
 
   beforeEach(async () => {
     clients = [];
-    server = createWordsServer({
-      port: 0,
-      cleanupIntervalMs: 60_000,
-    });
+    server = createWordsServer(
+      {
+        port: 0,
+        cleanupIntervalMs: 60_000,
+      },
+      testDependencies,
+    );
     port = await server.start(0);
   });
 
@@ -194,6 +248,7 @@ describe('Words Stage 2.5 server', () => {
       status: 'ok',
       service: 'Words',
       version: '0.2.5',
+      gameDataReady: true,
     });
     expect(response.headers).not.toHaveProperty('x-powered-by');
   });
@@ -647,19 +702,27 @@ describe('Words Stage 2.5 server', () => {
     expect(
       updatedRoom.players.find((player) => player.id === unrelatedPlayer.id),
     ).toMatchObject({ connected: true, isController: false });
-    expect(server.roomStore.getRoomState(created.room.code)).toEqual(
-      updatedRoom,
+    const storedRoom = server.roomStore.getRoomState(created.room.code);
+    expect(storedRoom).toEqual({
+      ...updatedRoom,
+      serverTime: expect.any(String),
+    });
+    expect(Date.parse(storedRoom?.serverTime ?? '')).toBeGreaterThanOrEqual(
+      Date.parse(updatedRoom.serverTime),
     );
     expect(server.roomStore.roomCount).toBe(1);
   });
 
   it('broadcasts controller succession once after disconnect grace expires', async () => {
     await server.stop();
-    server = createWordsServer({
-      port: 0,
-      reconnectGraceMs: 30,
-      cleanupIntervalMs: 10,
-    });
+    server = createWordsServer(
+      {
+        port: 0,
+        reconnectGraceMs: 30,
+        cleanupIntervalMs: 10,
+      },
+      testDependencies,
+    );
     port = await server.start(0);
 
     const display = await connectClient();
@@ -1005,11 +1068,14 @@ describe('Words Stage 2.5 server', () => {
 
   it('returns a structured rate-limit error after repeated attempts', async () => {
     await server.stop();
-    server = createWordsServer({
-      port: 0,
-      cleanupIntervalMs: 60_000,
-      rateLimitAttempts: 2,
-    });
+    server = createWordsServer(
+      {
+        port: 0,
+        cleanupIntervalMs: 60_000,
+        rateLimitAttempts: 2,
+      },
+      testDependencies,
+    );
     port = await server.start(0);
 
     const client = await connectClient();
@@ -1048,5 +1114,382 @@ describe('Words Stage 2.5 server', () => {
     if (response.ok) {
       expect(response.room.players[0]?.displayName).toBe('<Bright Fox>');
     }
+  });
+
+  it('broadcasts an authoritative settings update to the room', async () => {
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) {
+      throw new Error('Display creation failed in test setup.');
+    }
+    const controller = await connectClient();
+    const joined = await emitJoinPlayer(controller, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+    if (!joined.ok) {
+      throw new Error('Controller join failed in test setup.');
+    }
+    const settings = {
+      gridSize: 6 as const,
+      roundDurationSeconds: 60 as const,
+      scoringMode: 'traditional' as const,
+    };
+    const displayed = nextRoomState(
+      display,
+      (room) => room.settings.gridSize === 6,
+    );
+    const response = await emitUpdateSettings(controller, settings);
+
+    expect(response).toMatchObject({ ok: true, room: { settings } });
+    expect((await displayed).settings).toEqual(settings);
+  });
+
+  it('rejects settings updates from the display and an ordinary player', async () => {
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) {
+      throw new Error('Display creation failed in test setup.');
+    }
+    const controller = await connectClient();
+    await emitJoinPlayer(controller, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+    const ordinary = await connectClient();
+    await emitJoinPlayer(ordinary, {
+      roomCode: created.room.code,
+      displayName: 'Amber Kite',
+    });
+    const settings = {
+      gridSize: 5 as const,
+      roundDurationSeconds: 90 as const,
+      scoringMode: 'traditional' as const,
+    };
+
+    expect(await emitUpdateSettings(display, settings)).toMatchObject({
+      ok: false,
+      error: { code: 'NOT_CONTROLLER' },
+    });
+    expect(await emitUpdateSettings(ordinary, settings)).toMatchObject({
+      ok: false,
+      error: { code: 'NOT_CONTROLLER' },
+    });
+  });
+
+  it('rejects partial, extra, and client-authority settings payloads', async () => {
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) {
+      throw new Error('Display creation failed in test setup.');
+    }
+    const controller = await connectClient();
+    await emitJoinPlayer(controller, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+
+    for (const payload of [
+      { gridSize: 5 },
+      {
+        gridSize: 5,
+        roundDurationSeconds: 60,
+        scoringMode: 'traditional',
+        controllerPlayerId: created.session.displaySessionId,
+      },
+    ]) {
+      const response = await new Promise<ControllerActionResponse>((resolve) =>
+        controller.emit(
+          'controller:update-settings',
+          payload as never,
+          resolve,
+        ),
+      );
+      expect(response).toMatchObject({
+        ok: false,
+        error: { code: 'INVALID_PAYLOAD' },
+      });
+    }
+  });
+
+  it('starts one authoritative round and broadcasts the same board', async () => {
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) {
+      throw new Error('Display creation failed in test setup.');
+    }
+    const controller = await connectClient();
+    await emitJoinPlayer(controller, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+    const ordinary = await connectClient();
+    const ordinaryJoined = await emitJoinPlayer(ordinary, {
+      roomCode: created.room.code,
+      displayName: 'Amber Kite',
+    });
+    if (!ordinaryJoined.ok) {
+      throw new Error('Ordinary player join failed in test setup.');
+    }
+    const displayState = nextRoomState(
+      display,
+      (room) => room.phase === 'ROUND_ACTIVE',
+    );
+    const ordinaryState = nextRoomState(
+      ordinary,
+      (room) => room.phase === 'ROUND_ACTIVE',
+    );
+
+    const response = await emitStartRound(controller);
+    expect(response.ok).toBe(true);
+    if (!response.ok) {
+      return;
+    }
+    const [onDisplay, onOrdinary] = await Promise.all([
+      displayState,
+      ordinaryState,
+    ]);
+    expect(onDisplay.round).toEqual(response.room.round);
+    expect(onOrdinary.round).toEqual(response.room.round);
+    expect(response.room.round?.participants).toHaveLength(2);
+    expect(response.room.round?.board.tiles).toHaveLength(16);
+  });
+
+  it('rejects round starts from non-controllers and unexpected payloads', async () => {
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) {
+      throw new Error('Display creation failed in test setup.');
+    }
+    const controller = await connectClient();
+    await emitJoinPlayer(controller, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+    const ordinary = await connectClient();
+    await emitJoinPlayer(ordinary, {
+      roomCode: created.room.code,
+      displayName: 'Amber Kite',
+    });
+
+    expect(await emitStartRound(display)).toMatchObject({
+      ok: false,
+      error: { code: 'NOT_CONTROLLER' },
+    });
+    expect(await emitStartRound(ordinary)).toMatchObject({
+      ok: false,
+      error: { code: 'NOT_CONTROLLER' },
+    });
+    const malformed = await new Promise<ControllerActionResponse>((resolve) =>
+      controller.emit(
+        'controller:start-round',
+        { duration: 30 } as never,
+        resolve,
+      ),
+    );
+    expect(malformed).toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_PAYLOAD' },
+    });
+  });
+
+  it('rejects active-round settings changes and duplicate starts', async () => {
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) {
+      throw new Error('Display creation failed in test setup.');
+    }
+    const controller = await connectClient();
+    await emitJoinPlayer(controller, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+    expect((await emitStartRound(controller)).ok).toBe(true);
+
+    expect(await emitStartRound(controller)).toMatchObject({
+      ok: false,
+      error: { code: 'ROUND_IN_PROGRESS' },
+    });
+    expect(
+      await emitUpdateSettings(controller, {
+        gridSize: 5,
+        roundDurationSeconds: 60,
+        scoringMode: 'traditional',
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: { code: 'ROUND_IN_PROGRESS' },
+    });
+  });
+
+  it('broadcasts automatic round ending once and clears its single scheduler', async () => {
+    await server.stop();
+    let now = Date.parse('2026-07-29T20:00:00.000Z');
+    let lifecycleSweep: (() => void) | undefined;
+    const fakeTimer = {
+      unref: vi.fn(),
+    } as unknown as ReturnType<typeof setInterval>;
+    const clearLifecycleTimer = vi.fn();
+    const lifecycleDependencies: WordsServerDependencies = {
+      ...testDependencies,
+      now: () => now,
+      setInterval: (callback) => {
+        lifecycleSweep = callback;
+        return fakeTimer;
+      },
+      clearInterval: clearLifecycleTimer,
+    };
+    server = createWordsServer(
+      {
+        port: 0,
+        cleanupIntervalMs: 60_000,
+      },
+      lifecycleDependencies,
+    );
+    port = await server.start(0);
+
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) {
+      throw new Error('Display creation failed in test setup.');
+    }
+    const controller = await connectClient();
+    await emitJoinPlayer(controller, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+    await emitUpdateSettings(controller, {
+      gridSize: 4,
+      roundDurationSeconds: 30,
+      scoringMode: 'traditional',
+    });
+    const started = await emitStartRound(controller);
+    if (!started.ok || !started.room.round) {
+      throw new Error('Round start failed in test setup.');
+    }
+    const endedState = nextRoomState(
+      display,
+      (room) => room.phase === 'ROUND_ENDED',
+    );
+    now += 30_000;
+    lifecycleSweep?.();
+
+    const ended = await endedState;
+    expect(ended.round?.endedAt).toBe(started.room.round.deadlineAt);
+    expect(server.roomStore.advanceDueRounds()).toEqual([]);
+    lifecycleSweep?.();
+    await server.stop();
+    expect(clearLifecycleTimer).toHaveBeenCalledTimes(1);
+    expect(clearLifecycleTimer).toHaveBeenCalledWith(fakeTimer);
+  });
+
+  it('broadcasts a deadline transition even when the triggering action is rejected', async () => {
+    await server.stop();
+    let now = Date.parse('2026-07-29T20:00:00.000Z');
+    let lifecycleSweep: (() => void) | undefined;
+    server = createWordsServer(
+      {
+        port: 0,
+        cleanupIntervalMs: 60_000,
+      },
+      {
+        ...testDependencies,
+        now: () => now,
+        setInterval: (callback) => {
+          lifecycleSweep = callback;
+          return { unref: vi.fn() } as unknown as ReturnType<
+            typeof setInterval
+          >;
+        },
+        clearInterval: vi.fn(),
+      },
+    );
+    port = await server.start(0);
+
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) {
+      throw new Error('Display creation failed in test setup.');
+    }
+    const controller = await connectClient();
+    await emitJoinPlayer(controller, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+    const ordinary = await connectClient();
+    await emitJoinPlayer(ordinary, {
+      roomCode: created.room.code,
+      displayName: 'Amber Kite',
+    });
+    const started = await emitStartRound(controller);
+    if (!started.ok || !started.room.round) {
+      throw new Error('Round start failed in test setup.');
+    }
+
+    const endedBroadcasts: RoomState[] = [];
+    display.on('room:state', (room) => {
+      if (room.phase === 'ROUND_ENDED') {
+        endedBroadcasts.push(room);
+      }
+    });
+    const endedState = nextRoomState(
+      display,
+      (room) => room.phase === 'ROUND_ENDED',
+    );
+    now = Date.parse(started.room.round.deadlineAt);
+
+    expect(await emitStartRound(ordinary)).toMatchObject({
+      ok: false,
+      error: { code: 'NOT_CONTROLLER' },
+    });
+    const ended = await endedState;
+    expect(ended.round?.endedAt).toBe(started.room.round.deadlineAt);
+    expect(endedBroadcasts).toHaveLength(1);
+
+    lifecycleSweep?.();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(endedBroadcasts).toHaveLength(1);
+  });
+
+  it('returns a bounded board-generation error without a partial start', async () => {
+    await server.stop();
+    server = createWordsServer(
+      {
+        port: 0,
+        cleanupIntervalMs: 60_000,
+      },
+      {
+        ...testDependencies,
+        boardGenerator: () => ({
+          success: false,
+          code: 'NO_ACCEPTABLE_BOARD',
+          attempts: 8,
+        }),
+      },
+    );
+    port = await server.start(0);
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) {
+      throw new Error('Display creation failed in test setup.');
+    }
+    const controller = await connectClient();
+    await emitJoinPlayer(controller, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+
+    expect(await emitStartRound(controller)).toEqual({
+      ok: false,
+      error: {
+        code: 'BOARD_GENERATION_FAILED',
+        message:
+          'A playable board could not be generated. Try starting the round again.',
+      },
+    });
+    expect(server.roomStore.getRoomState(created.room.code)).toMatchObject({
+      phase: 'LOBBY',
+      round: null,
+    });
   });
 });

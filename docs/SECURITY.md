@@ -1,11 +1,11 @@
 # Security requirements
 
-Stage 2.5 has a real network boundary and controller-authority actions. Stage 3
-adds an isolated, defensive game engine without exposing it to the network.
-Stage 3.1 adds read-only hosted verification. Stage 4A adds verified,
-server-only production data without exposing gameplay. This document separates
-implemented controls from protections still required before public deployment
-and gameplay.
+Stage 2.5 established the network and controller boundary. Stage 3 adds an
+isolated defensive engine, Stage 3.1 adds read-only hosted verification, and
+Stage 4A adds verified server-only production data. Stage 4B authoritative
+settings and round lifecycle are in review. This document separates implemented
+controls from protections still required before public deployment and word
+submission.
 
 ## Implemented authority controls
 
@@ -36,9 +36,10 @@ and gameplay.
 - Public room state excludes socket IDs, token values, and private token
   indexes.
 
-Future game state—board, deadline, settings, paths, word decisions, scores, and
-results—must follow the same server-authority rule. In particular, a
-display-bound socket must never submit a player word.
+Stage 4B makes settings, board, participant snapshot, phase, round number, and
+deadline server-owned. Paths, word decisions, scores, and results remain future
+server-authority work. Stage 4B exposes no submission action, and a
+display-bound socket must never gain one.
 
 ## Implemented input and output controls
 
@@ -54,6 +55,11 @@ display-bound socket must never submit a player word.
   content rather than executable HTML.
 - Error responses use a fixed set of public codes and bounded messages.
 - Express disables its identifying `X-Powered-By` response header.
+- Settings and start payloads are strict complete/empty objects. Clients cannot
+  provide a board, seed, participant, timestamp, deadline, or round number.
+- Successful action acknowledgements are schema-validated by the client, and a
+  state version prevents a stale acknowledgement from replacing a newer
+  broadcast.
 
 Validation is not treated as authorization. The room store still decides
 whether a validated action is allowed for the socket and current role.
@@ -78,6 +84,10 @@ whether a validated action is allowed for the socket and current role.
   eight-player cap and room lifetime.
 - Environment-provided numeric limits are range-checked and fall back to safe
   defaults when invalid.
+- Board generation uses one cryptographic 48-bit sample per random value and
+  the Stage 4A eight-attempt quality bound.
+- One unreferenced 250 ms lifecycle interval scans bounded rooms. There is no
+  unmanaged timer per room or client.
 
 These controls reduce accidental exhaustion and simple abuse. They are not a
 complete public anti-abuse system.
@@ -106,8 +116,8 @@ role during a refresh race. Stale-tab cleanup compares the failed token before
 removing shared browser storage, so it cannot delete the replacement tab’s
 newly rotated credential.
 
-Browser storage is appropriate for this temporary, account-free Stage 2.5
-session, but it is accessible to JavaScript on the same origin. A future
+Browser storage is appropriate for the current temporary, account-free
+sessions, but it is accessible to JavaScript on the same origin. A future
 cross-site scripting flaw could expose it, so dependencies, text rendering, and
 future HTML features still require review.
 
@@ -173,7 +183,29 @@ WebSocket forwarding, and narrow the production origin policy to actual
 deployment needs. Reconnect tokens are application credentials and must never
 be sent over unencrypted public HTTP.
 
-## Known Stage 2.5 limits
+## Stage 4B round authority
+
+- Controlled startup loads the verified 79,370-word dictionary exactly once
+  before listening or allowing room creation.
+- The dictionary and provenance remain private server runtime state. Room
+  snapshots, health output, logs, and client bundles contain no entries.
+- Only the bound connected controller socket may update settings or start.
+- Board generation and result validation finish before room mutation.
+  Exhaustion leaves phase, prior round, settings, activity, and TTL unchanged.
+- Round reconciliation is idempotent and records the official deadline as
+  `endedAt`; it does not extend TTL.
+- Disconnect, reconnect, leave, grace expiry, mid-round join, and controller
+  transfer do not move the deadline or rewrite the participant snapshot.
+- Returned boards and participants are copies, so caller mutation cannot alter
+  internal room state.
+- The client countdown uses the server snapshot plus `performance.now()` only
+  for display. It cannot change the authoritative phase.
+
+There is no production `Math.random()`, client seed, audit PRNG, per-room timer,
+manual end action, dictionary socket lookup, submission, scoring, or result
+payload in Stage 4B.
+
+## Known current limits
 
 - Throttling is per socket, not per IP, subnet, device, or room code.
 - A client can reconnect to obtain a new socket and a fresh request window.

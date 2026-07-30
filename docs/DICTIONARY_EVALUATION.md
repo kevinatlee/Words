@@ -260,5 +260,5 @@ Stage 4A completed the earlier review checklist:
 6. kept moderation separate rather than inventing a family-mode blacklist;
 7. added a verified loader without calling it from the lobby.
 
-Stage 4B should call that loader once during controlled authoritative-server
-startup and retain the returned dictionary interface.
+Stage 4B calls that loader once during controlled authoritative-server startup
+and privately retains the returned dictionary interface for Stage 4C.
