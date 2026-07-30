@@ -1443,6 +1443,64 @@ describe('Stage 4B display and player room routes', () => {
     );
   });
 
+  it('rejects conflicting results at the same state version', async () => {
+    let reportRoomState: ((room: RoomState) => void) | undefined;
+    const endedRoom = createEndedRoom();
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+        ...controllerSuccess,
+        room: endedRoom,
+      })),
+      onRoomState: (listener) => {
+        reportRoomState = listener;
+        return () => undefined;
+      },
+    });
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'r'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+    expect(
+      await screen.findByRole('heading', { name: 'Silver Owl wins' }),
+    ).toBeVisible();
+
+    act(() =>
+      reportRoomState?.({
+        ...endedRoom,
+        serverTime: '2026-07-27T20:04:00.000Z',
+        round: endedRoom.round
+          ? {
+              ...endedRoom.round,
+              results: endedRoom.round.results
+                ? {
+                    ...endedRoom.round.results,
+                    winnerPlayerIds: [],
+                  }
+                : null,
+            }
+          : null,
+      }),
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Silver Owl wins' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('heading', {
+        name: 'No scoring winner this round',
+      }),
+    ).toBeNull();
+  });
+
   it('does not let an old active snapshot replace finalized results', async () => {
     let reportRoomState: ((room: RoomState) => void) | undefined;
     const activeRoom = createRoundRoom();

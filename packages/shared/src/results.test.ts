@@ -132,14 +132,17 @@ describe('public round result contracts', () => {
       ['SEASONS', 5, 1.25, 6.25],
       ['ELEPHANTS', 11, 2.75, 13.75],
     ] as const) {
+      const uniqueWord = {
+        word,
+        basePoints,
+        shared: false,
+        uniqueBonusPoints,
+        finalPoints,
+      };
+      expect(roundResultWordSchema.safeParse(uniqueWord).success).toBe(true);
       expect(
-        roundResultWordSchema.safeParse({
-          word,
-          basePoints,
-          shared: false,
-          uniqueBonusPoints,
-          finalPoints,
-        }).success,
+        roundResultWordSchema.safeParse(JSON.parse(JSON.stringify(uniqueWord)))
+          .success,
       ).toBe(true);
       expect(
         roundResultWordSchema.safeParse({
@@ -175,6 +178,31 @@ describe('public round result contracts', () => {
     }
   });
 
+  it('rejects negative zero in every public result score position', () => {
+    const negativeZero = JSON.parse('-0') as number;
+    expect(Object.is(negativeZero, -0)).toBe(true);
+    expect(
+      roundResultWordSchema.safeParse({
+        ...sharedTool,
+        uniqueBonusPoints: negativeZero,
+      }).success,
+    ).toBe(false);
+
+    const empty = playerResult(playerA, 'Bright Fox', []);
+    for (const field of [
+      'baseScore',
+      'uniqueBonusScore',
+      'finalScore',
+    ] as const) {
+      expect(
+        roundPlayerResultSchema.safeParse({
+          ...empty,
+          [field]: negativeZero,
+        }).success,
+      ).toBe(false);
+    }
+  });
+
   it('accepts 256 result words and rejects 257', () => {
     const maximumWords = Array.from({ length: 256 }, (_, index) => ({
       word: `${String.fromCharCode(65 + Math.floor(index / 26))}${String.fromCharCode(65 + (index % 26))}A`,
@@ -190,6 +218,21 @@ describe('public round result contracts', () => {
         uniqueBonusScore: 64,
         finalScore: 320,
         words: maximumWords,
+      }).success,
+    ).toBe(true);
+    expect(
+      roundPlayerResultSchema.safeParse({
+        ...playerResult(),
+        baseScore: 2_816,
+        uniqueBonusScore: 704,
+        finalScore: 3_520,
+        words: maximumWords.map((word) => ({
+          ...word,
+          word: `${word.word}AAAAA`,
+          basePoints: 11,
+          uniqueBonusPoints: 2.75,
+          finalPoints: 13.75,
+        })),
       }).success,
     ).toBe(true);
     expect(

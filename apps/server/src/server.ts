@@ -939,9 +939,14 @@ export function createWordsServer(
     }
 
     for (const roomCode of updatedRoomCodes) {
-      const room = roomStore.getRoomState(roomCode);
-      if (room) {
-        io.to(roomCode).emit('room:state', room);
+      try {
+        const room = roomStore.getRoomState(roomCode);
+        if (room) {
+          io.to(roomCode).emit('room:state', room);
+        }
+      } catch {
+        // One impossible room state must not suppress cleanup or deadline
+        // broadcasts already committed for other rooms in this sweep.
       }
     }
   };

@@ -141,6 +141,9 @@ base points for all accepted words, adds an exact 25% bonus to unique words,
 and returns detached immutable participant results. Display names, rankings,
 winners, rooms, clocks, and publication stay server-owned.
 
+Malformed or hostile in-process inputs, including throwing property access,
+return a bounded `INVALID_INPUT` result without exposing caller text.
+
 ## Commands
 
 From the repository root:

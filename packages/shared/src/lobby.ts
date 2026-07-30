@@ -165,14 +165,18 @@ export const traditionalPointsSchema = z.union([
   z.literal(11),
 ]);
 
-export const uniqueBonusPointsSchema = z.union([
-  z.literal(0),
-  z.literal(0.25),
-  z.literal(0.5),
-  z.literal(0.75),
-  z.literal(1.25),
-  z.literal(2.75),
-]);
+export const uniqueBonusPointsSchema = z
+  .union([
+    z.literal(0),
+    z.literal(0.25),
+    z.literal(0.5),
+    z.literal(0.75),
+    z.literal(1.25),
+    z.literal(2.75),
+  ])
+  .refine((points) => !Object.is(points, -0), {
+    message: 'A uniqueness bonus cannot be negative zero.',
+  });
 
 export const finalWordPointsSchema = z.union([
   z.literal(1),
@@ -193,7 +197,15 @@ const maximumUniqueBonusScore =
   productConfig.maximumAcceptedWordsPerPlayerPerRound * 2.75;
 const maximumFinalScore = maximumBaseScore + maximumUniqueBonusScore;
 const quarterPointScoreSchema = (maximum: number) =>
-  z.number().finite().nonnegative().multipleOf(0.25).max(maximum);
+  z
+    .number()
+    .finite()
+    .nonnegative()
+    .multipleOf(0.25)
+    .max(maximum)
+    .refine((score) => !Object.is(score, -0), {
+      message: 'A score cannot be negative zero.',
+    });
 
 export const roundResultWordSchema = z
   .object({

@@ -151,6 +151,9 @@ tolerance comparison is needed. The engine does not receive display names,
 accepted timestamps, paths, room state, clocks, Socket.IO, Zod, controller
 authority, or winner presentation policy.
 
+Malformed arrays, sparse entries, throwing getters, and hostile proxies return
+bounded error objects without caller-provided messages or accepted word text.
+
 These package limits complement, but do not replace, Stage 4B network payload
 size limits, controller authorization, phase checks, and deadline enforcement.
 

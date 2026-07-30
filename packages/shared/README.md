@@ -16,7 +16,8 @@ shared-word status, exact quarter-point totals, and every tied positive winner.
 Every public word retains traditional `basePoints`; a unique word carries a
 25% `uniqueBonusPoints` value, while a shared word has zero bonus and keeps its
 base as `finalPoints`. Player entries expose exact base, bonus, and final
-totals.
+totals. Runtime parsing rejects non-quarter values, non-finite values, negative
+values, and negative zero.
 
 The only Stage 4B controller actions are:
 

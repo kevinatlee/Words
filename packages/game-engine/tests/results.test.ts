@@ -27,6 +27,100 @@ describe('round word reconciliation', () => {
     });
   });
 
+  it('returns bounded errors for primitive, sparse, and malformed inputs', () => {
+    for (const input of [null, 1, 'players', {}, true]) {
+      expect(
+        reconcileRoundWords(
+          input as unknown as readonly ReconciliationParticipant[],
+        ),
+      ).toEqual({
+        success: false,
+        code: 'NO_PARTICIPANTS',
+      });
+    }
+
+    expect(
+      reconcileRoundWords(
+        Array(1) as unknown as readonly ReconciliationParticipant[],
+      ),
+    ).toEqual({
+      success: false,
+      code: 'INVALID_PLAYER_ID',
+      participantIndex: 0,
+    });
+    expect(
+      reconcileRoundWords([
+        participant(
+          'player-a',
+          Array(1) as ReconciliationParticipant['acceptedWords'],
+        ),
+      ]),
+    ).toEqual({
+      success: false,
+      code: 'INVALID_WORD',
+      participantIndex: 0,
+      wordIndex: 0,
+    });
+  });
+
+  it('contains throwing getters and proxies without exposing their messages', () => {
+    const secretMessage = 'private accepted word: TOOL';
+    const throwingParticipant = Object.defineProperty({}, 'playerId', {
+      get: () => {
+        throw new Error(secretMessage);
+      },
+    });
+    const throwingWords = {
+      playerId: 'player-a',
+      get acceptedWords() {
+        throw new Error(secretMessage);
+      },
+    };
+    const throwingArray = new Proxy([], {
+      get: () => {
+        throw new Error(secretMessage);
+      },
+    });
+
+    for (const input of [
+      [throwingParticipant],
+      [throwingWords],
+      throwingArray,
+    ]) {
+      const result = reconcileRoundWords(
+        input as unknown as readonly ReconciliationParticipant[],
+      );
+      expect(result).toEqual({
+        success: false,
+        code: 'INVALID_INPUT',
+      });
+      expect(JSON.stringify(result)).not.toContain(secretMessage);
+    }
+  });
+
+  it('accepts deeply frozen valid input', () => {
+    const input = Object.freeze([
+      Object.freeze({
+        playerId: 'player-a',
+        acceptedWords: Object.freeze([
+          Object.freeze({ word: 'TOOL', points: 1 as const }),
+        ]),
+      }),
+    ]);
+
+    expect(reconcileRoundWords(input)).toMatchObject({
+      success: true,
+      participants: [
+        {
+          playerId: 'player-a',
+          baseScore: 1,
+          uniqueBonusScore: 0.25,
+          finalScore: 1.25,
+        },
+      ],
+    });
+  });
+
   it('preserves a participant with no words and no score', () => {
     expect(reconcileRoundWords([participant('player-a')])).toEqual({
       success: true,
@@ -251,6 +345,30 @@ describe('round word reconciliation', () => {
       baseScore: 256,
       uniqueBonusScore: 0,
       finalScore: 256,
+    });
+  });
+
+  it('adds the maximum repeated 2.75-point bonus exactly', () => {
+    const acceptedWords = Array.from(
+      { length: MAX_RECONCILIATION_WORDS_PER_PARTICIPANT },
+      (_, index) => ({
+        word: `${String.fromCharCode(65 + Math.floor(index / 26))}${String.fromCharCode(65 + (index % 26))}AAAAAA`,
+        points: 11 as const,
+      }),
+    );
+    const result = reconcileRoundWords([
+      participant('player-a', acceptedWords),
+    ]);
+
+    expect(result).toMatchObject({
+      success: true,
+      participants: [
+        {
+          baseScore: 2_816,
+          uniqueBonusScore: 704,
+          finalScore: 3_520,
+        },
+      ],
     });
   });
 

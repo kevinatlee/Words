@@ -46,13 +46,17 @@ The exact word outcomes are:
 
 Quarter-point values are exact binary fractions. Result calculation and schema
 validation use exact equality and never round word values or player totals to
-whole numbers.
+whole numbers. The strict runtime schemas also reject negative zero rather than
+silently accepting a differently encoded zero.
 
 The engine validates participant uniqueness, canonical words, stored
 traditional point values, and the existing eight-participant and 256-word
 bounds. It preserves participant and accepted-word input order and returns a
 detached immutable result. It has no room, display-name, Socket.IO, clock,
 dictionary, React, or persistence dependency.
+
+Malformed arrays, sparse entries, throwing getters, and hostile proxies produce
+a bounded engine error with no accepted word text or thrown caller message.
 
 ## Public result contract
 
@@ -153,8 +157,16 @@ Finalization:
 - is a no-op after success
 
 An impossible internal invariant produces a bounded internal failure on action
-paths and remains retryable without partial mutation. Scheduler failures are
-contained. Accepted words and private maps are never logged.
+paths and remains retryable without partial mutation. Such an invariant is
+normally deterministic, so a retry is useful only if an injected dependency or
+later process repair makes the state valid. The 250-ms scheduler retry remains
+bounded by eight participants and 256 words each, and the ordinary room TTL
+still removes the room; no partial failure state or special deletion rule is
+added. The affected room cannot advance while invalid, but per-room containment
+keeps deadline and cleanup broadcasts flowing for other rooms. Accepted words
+and private maps are never logged. A future operational diagnostic may safely
+identify only the room code and bounded error category, never submitted words,
+paths, credentials, or private state.
 
 Room expiration retains its earlier precedence: a room deleted at its TTL does
 not publish obsolete results.
@@ -170,6 +182,11 @@ The display and phones use the authoritative result order. They show:
 - explicit shared/unique text, base points, uniqueness bonus, and clear final
   points
 - a textual “You” marker only on the matching player phone
+
+The client rejects lower state versions, older timestamps at the same version,
+and same-version changes to the finalized result projection. This prevents a
+conflicting rank or winner snapshot from replacing an accepted result while
+preserving established same-version lobby refresh behavior.
 
 The old official board can remain visible. Only the connected controller sees
 `Start Next Round`. Settings may change for the next round without changing the

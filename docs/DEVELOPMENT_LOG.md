@@ -28,6 +28,13 @@
   reviews, a quiet live announcement, and controller-only next-round behavior.
 - Expanded engine, schema, room-store, Socket.IO, client race, privacy,
   lifecycle failure, and 2,048-word boundary coverage.
+- Final focused review made hostile engine property access return a bounded
+  error, rejected negative zero from every public score position, and isolated
+  each cleanup broadcast so one impossible room cannot suppress another room's
+  committed update.
+- Hardened client snapshot ordering so a same-version message cannot replace
+  final results; added coverage that unrelated updates retain one unchanged live
+  announcement.
 - Kept cumulative scoring, previous-round history, custom shared-word rules,
   continuous tracing, QR rendering, persistence, packaging, deployment, and
   all Stage 5 work out of scope.
@@ -43,12 +50,12 @@
   size, zero generation failures, and deterministic report SHA-256
   `2b55a682eab2207020ae639e7b5b6b771758822f3a20f6fe91187fd4f0eda789`.
 - `npm run format:check`, `npm run lint`, and `npm run typecheck` — passed.
-- `npm test` — passed; 545 tests across 29 files:
-  - client: 71 tests across 5 files
-  - server: 188 tests across 6 files
+- `npm test` — passed; 553 tests across 29 files:
+  - client: 73 tests across 5 files
+  - server: 189 tests across 6 files
   - game data: 49 tests across 6 files
-  - game engine: 167 tests across 7 files
-  - shared: 70 tests across 5 files
+  - game engine: 171 tests across 7 files
+  - shared: 71 tests across 5 files
 - `npm run build` — passed; Vite transformed 160 modules and every package
   build completed.
 - `npm run data:verify -- --client-build` — passed; production game data was

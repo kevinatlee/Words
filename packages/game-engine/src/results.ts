@@ -35,6 +35,7 @@ export type ReconciledParticipant = {
 };
 
 export type RoundReconciliationErrorCode =
+  | 'INVALID_INPUT'
   | 'NO_PARTICIPANTS'
   | 'TOO_MANY_PARTICIPANTS'
   | 'INVALID_PLAYER_ID'
@@ -107,71 +108,80 @@ function finalPointsFor(
   }
 }
 
-export function reconcileRoundWords(
+function reconcileRoundWordsChecked(
   participants: readonly ReconciliationParticipant[],
 ): RoundReconciliationResult {
-  if (!Array.isArray(participants) || participants.length === 0) {
+  if (!Array.isArray(participants)) {
     return failure('NO_PARTICIPANTS');
   }
-  if (participants.length > MAX_RECONCILIATION_PARTICIPANTS) {
+  const participantCount = participants.length;
+  if (!Number.isInteger(participantCount) || participantCount === 0) {
+    return failure('NO_PARTICIPANTS');
+  }
+  if (participantCount > MAX_RECONCILIATION_PARTICIPANTS) {
     return failure('TOO_MANY_PARTICIPANTS');
   }
 
   const participantIds = new Set<string>();
   const wordPlayerCounts = new Map<string, number>();
+  const validatedParticipants: ReconciliationParticipant[] = [];
 
   for (
     let participantIndex = 0;
-    participantIndex < participants.length;
+    participantIndex < participantCount;
     participantIndex += 1
   ) {
     const participant = participants[participantIndex];
-    if (
-      !participant ||
-      typeof participant.playerId !== 'string' ||
-      participant.playerId.length === 0
-    ) {
+    const playerId = participant?.playerId;
+    if (!participant || typeof playerId !== 'string' || playerId.length === 0) {
       return failure('INVALID_PLAYER_ID', participantIndex);
     }
-    if (participantIds.has(participant.playerId)) {
+    if (participantIds.has(playerId)) {
       return failure('DUPLICATE_PLAYER_ID', participantIndex);
     }
-    participantIds.add(participant.playerId);
+    participantIds.add(playerId);
 
+    const acceptedWords = participant.acceptedWords;
+    if (!Array.isArray(acceptedWords)) {
+      return failure('TOO_MANY_WORDS', participantIndex);
+    }
+    const wordCount = acceptedWords.length;
     if (
-      !Array.isArray(participant.acceptedWords) ||
-      participant.acceptedWords.length >
-        MAX_RECONCILIATION_WORDS_PER_PARTICIPANT
+      !Number.isInteger(wordCount) ||
+      wordCount > MAX_RECONCILIATION_WORDS_PER_PARTICIPANT
     ) {
       return failure('TOO_MANY_WORDS', participantIndex);
     }
 
     const participantWords = new Set<string>();
-    for (
-      let wordIndex = 0;
-      wordIndex < participant.acceptedWords.length;
-      wordIndex += 1
-    ) {
-      const acceptedWord = participant.acceptedWords[wordIndex];
-      const scored = scoreTraditionalWord(acceptedWord?.word);
-      if (!acceptedWord || !scored.valid || scored.word !== acceptedWord.word) {
+    const validatedWords: ReconciliationAcceptedWord[] = [];
+    for (let wordIndex = 0; wordIndex < wordCount; wordIndex += 1) {
+      const acceptedWord = acceptedWords[wordIndex];
+      const word = acceptedWord?.word;
+      const points = acceptedWord?.points;
+      const scored = scoreTraditionalWord(word);
+      if (!acceptedWord || !scored.valid || scored.word !== word) {
         return failure('INVALID_WORD', participantIndex, wordIndex);
       }
-      if (participantWords.has(acceptedWord.word)) {
+      if (participantWords.has(word)) {
         return failure('DUPLICATE_WORD', participantIndex, wordIndex);
       }
-      if (acceptedWord.points !== scored.points) {
+      if (points !== scored.points) {
         return failure('INCORRECT_BASE_POINTS', participantIndex, wordIndex);
       }
-      participantWords.add(acceptedWord.word);
-      wordPlayerCounts.set(
-        acceptedWord.word,
-        (wordPlayerCounts.get(acceptedWord.word) ?? 0) + 1,
-      );
+      participantWords.add(word);
+      wordPlayerCounts.set(word, (wordPlayerCounts.get(word) ?? 0) + 1);
+      validatedWords.push(Object.freeze({ word, points }));
     }
+    validatedParticipants.push(
+      Object.freeze({
+        playerId,
+        acceptedWords: Object.freeze(validatedWords),
+      }),
+    );
   }
 
-  const reconciledParticipants = participants.map((participant) => {
+  const reconciledParticipants = validatedParticipants.map((participant) => {
     let baseScore = 0;
     let uniqueBonusScore = 0;
     let finalScore = 0;
@@ -208,4 +218,14 @@ export function reconcileRoundWords(
     success: true,
     participants: Object.freeze(reconciledParticipants),
   });
+}
+
+export function reconcileRoundWords(
+  participants: readonly ReconciliationParticipant[],
+): RoundReconciliationResult {
+  try {
+    return reconcileRoundWordsChecked(participants);
+  } catch {
+    return failure('INVALID_INPUT');
+  }
 }

@@ -1396,6 +1396,114 @@ describe('Words Stage 4B server', () => {
     expect(clearLifecycleTimer).toHaveBeenCalledWith(fakeTimer);
   });
 
+  it('does not let one corrupt cleanup room suppress another room update', async () => {
+    await server.stop();
+    let now = Date.parse('2026-07-30T20:00:00.000Z');
+    let lifecycleSweep: (() => void) | undefined;
+    server = createWordsServer(
+      {
+        port: 0,
+        reconnectGraceMs: 1_000,
+        cleanupIntervalMs: 1_000,
+      },
+      {
+        ...testDependencies,
+        now: () => now,
+        setInterval: (callback) => {
+          lifecycleSweep = callback;
+          return { unref: vi.fn() } as unknown as ReturnType<
+            typeof setInterval
+          >;
+        },
+        clearInterval: vi.fn(),
+      },
+    );
+    port = await server.start(0);
+
+    const corruptDisplay = await connectClient();
+    const corruptRoom = await emitCreateDisplay(corruptDisplay);
+    if (!corruptRoom.ok) throw new Error('Corrupt-room display setup failed.');
+    const corruptController = await connectClient();
+    const corruptControllerJoin = await emitJoinPlayer(corruptController, {
+      roomCode: corruptRoom.room.code,
+      displayName: 'Silver Owl',
+    });
+    const expiringPlayer = await connectClient();
+    const expiringPlayerJoin = await emitJoinPlayer(expiringPlayer, {
+      roomCode: corruptRoom.room.code,
+      displayName: 'Amber Kite',
+    });
+    const corruptRound = await emitStartRound(corruptController);
+    if (
+      !corruptControllerJoin.ok ||
+      !expiringPlayerJoin.ok ||
+      !corruptRound.ok ||
+      !corruptRound.room.round
+    ) {
+      throw new Error('Corrupt-room round setup failed.');
+    }
+
+    const validDisplay = await connectClient();
+    const validRoom = await emitCreateDisplay(validDisplay);
+    if (!validRoom.ok) throw new Error('Valid-room display setup failed.');
+    const expiringController = await connectClient();
+    const expiringControllerJoin = await emitJoinPlayer(expiringController, {
+      roomCode: validRoom.room.code,
+      displayName: 'Copper Fox',
+    });
+    const successor = await connectClient();
+    const successorJoin = await emitJoinPlayer(successor, {
+      roomCode: validRoom.room.code,
+      displayName: 'Violet Heron',
+    });
+    if (!expiringControllerJoin.ok || !successorJoin.ok) {
+      throw new Error('Valid-room player setup failed.');
+    }
+
+    const corruptDisconnect = nextRoomState(
+      corruptDisplay,
+      (room) =>
+        room.players.find(
+          (player) => player.id === expiringPlayerJoin.session.playerId,
+        )?.connected === false,
+    );
+    expiringPlayer.disconnect();
+    await corruptDisconnect;
+    const validDisconnect = nextRoomState(
+      validDisplay,
+      (room) =>
+        room.players.find(
+          (player) => player.id === expiringControllerJoin.session.playerId,
+        )?.connected === false,
+    );
+    expiringController.disconnect();
+    await validDisconnect;
+
+    const internal = server.roomStore as unknown as {
+      rooms: Map<string, { roundSubmissions: Map<string, unknown> | null }>;
+    };
+    internal.rooms
+      .get(corruptRoom.room.code)
+      ?.roundSubmissions?.delete(corruptControllerJoin.session.playerId);
+
+    const promotedState = nextRoomState(
+      validDisplay,
+      (room) => room.controllerPlayerId === successorJoin.session.playerId,
+    );
+    now = Date.parse(corruptRound.room.round.deadlineAt);
+    lifecycleSweep?.();
+
+    await expect(promotedState).resolves.toMatchObject({
+      controllerPlayerId: successorJoin.session.playerId,
+      players: [
+        expect.objectContaining({
+          id: successorJoin.session.playerId,
+          isController: true,
+        }),
+      ],
+    });
+  });
+
   it('publishes identical public results through only room:state', async () => {
     await server.stop();
     let now = Date.parse('2026-07-30T20:00:00.000Z');

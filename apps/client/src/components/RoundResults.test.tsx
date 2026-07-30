@@ -89,6 +89,33 @@ describe('RoundResults', () => {
     expect(screen.getByText('Amber Kite (You)')).toBeVisible();
   });
 
+  it('keeps one unchanged result announcement across unrelated updates', () => {
+    const { rerender } = render(
+      <RoundResults
+        roundNumber={1}
+        results={results}
+        currentPlayerId={playerA}
+        isDisplay={false}
+      />,
+    );
+    const announcement = screen.getByRole('status');
+    const announcementText = announcement.textContent;
+
+    rerender(
+      <RoundResults
+        roundNumber={1}
+        results={results}
+        currentPlayerId={playerB}
+        isDisplay={false}
+      />,
+    );
+
+    expect(screen.getByRole('status')).toBe(announcement);
+    expect(screen.getByRole('status')).toHaveTextContent(
+      announcementText ?? '',
+    );
+  });
+
   it('shows unique bonuses and shared base points as text', () => {
     render(
       <RoundResults

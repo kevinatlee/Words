@@ -87,6 +87,13 @@ function submissionStatesMatch(
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function finalizedResultsMatch(left: RoomState, right: RoomState): boolean {
+  return (
+    JSON.stringify(left.round?.results ?? null) ===
+    JSON.stringify(right.round?.results ?? null)
+  );
+}
+
 export function App({
   routePath,
   client = defaultLobbyClient,
@@ -129,8 +136,9 @@ export function App({
         currentRoom?.code === nextRoom.code &&
         (nextRoom.stateVersion < currentRoom.stateVersion ||
           (nextRoom.stateVersion === currentRoom.stateVersion &&
-            Date.parse(nextRoom.serverTime) <
-              Date.parse(currentRoom.serverTime)))
+            (Date.parse(nextRoom.serverTime) <
+              Date.parse(currentRoom.serverTime) ||
+              !finalizedResultsMatch(currentRoom, nextRoom))))
       ) {
         return;
       }
