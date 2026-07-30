@@ -14,9 +14,10 @@ runtime API.
 
 Stage 4A adds a separate server-oriented `@words/game-data` caller with a
 verified dictionary, derived default weights, and a bounded quality predicate.
-The current lobby still imports neither package. In Stage 4B, the server—not a
-browser—must generate and retain each official board, authorize each player
-submission, call path and dictionary validation, and calculate any result.
+Stage 4B connects the server—not the browser—to default board generation and
+retains each official board and deadline. The client imports neither package.
+Path validation, dictionary checks, submissions, and results remain beyond
+Stage 4B.
 
 ## Canonical board and path
 
@@ -132,23 +133,17 @@ normalization code. Core lookup performs no filesystem or network work.
 - caller-owned arrays are never mutated.
 
 These package limits complement, but do not replace, Stage 4B network payload
-size limits, authorization, phase checks, submission rate limits, and deadline
-enforcement.
+size limits, controller authorization, phase checks, and deadline enforcement.
 
-## Known limitations and Stage 4B boundary
+## Stage 4B integration and Stage 4C boundary
 
-Stage 4A supplies production dictionary data and default generation inputs in a
-separate server-only package. Neither application imports them. There are
-still no gameplay events, round state, deadline, score, duplicate handling,
-touch interface, or live board. The engine does not infer a path from a word.
+Stage 4B loads the verified dictionary once during controlled server startup,
+injects a cryptographic server-owned random source into
+`generateDefaultBoard`, and makes the server own settings, boards, participant
+snapshots, phase, and deadline. It adds no path or word payload.
 
-Stage 4B should:
-
-1. load the verified dictionary once during controlled server startup;
-2. inject a cryptographically appropriate production random source into
-   `generateDefaultBoard`;
-3. add strict shared network schemas for traced index paths and words;
-4. make the server own the board, deadline, validation, and scoring;
-5. keep the display passive and reject display-bound submissions;
-6. add synchronized rounds and reconnection only after those authority
-   boundaries are tested.
+Stage 4C may add a strict player-only submission event and call the existing
+path and dictionary validation APIs. It must enforce current-round
+participation and deadline on the server, keep the display passive, and avoid
+making the engine depend on rooms or sockets. Scoring and results remain
+separate reviewed scope.

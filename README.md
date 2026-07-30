@@ -7,10 +7,11 @@ shared-screen browser creates and presents a temporary room. Phone players join
 without accounts, and the first player becomes the initial game host
 (controller).
 
-**Stage 3.1 is complete. Stage 4A production game data is in review.** The
-secure lobby, isolated game engine, and read-only hosted CI are complete.
-Stage 4A adds reproducible server-only dictionary and board-generation data
-without connecting them to live rooms.
+**Stage 4A is complete. Stage 4B authoritative rounds are in review.** The
+secure lobby, isolated game engine, read-only hosted CI, and reproducible
+server-only game data are complete. Stage 4B connects settings and bounded
+board generation to a server-owned round lifecycle without adding word
+submissions, scoring, or results.
 
 ## What works today
 
@@ -28,12 +29,24 @@ without connecting them to live rooms.
   automatically promotes the earliest-joined connected player, breaking equal
   join-time ties by player ID.
 - Display and player presence update in real time.
+- The connected controller can atomically choose a supported grid size and
+  round duration, then start a server-owned round.
+- Every session receives the same immutable board, participant snapshot,
+  deadline, and `LOBBY`, `ROUND_ACTIVE`, or `ROUND_ENDED` phase.
+- The server loads and verifies the 79,370-word production dictionary before
+  listening, then uses cryptographic randomness for bounded board generation.
+- A single 250 ms server lifecycle sweep ends due rounds at their exact
+  deadline. Disconnects, reconnects, and controller transfers do not pause or
+  extend it.
+- Browser countdowns use `serverTime` plus a monotonic elapsed clock; only the
+  server changes the phase.
 - Display and player tabs use separate, temporary reconnect credentials.
 - A display or controller disconnect does not immediately close the room.
 - Rooms and credentials live only in bounded server memory.
-- `GET /api/health` reports the service and Stage 2.5 version.
+- `GET /api/health` reports the service version and whether controlled game-data
+  startup completed.
 - Shared strict Zod schemas validate every inbound lobby payload.
-- The Stage 1 visual identity and local board-setting previews remain.
+- The Stage 1 visual identity now presents authoritative settings and boards.
 - `@words/game-engine` validates immutable 4 × 4, 5 × 5, and 6 × 6 boards
   using row-major tile-index paths.
 - The engine performs deterministic injected-random weighted generation,
@@ -46,22 +59,20 @@ without connecting them to live rooms.
 - The default Q-bearing tile is `QU`; standalone `Q` is absent from the default
   distribution while Q-without-U words remain in the master dictionary.
 - The server-only loader verifies the dictionary checksum before constructing
-  the engine’s immutable lookup interface. It is not called by the lobby yet.
+  the engine’s immutable lookup interface. Stage 4B retains that dictionary
+  privately for Stage 4C; no entries reach room state or the browser.
 - Stage 3.1 provides read-only GitHub-hosted checks for pull requests to `main`,
   pushes to `main`, and manual runs. Hosted CI supplements local review rather
   than replacing it.
 
 ## What is not implemented
 
-Stage 4A remains disconnected from the lobby, with no gameplay events, live
-boards, touch tracing,
-synchronized rounds, word-submission networking, scoring, duplicate handling,
-timers, round starts, scannable QR codes, persistence, deployment workflow,
-container packaging, image publishing, server installation, or tunnel
-configuration.
-
-`Start Round` remains disabled. Settings in the lobby are local interface
-previews and are not server actions yet.
+Stage 4B deliberately stops at authoritative settings and rounds. There is no
+touch tracing, word-entry or word-submission event, dictionary lookup from a
+socket action, duplicate handling, scoring, rankings, winner selection, or
+results phase. Scannable QR codes, persistence, deployment workflow, container
+packaging, image publishing, server installation, and tunnel configuration also
+remain unimplemented.
 
 ## Roles and authority
 
@@ -78,8 +89,9 @@ previews and are not server actions yet.
 - `controllerStatus` is `none` only when no player is connected. The next join
   or reconnect becomes game host automatically.
 
-The server owns room membership, roles, settings, and expiration. No database,
-Redis instance, account provider, or paid service is used.
+The server owns room membership, roles, settings, boards, participant
+snapshots, deadlines, phases, and expiration. No database, Redis instance,
+account provider, or paid service is used.
 
 The intended public URL remains `https://words.atlee.io`. The server’s default
 port remains `6532`.
@@ -128,11 +140,14 @@ Try the lobby:
    device. `/join` remains available for manually entering a code.
 3. Enter a temporary display name. This first player becomes the controller.
 4. Join from another phone tab and watch the shared display update.
-5. On the controller phone, transfer Game Host authority to the second player.
-6. Disconnect the new controller and confirm the room remains visible during
+5. On the controller phone, choose a supported grid and duration, then start a
+   round. Confirm every session shows the same official board and deadline.
+6. Transfer Game Host authority to the second player during the round; the
+   display, board, and deadline remain unchanged.
+7. Disconnect the new controller and confirm the room remains visible during
    reconnect grace. After grace expires, confirm the server automatically
    promotes the earliest-joined connected player without display action.
-7. As an isolation check, open `/` in a second browser profile. Confirm it gets a
+8. As an isolation check, open `/` in a second browser profile. Confirm it gets a
    different code, remains empty when players join the first room, and refreshes
    back into only its own room.
 
@@ -240,6 +255,9 @@ Player requests:
 Controller requests:
 
 - `controller:transfer` — current connected controller to connected player
+- `controller:update-settings` — complete strict settings, in lobby or after a
+  round
+- `controller:start-round` — strict empty payload, in lobby or after a round
 
 The server broadcasts:
 
@@ -252,10 +270,10 @@ The server broadcasts:
 
 All lobby payloads, state, acknowledgements, and error codes are defined
 centrally in `packages/shared/src/lobby.ts`. See
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the complete Stage 2.5 flow
-and [`docs/GAME_ENGINE.md`](docs/GAME_ENGINE.md) for the intentionally separate
-Stage 3 engine boundary. [`docs/GAME_DATA.md`](docs/GAME_DATA.md) records the
-Stage 4A provenance, derivation, audits, and Stage 4B boundary.
+[`docs/ROUND_LIFECYCLE.md`](docs/ROUND_LIFECYCLE.md) for the Stage 4B contract,
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the complete system flow,
+and [`docs/GAME_DATA.md`](docs/GAME_DATA.md) for Stage 4A provenance and
+derivation.
 
 ## Repository structure
 
@@ -298,12 +316,11 @@ cannot recreate the display.
 
 ## Next stage
 
-After Stage 4A review, Stage 4B should load the verified dictionary once during
-controlled server startup, inject a cryptographically appropriate random
-source into default board generation, add strict shared gameplay payloads, and
-integrate authoritative phases, boards, deadlines, submissions, validation,
-scoring, duplicate handling, results, and round-aware reconnect behavior. The
-display must stay passive and unable to submit words.
+Stage 4C may add server-authoritative word submissions and engine validation
+against the privately loaded dictionary. It must preserve role authorization,
+round participant semantics, deadline ownership, and strict shared schemas.
+Scoring, duplicate resolution, and results remain separate later work unless a
+reviewed Stage 4C specification explicitly includes them.
 
 ## License
 

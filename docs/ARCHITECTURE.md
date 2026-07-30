@@ -1,8 +1,8 @@
 # Architecture
 
-This document describes the completed Stage 2.5 lobby, Stage 3 engine, and
-Stage 3.1 CI, plus the Stage 4A production game-data package in review and the
-boundaries later gameplay must preserve.
+This document describes the completed lobby, Stage 3 engine, Stage 3.1 CI,
+completed Stage 4A production game data, and the Stage 4B authoritative round
+lifecycle now in review.
 
 ## Runtime pieces
 
@@ -12,8 +12,9 @@ never the source of truth for membership or controller authority.
 
 **Node.js server (`apps/server`):** Runs Express and Socket.IO in one process.
 It owns active rooms, display sessions, players, `controllerPlayerId`,
-`controllerStatus`, role-specific reconnect credentials, authorization,
-expiration, capacity, and cleanup.
+`controllerStatus`, role-specific reconnect credentials, settings, round
+boards, participant snapshots, deadlines, phases, authorization, expiration,
+capacity, and cleanup.
 
 **Shared package (`packages/shared`):** Defines product configuration, strict
 Zod schemas, state shapes, structured errors, acknowledgements, and typed
@@ -31,8 +32,10 @@ dictionary-derived default distribution, simple size-specific board-quality
 profiles, a filesystem loader, and deterministic offline audits. It depends on
 the engine but not on the browser, React, Express, Socket.IO, or room store.
 
-Neither application imports the engine or game data in Stage 4A. No board,
-word, score, deadline, or game phase is added to the room store.
+The Stage 4B server imports game data and uses its bounded default board
+generator. The client still imports neither game data nor the engine.
+Dictionary contents remain private to the server. No word submission, score,
+or result state exists.
 
 ## Roles
 
@@ -78,7 +81,7 @@ Vite client on :5173
                             in-memory RoomStore
 ```
 
-The Vite proxy means the browser connects to its current origin. The Stage 2.5
+The Vite proxy means the browser connects to its current origin. The current
 production build does not yet serve the React build from Express.
 
 ## Health endpoint
@@ -89,7 +92,8 @@ production build does not yet serve the React build from Express.
 {
   "status": "ok",
   "service": "Words",
-  "version": "0.2.5"
+  "version": "0.2.5",
+  "gameDataReady": true
 }
 ```
 
@@ -119,9 +123,11 @@ Player events:
 
 Controller events:
 
-| Event                 | Client fields    | Authorized caller and purpose                 |
-| --------------------- | ---------------- | --------------------------------------------- |
-| `controller:transfer` | `targetPlayerId` | Current controller assigns a connected player |
+| Event                        | Client fields           | Authorized caller and purpose                     |
+| ---------------------------- | ----------------------- | ------------------------------------------------- |
+| `controller:transfer`        | `targetPlayerId`        | Current controller assigns a connected player     |
+| `controller:update-settings` | complete `RoomSettings` | Current controller configures the next round      |
+| `controller:start-round`     | none                    | Current controller starts one authoritative round |
 
 The server emits:
 
@@ -199,6 +205,21 @@ and a disconnected or cross-room target are rejected with structured errors.
 The payload cannot include a requester ID, controller claim, role, or room
 state.
 
+## Authoritative settings and round flow
+
+Settings updates are strict complete replacements accepted only from the bound,
+connected controller in `LOBBY` or `ROUND_ENDED`. A round start accepts an
+empty object, snapshots settings and connected players, generates a bounded
+server-only board, creates the official deadline, increments the round number,
+and broadcasts one state.
+
+Room phases are exactly `LOBBY`, `ROUND_ACTIVE`, and `ROUND_ENDED`. One 250 ms
+server interval reconciles due rounds and broadcasts only changes. Reconnect,
+disconnect, leave, controller transfer, and mid-round join preserve the board,
+participant snapshot, and deadline. See
+[`ROUND_LIFECYCLE.md`](ROUND_LIFECYCLE.md) for the full invariants and Stage 4C
+boundary.
+
 ## Automatic controller succession
 
 ```text
@@ -221,13 +242,15 @@ ordinary player. The display does not participate in any of these transitions.
 
 Rooms are keyed by normalized room code. Each internal room holds:
 
-- phase (`LOBBY` only)
+- phase (`LOBBY`, `ROUND_ACTIVE`, or `ROUND_ENDED`)
+- a monotonically increasing state version
 - creation, activity, and expiration timestamps
 - one internal display session
 - `controllerPlayerId`
 - `controllerStatus`
 - a bounded map of zero to eight players
-- read-only default settings
+- authoritative next-round settings
+- at most one current immutable round snapshot
 
 The internal display holds a server UUID, connection status, creation time,
 current socket ID, reconnect-token reference, and disconnect deadline.
@@ -312,13 +335,12 @@ still bounds every room, including one with no connected controller candidate.
 
 ## Server-authority boundary
 
-Browsers are controlled by users and can send invented events. Stage 2.5 trusts
-only data it validates and maps to a server-bound role session.
-
-Future stages must verify room membership, role, phase, controller player ID,
-settings, path, word, deadline, and rate limits. The client must never supply an
-official score, controller role, board, timer, dictionary verdict, or round
-result. A display-bound socket must never submit a player word.
+Browsers are controlled by users and can send invented events. The server
+trusts only strict shared payloads mapped to a current server-bound role and
+socket. It owns settings, board generation, participants, round number,
+timestamps, phase, and deadline. The client never supplies an official score,
+controller role, board, seed, timer, dictionary verdict, or round result. A
+display-bound socket has no submission action.
 
 ## Generic board dimensions
 
@@ -372,8 +394,8 @@ rejects symlinks and non-regular files, validates every strict manifest field,
 byte count, SHA-256, canonical lines, and word count, and then calls the
 engine’s Set-backed dictionary constructor. It returns a structured failure and
 has no network access or global mutable cache. Its emitted JavaScript is
-smoke-loaded from an unrelated working directory. Stage 4B should call it once
-during controlled server startup.
+smoke-loaded from an unrelated working directory. Stage 4B calls it once during
+controlled server startup and retains the result privately.
 
 The selected default distribution counts each letter at most twice per
 accepted dictionary word. Q’s derived weight becomes the `QU` token;

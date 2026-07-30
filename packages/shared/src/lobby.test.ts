@@ -8,9 +8,13 @@ import {
   normalizeRoomCode,
   reconnectDisplayInputSchema,
   reconnectPlayerInputSchema,
+  roomSettingsSchema,
   roomCodeSchema,
   roomStateSchema,
+  roundStateSchema,
+  startRoundInputSchema,
   transferControllerInputSchema,
+  updateRoomSettingsInputSchema,
 } from './lobby';
 
 const controllerPlayerId = '00000000-0000-4000-8000-000000000001';
@@ -20,6 +24,8 @@ function roomStateFixture() {
   return {
     code: 'ABC234',
     phase: 'LOBBY',
+    stateVersion: 0,
+    serverTime: '2026-07-27T20:00:00.000Z',
     createdAt: '2026-07-27T20:00:00.000Z',
     lastActivityAt: '2026-07-27T20:00:00.000Z',
     expiresAt: '2026-07-27T22:00:00.000Z',
@@ -44,6 +50,50 @@ function roomStateFixture() {
       roundDurationSeconds: 180,
       scoringMode: 'traditional',
     },
+    round: null,
+  } as const;
+}
+
+function roundStateFixture() {
+  return {
+    id: '00000000-0000-4000-8000-000000000100',
+    number: 1,
+    settings: {
+      gridSize: 4,
+      roundDurationSeconds: 30,
+      scoringMode: 'traditional',
+    },
+    board: {
+      size: 4,
+      tiles: [
+        'A',
+        'B',
+        'C',
+        'D',
+        'E',
+        'F',
+        'G',
+        'H',
+        'I',
+        'J',
+        'K',
+        'L',
+        'M',
+        'N',
+        'O',
+        'QU',
+      ],
+    },
+    participants: [
+      {
+        playerId: controllerPlayerId,
+        displayName: 'Bright Fox',
+      },
+    ],
+    startedAt: '2026-07-27T20:00:00.000Z',
+    deadlineAt: '2026-07-27T20:00:30.000Z',
+    endedAt: null,
+    generationAttempts: 1,
   } as const;
 }
 
@@ -232,12 +282,214 @@ describe('lobby contracts', () => {
     ).toBe(false);
   });
 
-  it('keeps Stage 2 state bounded and free of game-engine data', () => {
+  it('keeps lobby state bounded and free of round data', () => {
     const state = roomStateSchema.parse(roomStateFixture());
 
     expect(state.phase).toBe('LOBBY');
     expect(state.settings.gridSize).toBe(4);
+    expect(state.round).toBeNull();
     expect(state).not.toHaveProperty('board');
     expect(state).not.toHaveProperty('scores');
+  });
+
+  it('accepts exactly the three authoritative room phases', () => {
+    for (const phase of ['LOBBY', 'ROUND_ACTIVE', 'ROUND_ENDED']) {
+      const round =
+        phase === 'LOBBY'
+          ? null
+          : {
+              ...roundStateFixture(),
+              endedAt:
+                phase === 'ROUND_ENDED' ? '2026-07-27T20:00:30.000Z' : null,
+            };
+      expect(
+        roomStateSchema.safeParse({
+          ...roomStateFixture(),
+          phase,
+          round,
+        }).success,
+      ).toBe(true);
+    }
+
+    expect(
+      roomStateSchema.safeParse({
+        ...roomStateFixture(),
+        phase: 'RESULTS',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('requires a matching phase and round snapshot', () => {
+    expect(
+      roomStateSchema.safeParse({
+        ...roomStateFixture(),
+        phase: 'ROUND_ACTIVE',
+        round: null,
+      }).success,
+    ).toBe(false);
+    expect(
+      roomStateSchema.safeParse({
+        ...roomStateFixture(),
+        phase: 'LOBBY',
+        round: roundStateFixture(),
+      }).success,
+    ).toBe(false);
+    expect(
+      roomStateSchema.safeParse({
+        ...roomStateFixture(),
+        phase: 'ROUND_ENDED',
+        round: roundStateFixture(),
+      }).success,
+    ).toBe(false);
+  });
+
+  it('validates board dimensions and complete tile tokens', () => {
+    expect(roundStateSchema.parse(roundStateFixture()).board.tiles[15]).toBe(
+      'QU',
+    );
+    expect(
+      roundStateSchema.safeParse({
+        ...roundStateFixture(),
+        board: { size: 5, tiles: roundStateFixture().board.tiles },
+      }).success,
+    ).toBe(false);
+    expect(
+      roundStateSchema.safeParse({
+        ...roundStateFixture(),
+        board: {
+          ...roundStateFixture().board,
+          tiles: [...roundStateFixture().board.tiles.slice(0, 15), 'Qu'],
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it.each([4, 5, 6] as const)('accepts an exact %s by %s board', (size) => {
+    const round = {
+      ...roundStateFixture(),
+      settings: { ...roundStateFixture().settings, gridSize: size },
+      board: {
+        size,
+        tiles: Array.from({ length: size * size }, () => 'A'),
+      },
+    };
+    expect(roundStateSchema.safeParse(round).success).toBe(true);
+  });
+
+  it('requires the board size to match the settings snapshot', () => {
+    expect(
+      roundStateSchema.safeParse({
+        ...roundStateFixture(),
+        settings: { ...roundStateFixture().settings, gridSize: 5 },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('requires the exact authoritative deadline delta', () => {
+    expect(
+      roundStateSchema.safeParse({
+        ...roundStateFixture(),
+        deadlineAt: '2026-07-27T20:00:29.999Z',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('does not allow a round to end before its deadline', () => {
+    expect(
+      roundStateSchema.safeParse({
+        ...roundStateFixture(),
+        endedAt: '2026-07-27T20:00:29.999Z',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('requires unique bounded participant IDs', () => {
+    expect(
+      roundStateSchema.safeParse({
+        ...roundStateFixture(),
+        participants: [
+          ...roundStateFixture().participants,
+          ...roundStateFixture().participants,
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      roundStateSchema.safeParse({
+        ...roundStateFixture(),
+        participants: Array.from({ length: 9 }, (_, index) => ({
+          playerId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+          displayName: `Player ${index + 1}`,
+        })),
+      }).success,
+    ).toBe(false);
+  });
+
+  it('bounds board generation attempts to the production profile', () => {
+    expect(
+      roundStateSchema.safeParse({
+        ...roundStateFixture(),
+        generationAttempts: 9,
+      }).success,
+    ).toBe(false);
+    expect(
+      roundStateSchema.safeParse({
+        ...roundStateFixture(),
+        generationAttempts: 0,
+      }).success,
+    ).toBe(false);
+    expect(
+      roundStateSchema.safeParse({
+        ...roundStateFixture(),
+        number: 0,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('requires a valid authoritative server-time snapshot', () => {
+    expect(
+      roomStateSchema.safeParse({
+        ...roomStateFixture(),
+        serverTime: 'not-a-time',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('requires complete strict settings update payloads', () => {
+    const settings = roomStateFixture().settings;
+    expect(updateRoomSettingsInputSchema.parse(settings)).toEqual(settings);
+    expect(
+      updateRoomSettingsInputSchema.safeParse({
+        gridSize: 5,
+        roundDurationSeconds: 60,
+      }).success,
+    ).toBe(false);
+    expect(
+      roomSettingsSchema.safeParse({
+        ...settings,
+        controllerPlayerId,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts only an empty round-start payload', () => {
+    expect(startRoundInputSchema.parse({})).toEqual({});
+    expect(startRoundInputSchema.safeParse({ gridSize: 6 }).success).toBe(
+      false,
+    );
+  });
+
+  it('rejects unknown room and round fields', () => {
+    expect(
+      roomStateSchema.safeParse({
+        ...roomStateFixture(),
+        score: 100,
+      }).success,
+    ).toBe(false);
+    expect(
+      roundStateSchema.safeParse({
+        ...roundStateFixture(),
+        words: [],
+      }).success,
+    ).toBe(false);
   });
 });

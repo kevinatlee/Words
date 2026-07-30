@@ -40,7 +40,7 @@ Creating the room does not grant the display player membership or controller
 authority. The display never selects or approves a controller. Changing the
 controller must never change the display session.
 
-## Current scope: Stage 3.1 complete, Stage 4A game data in review
+## Current scope: Stage 4A complete, Stage 4B rounds in review
 
 Stage 2.5 is complete. It extends the secure, server-backed lobby with explicit
 game-host delegation and deterministic automatic succession:
@@ -101,10 +101,18 @@ Stage 4A adds a private server-oriented `@words/game-data` package with:
   boards;
 - a server-only verified loader and pure injected-random default-board wrapper.
 
-Neither application imports game data in Stage 4A. The lobby, room store,
-network contract, UI, and runtime behavior are unchanged.
+Stage 4B connects that package to the server. Controlled startup verifies and
+privately retains the production dictionary before listening. The connected
+controller can set supported room settings and start an authoritative round.
+The server owns the generated board, connected-participant snapshot, start,
+deadline, phase, and automatic ending. Every session reconnects to the same
+current round.
 
-## Stage 2.5 room model
+Stage 4B deliberately has no word or path submission, dictionary socket lookup,
+duplicate handling, scoring, rankings, winners, results, persistence, or
+deployment behavior. See `ROUND_LIFECYCLE.md`.
+
+## Stage 4B room model
 
 A room contains:
 
@@ -117,8 +125,10 @@ A room contains:
 - a cryptographically random, collision-checked room code
 - separate temporary reconnect credentials for the display and each player
 - connection status for the display and players
-- a `LOBBY` phase
-- default grid, duration, and scoring settings for display
+- an exact `LOBBY`, `ROUND_ACTIVE`, or `ROUND_ENDED` phase
+- authoritative settings and at most one current round snapshot
+- a server state version and serialization-time clock snapshot
+- controller-configured grid and duration plus traditional scoring mode
 - creation, last-activity, and expiration timestamps
 
 Room state lives in one Node.js process. The server bounds active rooms,
@@ -126,11 +136,12 @@ players, socket attempts, session maps, and recent-code tombstones. No browser
 can submit its own session ID, controller role, room ownership, or room state.
 
 The display never appears in the player array or player count. It cannot use
-player reconnect events. Future gameplay must not accept word submissions from
-a display-bound socket.
+player reconnect or controller events. Stage 4B contains no word-submission
+event for any role.
 
-Stage 2.5 settings are read-only server state. The visible settings controls are
-local previews; updating settings is intentionally deferred.
+Only the connected controller can atomically update complete settings in the
+lobby or after a round, and only that controller can start a round. The display
+and ordinary players render those values read-only.
 
 ## Disconnect and room-lifetime policy
 
@@ -192,12 +203,12 @@ Each successful reconnect rotates the credential. Tokens are scoped to one
 role and room, do not appear in URLs or logs, and become unusable after the
 disconnect grace period.
 
-## Planned game experience
+## Game experience boundary
 
-Later stages will let the controller choose supported settings and start a
-countdown and round. The display will remain the shared presentation surface.
-Players will trace and submit words and receive server-calculated validation
-and scoring.
+Stage 4B lets the controller choose supported settings and start an
+authoritative countdown and round. The display remains the shared presentation
+surface. Later stages will let players trace and submit words and receive
+server-calculated validation and scoring.
 
 Planned rules remain:
 
@@ -210,7 +221,8 @@ Planned rules remain:
 - Adjacency: horizontal, vertical, and diagonal; no tile reuse within a word
 
 Traditional scoring gives 1 point for 3–4 letters, 2 for 5, 3 for 6, 5 for 7,
-and 11 for 8 or more. These rules are documentation only in Stage 2.5.
+and 11 for 8 or more. These scoring rules remain documentation-only through
+Stage 4B.
 
 ## Non-goals through Stage 4A
 
@@ -254,12 +266,16 @@ details are future deployment work, not a claim about Stage 2.
    licence-reviewed dictionary recommendation.
 5. **Stage 3.1 — complete:** read-only GitHub-hosted locked-install, quality,
    test, build, audit, and repository-cleanliness checks.
-6. **Stage 4A — in review:** pinned production dictionary, licence and
+6. **Stage 4A — complete:** pinned production dictionary, licence and
    provenance, offline verification, vocabulary audit, original token
    distribution, board-quality profiles, loader, and default-board wrapper.
-7. **Stage 4B:** synchronized rounds, submissions, validation, scoring,
-   duplicate handling, results, and round-aware reconnection.
-8. **Stage 5:** production hardening, one-container build, image publishing,
+7. **Stage 4B — in review:** controlled dictionary startup, cryptographic board
+   generation, controller-owned settings, authoritative boards, participant
+   snapshots, deadlines, automatic ending, and round-aware reconnection.
+8. **Stage 4C:** player-only submissions and server-owned path and dictionary
+   validation. Scoring, duplicate handling, and results require explicit
+   reviewed scope.
+9. **Stage 5:** production hardening, one-container build, image publishing,
    server configuration, and tunnel documentation.
 
 Each stage should remain independently reviewable and must not imply that later
@@ -282,13 +298,12 @@ The eventual MVP must allow:
     player.
 
 Stage 2.5 completes the room-code and authority portions of items 1–3 and 10.
-Stage 3 supplies the isolated engine foundation and Stage 4A supplies verified
-production inputs for items 6–8 without connecting either to room or network
-state.
+Stage 3 supplies the isolated engine foundation, Stage 4A supplies verified
+production inputs, and Stage 4B completes items 4–6 without beginning
+submissions or scoring.
 
 ## Decisions deferred to later stages
 
-- Whether controller transfer should be allowed during future non-lobby phases
 - Whether later play testing justifies a versioned dictionary, distribution,
   or quality-profile revision
 - Per-IP production throttling and room-code enumeration responses

@@ -1,33 +1,34 @@
 import {
   formatRoundDuration,
   productConfig,
-  type GridSize,
-  type RoundDurationSeconds,
+  type RoomSettings,
 } from '@words/shared';
 
-type GameSettingsPrototypeProps = {
-  gridSize: GridSize;
-  duration: RoundDurationSeconds;
-  disabled?: boolean;
-  onGridSizeChange: (size: GridSize) => void;
-  onDurationChange: (duration: RoundDurationSeconds) => void;
+type GameSettingsProps = {
+  settings: RoomSettings;
+  disabled: boolean;
+  pending: boolean;
+  canEdit: boolean;
+  onChange: (settings: RoomSettings) => void;
 };
 
-export function GameSettingsPrototype({
-  gridSize,
-  duration,
-  disabled = false,
-  onGridSizeChange,
-  onDurationChange,
-}: GameSettingsPrototypeProps) {
+export function GameSettings({
+  settings,
+  disabled,
+  pending,
+  canEdit,
+  onChange,
+}: GameSettingsProps) {
   return (
     <section className="panel settings-panel" aria-labelledby="settings-title">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">Stage 2.5 preview</span>
+          <span className="eyebrow">Authoritative room settings</span>
           <h2 id="settings-title">Round setup</h2>
         </div>
-        <span className="status-label">Not networked</span>
+        <span className="status-label">
+          {pending ? 'Saving…' : canEdit ? 'Game Host controls' : 'Read only'}
+        </span>
       </div>
 
       <fieldset className="choice-group">
@@ -36,9 +37,9 @@ export function GameSettingsPrototype({
           {productConfig.supportedGridSizes.map((size) => (
             <button
               type="button"
-              aria-pressed={gridSize === size}
+              aria-pressed={settings.gridSize === size}
               disabled={disabled}
-              onClick={() => onGridSizeChange(size)}
+              onClick={() => onChange({ ...settings, gridSize: size })}
               key={size}
             >
               {size} × {size}
@@ -53,9 +54,11 @@ export function GameSettingsPrototype({
           {productConfig.supportedRoundDurationsSeconds.map((seconds) => (
             <button
               type="button"
-              aria-pressed={duration === seconds}
+              aria-pressed={settings.roundDurationSeconds === seconds}
               disabled={disabled}
-              onClick={() => onDurationChange(seconds)}
+              onClick={() =>
+                onChange({ ...settings, roundDurationSeconds: seconds })
+              }
               key={seconds}
             >
               {formatRoundDuration(seconds)}

@@ -1,20 +1,27 @@
 import { io, type Socket } from 'socket.io-client';
 
-import type {
-  ClientToServerEvents,
-  ConnectionStatus,
-  ControllerActionResponse,
-  CreateDisplayInput,
-  DisplayActionResponse,
-  JoinPlayerInput,
-  LeaveSessionResponse,
-  PlayerActionResponse,
-  ReconnectDisplayInput,
-  ReconnectPlayerInput,
-  RoomError,
-  RoomState,
-  ServerToClientEvents,
-  TransferControllerInput,
+import {
+  controllerActionResponseSchema,
+  displayActionResponseSchema,
+  leaveSessionResponseSchema,
+  playerActionResponseSchema,
+  roomErrorSchema,
+  roomStateSchema,
+  type ClientToServerEvents,
+  type ConnectionStatus,
+  type ControllerActionResponse,
+  type CreateDisplayInput,
+  type DisplayActionResponse,
+  type JoinPlayerInput,
+  type LeaveSessionResponse,
+  type PlayerActionResponse,
+  type ReconnectDisplayInput,
+  type ReconnectPlayerInput,
+  type RoomError,
+  type RoomState,
+  type ServerToClientEvents,
+  type TransferControllerInput,
+  type UpdateRoomSettingsInput,
 } from '@words/shared';
 
 export type LobbyClient = {
@@ -32,6 +39,10 @@ export type LobbyClient = {
   transferController: (
     input: TransferControllerInput,
   ) => Promise<ControllerActionResponse>;
+  updateSettings: (
+    input: UpdateRoomSettingsInput,
+  ) => Promise<ControllerActionResponse>;
+  startRound: () => Promise<ControllerActionResponse>;
   onRoomState: (listener: (room: RoomState) => void) => () => void;
   onRoomError: (listener: (error: RoomError) => void) => () => void;
   onConnectionStatus: (
@@ -94,7 +105,10 @@ export class SocketLobbyClient implements LobbyClient {
       this.socket
         .timeout(5_000)
         .emit('display:create', input, (error, response) => {
-          resolve(error ? displayConnectionFailure : response);
+          const parsed = displayActionResponseSchema.safeParse(response);
+          resolve(
+            error || !parsed.success ? displayConnectionFailure : parsed.data,
+          );
         });
     });
   }
@@ -110,7 +124,10 @@ export class SocketLobbyClient implements LobbyClient {
       this.socket
         .timeout(5_000)
         .emit('display:reconnect', input, (error, response) => {
-          resolve(error ? displayConnectionFailure : response);
+          const parsed = displayActionResponseSchema.safeParse(response);
+          resolve(
+            error || !parsed.success ? displayConnectionFailure : parsed.data,
+          );
         });
     });
   }
@@ -124,7 +141,10 @@ export class SocketLobbyClient implements LobbyClient {
       this.socket
         .timeout(5_000)
         .emit('display:leave', {}, (error, response) => {
-          resolve(error ? leaveConnectionFailure : response);
+          const parsed = leaveSessionResponseSchema.safeParse(response);
+          resolve(
+            error || !parsed.success ? leaveConnectionFailure : parsed.data,
+          );
         });
     });
   }
@@ -138,7 +158,10 @@ export class SocketLobbyClient implements LobbyClient {
       this.socket
         .timeout(5_000)
         .emit('player:join', input, (error, response) => {
-          resolve(error ? playerConnectionFailure : response);
+          const parsed = playerActionResponseSchema.safeParse(response);
+          resolve(
+            error || !parsed.success ? playerConnectionFailure : parsed.data,
+          );
         });
     });
   }
@@ -154,7 +177,10 @@ export class SocketLobbyClient implements LobbyClient {
       this.socket
         .timeout(5_000)
         .emit('player:reconnect', input, (error, response) => {
-          resolve(error ? playerConnectionFailure : response);
+          const parsed = playerActionResponseSchema.safeParse(response);
+          resolve(
+            error || !parsed.success ? playerConnectionFailure : parsed.data,
+          );
         });
     });
   }
@@ -166,7 +192,10 @@ export class SocketLobbyClient implements LobbyClient {
 
     return new Promise((resolve) => {
       this.socket.timeout(5_000).emit('player:leave', {}, (error, response) => {
-        resolve(error ? leaveConnectionFailure : response);
+        const parsed = leaveSessionResponseSchema.safeParse(response);
+        resolve(
+          error || !parsed.success ? leaveConnectionFailure : parsed.data,
+        );
       });
     });
   }
@@ -182,19 +211,76 @@ export class SocketLobbyClient implements LobbyClient {
       this.socket
         .timeout(5_000)
         .emit('controller:transfer', input, (error, response) => {
-          resolve(error ? controllerConnectionFailure : response);
+          const parsed = controllerActionResponseSchema.safeParse(response);
+          resolve(
+            error || !parsed.success
+              ? controllerConnectionFailure
+              : parsed.data,
+          );
+        });
+    });
+  }
+
+  async updateSettings(
+    input: UpdateRoomSettingsInput,
+  ): Promise<ControllerActionResponse> {
+    if (!this.socket.connected) {
+      return controllerConnectionFailure;
+    }
+
+    return new Promise((resolve) => {
+      this.socket
+        .timeout(5_000)
+        .emit('controller:update-settings', input, (error, response) => {
+          const parsed = controllerActionResponseSchema.safeParse(response);
+          resolve(
+            error || !parsed.success
+              ? controllerConnectionFailure
+              : parsed.data,
+          );
+        });
+    });
+  }
+
+  async startRound(): Promise<ControllerActionResponse> {
+    if (!this.socket.connected) {
+      return controllerConnectionFailure;
+    }
+
+    return new Promise((resolve) => {
+      this.socket
+        .timeout(5_000)
+        .emit('controller:start-round', {}, (error, response) => {
+          const parsed = controllerActionResponseSchema.safeParse(response);
+          resolve(
+            error || !parsed.success
+              ? controllerConnectionFailure
+              : parsed.data,
+          );
         });
     });
   }
 
   onRoomState(listener: (room: RoomState) => void): () => void {
-    this.socket.on('room:state', listener);
-    return () => this.socket.off('room:state', listener);
+    const validatedListener = (room: RoomState) => {
+      const parsed = roomStateSchema.safeParse(room);
+      if (parsed.success) {
+        listener(parsed.data);
+      }
+    };
+    this.socket.on('room:state', validatedListener);
+    return () => this.socket.off('room:state', validatedListener);
   }
 
   onRoomError(listener: (error: RoomError) => void): () => void {
-    this.socket.on('room:error', listener);
-    return () => this.socket.off('room:error', listener);
+    const validatedListener = (error: RoomError) => {
+      const parsed = roomErrorSchema.safeParse(error);
+      if (parsed.success) {
+        listener(parsed.data);
+      }
+    };
+    this.socket.on('room:error', validatedListener);
+    return () => this.socket.off('room:error', validatedListener);
   }
 
   onConnectionStatus(listener: (status: ConnectionStatus) => void): () => void {

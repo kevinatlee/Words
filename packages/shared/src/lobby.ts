@@ -43,6 +43,19 @@ export const displayNameSchema = z
       ),
   );
 
+const serializedDisplayNameSchema = z
+  .string()
+  .min(2)
+  .max(24)
+  .refine(
+    (value) => !controlCharacterPattern.test(value),
+    'Display names cannot contain control characters.',
+  )
+  .refine(
+    (value) => value === normalizeDisplayName(value),
+    'Serialized display names must already be normalized.',
+  );
+
 export const reconnectTokenSchema = z
   .string()
   .min(32)
@@ -73,6 +86,7 @@ export const reconnectPlayerInputSchema = z
   .strict();
 
 export const leaveSessionInputSchema = z.object({}).strict();
+export const startRoundInputSchema = z.object({}).strict();
 
 export const playerIdSchema = z.string().max(36).uuid();
 
@@ -97,6 +111,106 @@ export const roomSettingsSchema = z
   })
   .strict();
 
+export const updateRoomSettingsInputSchema = roomSettingsSchema;
+
+export const roomPhaseSchema = z.enum(['LOBBY', 'ROUND_ACTIVE', 'ROUND_ENDED']);
+
+export const maximumRoundGenerationAttempts = 8;
+
+export const roundParticipantSchema = z
+  .object({
+    playerId: playerIdSchema,
+    displayName: serializedDisplayNameSchema,
+  })
+  .strict()
+  .readonly();
+
+export const roundBoardSchema = z
+  .object({
+    size: z.union([z.literal(4), z.literal(5), z.literal(6)]),
+    tiles: z
+      .array(z.string().regex(/^[A-Z]{1,4}$/))
+      .max(36)
+      .readonly(),
+  })
+  .strict()
+  .superRefine((board, context) => {
+    if (board.tiles.length !== board.size * board.size) {
+      context.addIssue({
+        code: 'custom',
+        message: 'The board must contain exactly size squared tile tokens.',
+        path: ['tiles'],
+      });
+    }
+  })
+  .readonly();
+
+const roundSettingsSchema = roomSettingsSchema.readonly();
+
+export const roundStateSchema = z
+  .object({
+    id: z.string().uuid(),
+    number: z.number().int().positive().safe(),
+    settings: roundSettingsSchema,
+    board: roundBoardSchema,
+    participants: z
+      .array(roundParticipantSchema)
+      .min(1)
+      .max(productConfig.maxPlayers)
+      .readonly(),
+    startedAt: z.string().datetime(),
+    deadlineAt: z.string().datetime(),
+    endedAt: z.string().datetime().nullable(),
+    generationAttempts: z
+      .number()
+      .int()
+      .positive()
+      .max(maximumRoundGenerationAttempts),
+  })
+  .strict()
+  .superRefine((round, context) => {
+    const startedAt = Date.parse(round.startedAt);
+    const deadlineAt = Date.parse(round.deadlineAt);
+    const expectedDeadline =
+      startedAt + round.settings.roundDurationSeconds * 1_000;
+
+    if (deadlineAt !== expectedDeadline) {
+      context.addIssue({
+        code: 'custom',
+        message: 'The round deadline must match its settings snapshot.',
+        path: ['deadlineAt'],
+      });
+    }
+
+    if (round.board.size !== round.settings.gridSize) {
+      context.addIssue({
+        code: 'custom',
+        message: 'The board size must match the round settings snapshot.',
+        path: ['board', 'size'],
+      });
+    }
+
+    if (round.endedAt !== null && Date.parse(round.endedAt) < deadlineAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A round cannot end before its deadline.',
+        path: ['endedAt'],
+      });
+    }
+
+    const participantIds = new Set(
+      round.participants.map((participant) => participant.playerId),
+    );
+    if (participantIds.size !== round.participants.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Round participants must have unique player IDs.',
+        path: ['participants'],
+      });
+    }
+  })
+  .readonly();
+
 export const displayStateSchema = z
   .object({
     connected: z.boolean(),
@@ -107,7 +221,7 @@ export const displayStateSchema = z
 export const playerStateSchema = z
   .object({
     id: playerIdSchema,
-    displayName: displayNameSchema,
+    displayName: serializedDisplayNameSchema,
     connected: z.boolean(),
     joinedAt: z.string().datetime(),
     isController: z.boolean(),
@@ -119,7 +233,9 @@ export const controllerStatusSchema = z.enum(['none', 'assigned']);
 export const roomStateSchema = z
   .object({
     code: roomCodeSchema,
-    phase: z.literal('LOBBY'),
+    phase: roomPhaseSchema,
+    stateVersion: z.number().int().nonnegative().safe(),
+    serverTime: z.string().datetime(),
     createdAt: z.string().datetime(),
     lastActivityAt: z.string().datetime(),
     expiresAt: z.string().datetime(),
@@ -129,6 +245,7 @@ export const roomStateSchema = z
     controllerPlayerId: playerIdSchema.nullable(),
     players: z.array(playerStateSchema).max(productConfig.maxPlayers),
     settings: roomSettingsSchema,
+    round: roundStateSchema.nullable(),
   })
   .strict()
   .superRefine((room, context) => {
@@ -149,10 +266,7 @@ export const roomStateSchema = z
           path: ['controllerStatus'],
         });
       }
-      return;
-    }
-
-    if (
+    } else if (
       room.controllerPlayerId === null ||
       controllerPlayers.length !== 1 ||
       controllerPlayers[0]?.id !== room.controllerPlayerId
@@ -162,6 +276,36 @@ export const roomStateSchema = z
         message:
           'A room with players must reference exactly one controller player.',
         path: ['controllerPlayerId'],
+      });
+    }
+
+    if (room.phase === 'LOBBY' && room.round !== null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A lobby cannot expose a round snapshot.',
+        path: ['round'],
+      });
+    }
+
+    if (
+      room.phase === 'ROUND_ACTIVE' &&
+      (room.round === null || room.round.endedAt !== null)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An active round must have an unended round snapshot.',
+        path: ['round'],
+      });
+    }
+
+    if (
+      room.phase === 'ROUND_ENDED' &&
+      (room.round === null || room.round.endedAt === null)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An ended round must have an ended round snapshot.',
+        path: ['round'],
       });
     }
   });
@@ -194,6 +338,8 @@ export const roomErrorCodeSchema = z.enum([
   'RECONNECT_FAILED',
   'RATE_LIMITED',
   'SERVER_BUSY',
+  'ROUND_IN_PROGRESS',
+  'BOARD_GENERATION_FAILED',
   'INTERNAL_ERROR',
 ]);
 
@@ -259,10 +405,18 @@ export type JoinPlayerInput = z.infer<typeof joinPlayerInputSchema>;
 export type ReconnectDisplayInput = z.infer<typeof reconnectDisplayInputSchema>;
 export type ReconnectPlayerInput = z.infer<typeof reconnectPlayerInputSchema>;
 export type LeaveSessionInput = z.infer<typeof leaveSessionInputSchema>;
+export type StartRoundInput = z.infer<typeof startRoundInputSchema>;
 export type TransferControllerInput = z.infer<
   typeof transferControllerInputSchema
 >;
+export type UpdateRoomSettingsInput = z.infer<
+  typeof updateRoomSettingsInputSchema
+>;
 export type RoomSettings = z.infer<typeof roomSettingsSchema>;
+export type RoomPhase = z.infer<typeof roomPhaseSchema>;
+export type RoundParticipant = z.infer<typeof roundParticipantSchema>;
+export type RoundBoard = z.infer<typeof roundBoardSchema>;
+export type RoundState = z.infer<typeof roundStateSchema>;
 export type DisplayState = z.infer<typeof displayStateSchema>;
 export type PlayerState = z.infer<typeof playerStateSchema>;
 export type ControllerStatus = z.infer<typeof controllerStatusSchema>;
@@ -325,6 +479,14 @@ export interface ClientToServerEvents {
   ) => void;
   'controller:transfer': (
     payload: TransferControllerInput,
+    acknowledge: ControllerActionAcknowledgement,
+  ) => void;
+  'controller:update-settings': (
+    payload: UpdateRoomSettingsInput,
+    acknowledge: ControllerActionAcknowledgement,
+  ) => void;
+  'controller:start-round': (
+    payload: StartRoundInput,
     acknowledge: ControllerActionAcknowledgement,
   ) => void;
 }

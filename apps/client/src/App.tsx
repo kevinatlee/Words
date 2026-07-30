@@ -11,6 +11,7 @@ import {
   type ConnectionStatus,
   type RoomError,
   type RoomErrorCode,
+  type RoomSettings,
   type RoomState,
 } from '@words/shared';
 
@@ -77,6 +78,18 @@ export function App({
   const reconnectingRef = useRef(false);
   const displayStartupStartedRef = useRef(false);
   const attemptedRoomCodeRef = useRef<string | null>(null);
+
+  const acceptRoomSnapshot = useCallback((nextRoom: RoomState) => {
+    setRoom((currentRoom) => {
+      if (
+        currentRoom?.code === nextRoom.code &&
+        nextRoom.stateVersion < currentRoom.stateVersion
+      ) {
+        return currentRoom;
+      }
+      return nextRoom;
+    });
+  }, []);
 
   const navigate = useCallback(
     (path: string) => {
@@ -217,7 +230,7 @@ export function App({
   useEffect(() => {
     const stopRoomState = client.onRoomState((nextRoom) => {
       if (sessionRef.current?.roomCode === nextRoom.code) {
-        setRoom(nextRoom);
+        acceptRoomSnapshot(nextRoom);
       }
     });
     const stopRoomError = client.onRoomError((error) => {
@@ -262,7 +275,7 @@ export function App({
       stopConnectionStatus();
       window.removeEventListener('popstate', onPopState);
     };
-  }, [client, reconnectSession, sessionStore]);
+  }, [acceptRoomSnapshot, client, reconnectSession, sessionStore]);
 
   useEffect(() => {
     if (
@@ -384,7 +397,33 @@ export function App({
       return response.error;
     }
 
-    setRoom(response.room);
+    acceptRoomSnapshot(response.room);
+    setRoomError(null);
+    return null;
+  };
+
+  const updateSettings = async (
+    settings: RoomSettings,
+  ): Promise<RoomError | null> => {
+    const response = await client.updateSettings(settings);
+
+    if (!response.ok) {
+      return response.error;
+    }
+
+    acceptRoomSnapshot(response.room);
+    setRoomError(null);
+    return null;
+  };
+
+  const startRound = async (): Promise<RoomError | null> => {
+    const response = await client.startRound();
+
+    if (!response.ok) {
+      return response.error;
+    }
+
+    acceptRoomSnapshot(response.room);
     setRoomError(null);
     return null;
   };
@@ -406,6 +445,8 @@ export function App({
             connectionStatus={connectionStatus}
             onLeave={leaveSession}
             onTransferController={transferController}
+            onUpdateSettings={updateSettings}
+            onStartRound={startRound}
           />
         </>
       );
@@ -466,6 +507,8 @@ export function App({
             connectionStatus={connectionStatus}
             onLeave={leaveSession}
             onTransferController={transferController}
+            onUpdateSettings={updateSettings}
+            onStartRound={startRound}
           />
         </>
       );

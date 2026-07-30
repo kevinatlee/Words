@@ -1,17 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
 import {
   buildJoinUrl,
   type ConnectionStatus,
-  type GridSize,
   type RoomError,
+  type RoomSettings,
   type RoomState,
-  type RoundDurationSeconds,
 } from '@words/shared';
 
+import { useRoundCountdown } from '../useRoundCountdown';
 import { createDemoBoard } from '../utils/demoBoard';
 import { ControllerPanel } from './ControllerPanel';
-import { GameSettingsPrototype } from './GameSettingsPrototype';
+import { GameSettings } from './GameSettings';
 import { LetterGrid } from './LetterGrid';
 import { PlayerList } from './PlayerList';
 import { PrototypeNotice } from './PrototypeNotice';
@@ -32,6 +32,8 @@ type RoomLobbyProps = {
   connectionStatus: ConnectionStatus;
   onLeave: () => Promise<void>;
   onTransferController: (targetPlayerId: string) => Promise<RoomError | null>;
+  onUpdateSettings: (settings: RoomSettings) => Promise<RoomError | null>;
+  onStartRound: () => Promise<RoomError | null>;
 };
 
 export function RoomLobby({
@@ -41,37 +43,82 @@ export function RoomLobby({
   connectionStatus,
   onLeave,
   onTransferController,
+  onUpdateSettings,
+  onStartRound,
 }: RoomLobbyProps) {
-  const [gridSize, setGridSize] = useState<GridSize>(room.settings.gridSize);
-  const [duration, setDuration] = useState<RoundDurationSeconds>(
-    room.settings.roundDurationSeconds,
-  );
+  const [actionPending, setActionPending] = useState(false);
+  const [actionError, setActionError] = useState<RoomError | null>(null);
   const currentPlayer = room.players.find(
     (player) => player.id === currentPlayerId,
   );
   const controller = room.players.find(
     (player) => player.id === room.controllerPlayerId,
   );
-  const letters = useMemo(() => createDemoBoard(gridSize), [gridSize]);
   const isDisplay = sessionRole === 'display';
+  const isConnectedController =
+    sessionRole === 'player' &&
+    connectionStatus === 'connected' &&
+    currentPlayer?.connected === true &&
+    currentPlayer.id === room.controllerPlayerId;
+  const roundIsActive = room.phase === 'ROUND_ACTIVE';
+  const canChangeSettings = isConnectedController && !roundIsActive;
+  const canStartRound = isConnectedController && !roundIsActive;
   const joinUrl = buildJoinUrl(window.location.origin, room.code);
+  const countdownMs = useRoundCountdown(room);
+  const letters = room.round
+    ? [...room.round.board.tiles]
+    : createDemoBoard(room.settings.gridSize);
+  const boardSize = room.round?.board.size ?? room.settings.gridSize;
+  const isRoundParticipant =
+    currentPlayerId !== null &&
+    room.round?.participants.some(
+      (participant) => participant.playerId === currentPlayerId,
+    );
 
   const heading = isDisplay
-    ? 'Shared display is ready.'
+    ? roundIsActive
+      ? `Round ${room.round?.number ?? ''} is live.`
+      : 'Shared display is ready.'
     : currentPlayer?.isController
       ? 'You’re the game host.'
       : 'You’re in the room.';
   const supportingText = isDisplay
-    ? 'Share the code and keep this screen visible while phone players join.'
+    ? roundIsActive
+      ? 'The server owns this board and the official round deadline.'
+      : 'Share the code and keep this screen visible while phone players join.'
     : currentPlayer?.isController
-      ? 'You play normally and will control lobby settings and round starts in a later stage.'
-      : `Waiting with ${controller?.displayName ?? 'the next Game Host'} for a future round.`;
+      ? roundIsActive
+        ? 'Play normally. Settings and another start unlock after the official deadline.'
+        : 'Choose the next round settings, start it, and play normally.'
+      : `Waiting with ${controller?.displayName ?? 'the next Game Host'}.`;
+
+  const runSettingsUpdate = async (settings: RoomSettings) => {
+    if (!canChangeSettings || actionPending) {
+      return;
+    }
+    setActionPending(true);
+    setActionError(null);
+    const error = await onUpdateSettings(settings);
+    setActionError(error);
+    setActionPending(false);
+  };
+
+  const runStartRound = async () => {
+    if (!canStartRound || actionPending) {
+      return;
+    }
+    setActionPending(true);
+    setActionError(null);
+    const error = await onStartRound();
+    setActionError(error);
+    setActionPending(false);
+  };
 
   return (
     <div className="room-page">
       <section className="room-intro">
         <div>
-          <span className="eyebrow">Live temporary lobby</span>
+          <span className="eyebrow">Live temporary room</span>
           <h1>{heading}</h1>
           <p>{supportingText}</p>
         </div>
@@ -88,6 +135,13 @@ export function RoomLobby({
               ? 'Reconnecting…'
               : 'Disconnected'}
         </span>
+        <span className="status-label">
+          {room.phase === 'LOBBY'
+            ? 'Lobby'
+            : room.phase === 'ROUND_ACTIVE'
+              ? 'Round active'
+              : 'Round ended'}
+        </span>
         {!isDisplay && (
           <button
             className="text-button"
@@ -99,10 +153,20 @@ export function RoomLobby({
         )}
       </div>
 
-      <PrototypeNotice>
-        The lobby and Game Host authority are live. Gameplay and round starts
-        remain intentionally unavailable in Stage 2.5.
-      </PrototypeNotice>
+      {roundIsActive && !isDisplay && !isRoundParticipant && (
+        <PrototypeNotice
+          title="Waiting this round."
+          ariaLabel="Round participation status"
+        >
+          You joined after this round began. You can watch this board and will
+          join the next round.
+        </PrototypeNotice>
+      )}
+      {actionError && (
+        <p className="form-error" role="alert">
+          {actionError.message}
+        </p>
+      )}
 
       <div className="room-dashboard">
         <div className="room-dashboard__lobby">
@@ -145,8 +209,8 @@ export function RoomLobby({
               </span>
               <strong>Scan-to-join area</strong>
               <small>
-                The exact join link is ready. A scannable QR image is deferred
-                to the next UI stage.
+                The exact join link is ready. A scannable QR image remains
+                outside this stage.
               </small>
             </section>
           )}
@@ -163,35 +227,66 @@ export function RoomLobby({
         </div>
 
         <div className="room-dashboard__preview">
-          <GameSettingsPrototype
-            gridSize={gridSize}
-            duration={duration}
-            disabled={isDisplay}
-            onGridSizeChange={setGridSize}
-            onDurationChange={setDuration}
+          <GameSettings
+            settings={room.settings}
+            disabled={!canChangeSettings || actionPending}
+            pending={actionPending}
+            canEdit={canChangeSettings}
+            onChange={(settings) => void runSettingsUpdate(settings)}
           />
-          <section className="panel board-panel" aria-labelledby="board-title">
+          <section
+            className="panel board-panel"
+            aria-labelledby="board-title"
+            data-round-id={room.round?.id}
+            data-round-deadline-at={room.round?.deadlineAt}
+          >
             <div className="panel-heading board-panel__heading">
               <div>
-                <span className="eyebrow">Future board preview</span>
+                <span className="eyebrow">
+                  {room.round ? `Round ${room.round.number}` : 'Layout preview'}
+                </span>
                 <h2 id="board-title">
-                  {gridSize} × {gridSize} letter grid
+                  {boardSize} × {boardSize} letter grid
                 </h2>
               </div>
-              <span className="status-label">Local preview</span>
+              <span
+                className={`status-label${room.round ? ' status-label--display' : ''}`}
+              >
+                {room.round ? 'Official board' : 'Non-official preview'}
+              </span>
             </div>
+            {room.round && (
+              <div className="round-clock" aria-live="polite">
+                <small>
+                  {room.phase === 'ROUND_ACTIVE'
+                    ? 'Authoritative time remaining'
+                    : 'Round complete'}
+                </small>
+                <strong>{Math.ceil((countdownMs ?? 0) / 1_000)} seconds</strong>
+              </div>
+            )}
             <LetterGrid
               letters={letters}
-              size={gridSize}
-              label={`${gridSize} by ${gridSize} demonstration letter grid`}
+              size={boardSize}
+              label={`${boardSize} by ${boardSize} ${room.round ? 'official' : 'demonstration'} letter grid`}
             />
             <div className="round-action">
               <p>
-                The controller will own settings and round starts in a future
-                stage.
+                {roundIsActive
+                  ? `${room.round?.participants.length ?? 0} players were present when this round started.`
+                  : `Next round: ${room.settings.roundDurationSeconds} seconds, traditional scoring.`}
               </p>
-              <button className="button button--primary" type="button" disabled>
-                Start Round
+              <button
+                className="button button--primary"
+                type="button"
+                disabled={!canStartRound || actionPending}
+                onClick={() => void runStartRound()}
+              >
+                {actionPending
+                  ? 'Working…'
+                  : room.phase === 'ROUND_ENDED'
+                    ? 'Start Next Round'
+                    : 'Start Round'}
               </button>
             </div>
           </section>
