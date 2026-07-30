@@ -6,9 +6,9 @@ normalization, and injected dictionary lookup. It has no runtime dependencies
 and does not import React, Express, Socket.IO, the DOM, Node runtime APIs, or
 the room store.
 
-The package is not connected to live rooms yet. Stage 4B must call it from
-server-authorized round and submission handlers; browsers must never decide the
-official board or dictionary result.
+The authoritative server calls the package for board generation, submission
+validation, and traditional scoring. Browsers never decide the official board,
+dictionary result, or points.
 
 ## Public model
 
@@ -42,6 +42,7 @@ path copy.
 - Paths: `validatePath` and `readPath`
 - Words: `normalizeWord`, `validateWordPath`,
   `DEFAULT_MINIMUM_WORD_LENGTH`, and `MAX_CANDIDATE_WORD_LENGTH`
+- Scoring: `scoreTraditionalWord`
 - Dictionaries: `WordDictionary` and `createWordDictionary`
 
 All exports come from `src/index.ts`.
@@ -131,6 +132,8 @@ See
 [`docs/DICTIONARY_EVALUATION.md`](../../docs/DICTIONARY_EVALUATION.md) for the
 pinned Stage 4 dictionary recommendation and licence conditions, and
 [`docs/GAME_ENGINE.md`](../../docs/GAME_ENGINE.md) for the complete boundary.
+
+Stage 4C calls validation and scoring only on the authoritative server.
 
 ## Commands
 

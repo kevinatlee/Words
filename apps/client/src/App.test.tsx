@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,9 +9,11 @@ import type {
   DisplayActionResponse,
   LeaveSessionResponse,
   PlayerActionResponse,
+  PlayerActionSuccess,
   PlayerState,
   RoomError,
   RoomState,
+  SubmitWordResponse,
 } from '@words/shared';
 
 import { App } from './App';
@@ -156,22 +158,24 @@ const displaySuccess: DisplayActionResponse = {
   },
 };
 
-const controllerSuccess: PlayerActionResponse = {
+const controllerSuccess: PlayerActionSuccess = {
   ok: true,
   room: createRoom([controllerPlayer]),
   session: {
     playerId: controllerPlayer.id,
     playerReconnectToken: 'b'.repeat(43),
   },
+  submissionState: null,
 };
 
-const ordinarySuccess: PlayerActionResponse = {
+const ordinarySuccess: PlayerActionSuccess = {
   ok: true,
   room: createRoom([controllerPlayer, ordinaryPlayer]),
   session: {
     playerId: ordinaryPlayer.id,
     playerReconnectToken: 'c'.repeat(43),
   },
+  submissionState: null,
 };
 
 const transferredRoom = createRoom([
@@ -179,7 +183,7 @@ const transferredRoom = createRoom([
   { ...ordinaryPlayer, isController: true },
 ]);
 
-const controllerWithPlayersSuccess: PlayerActionResponse = {
+const controllerWithPlayersSuccess: PlayerActionSuccess = {
   ...controllerSuccess,
   room: createRoom([controllerPlayer, ordinaryPlayer]),
 };
@@ -189,7 +193,7 @@ const awaitingAutomaticRoom = createRoom(
   'none',
 );
 
-const otherRoomSuccess: PlayerActionResponse = {
+const otherRoomSuccess: PlayerActionSuccess = {
   ok: true,
   room: {
     ...createRoom([otherRoomController]),
@@ -199,6 +203,7 @@ const otherRoomSuccess: PlayerActionResponse = {
     playerId: otherRoomController.id,
     playerReconnectToken: 'z'.repeat(43),
   },
+  submissionState: null,
 };
 
 function createFakeClient(overrides: Partial<LobbyClient> = {}): LobbyClient {
@@ -233,6 +238,14 @@ function createFakeClient(overrides: Partial<LobbyClient> = {}): LobbyClient {
     startRound: vi.fn(async (): Promise<ControllerActionResponse> => ({
       ok: true,
       room: createRoom([controllerPlayer]),
+    })),
+    submitWord: vi.fn(async (): Promise<SubmitWordResponse> => ({
+      ok: false,
+      error: {
+        code: 'WORD_NOT_IN_DICTIONARY',
+        message: 'That word is not in this game dictionary.',
+      },
+      state: null,
     })),
     onRoomState: () => () => undefined,
     onRoomError: () => () => undefined,
@@ -1419,10 +1432,396 @@ describe('Stage 4B display and player room routes', () => {
 
     expect(client.startRound).toHaveBeenCalledWith();
     expect(await screen.findByText('Official board')).toBeInTheDocument();
-    expect(screen.getByRole('gridcell', { name: 'QU' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'QU, tile 1' }),
+    ).toBeInTheDocument();
     expect(screen.getAllByText('30 seconds')).toHaveLength(2);
     expect(screen.getByRole('timer')).toHaveAttribute('aria-live', 'off');
     expect(screen.queryByRole('textbox', { name: /word/i })).toBeNull();
+  });
+
+  it('lets a current participant build and privately submit an adjacent tile path', async () => {
+    const activeRoom = createRoundRoom();
+    const privateState = {
+      roundId: activeRoom.round?.id ?? '',
+      playerId: controllerPlayer.id,
+      submissionVersion: 0,
+      acceptedWords: [],
+      provisionalScore: 0,
+    };
+    const submitWord = vi.fn(async (): Promise<SubmitWordResponse> => ({
+      ok: true,
+      acceptedWord: {
+        sequence: 1,
+        word: 'QUAB',
+        points: 1,
+        acceptedAt: '2026-07-27T20:03:01.000Z',
+      },
+      state: {
+        ...privateState,
+        submissionVersion: 1,
+        acceptedWords: [
+          {
+            sequence: 1,
+            word: 'QUAB',
+            points: 1,
+            acceptedAt: '2026-07-27T20:03:01.000Z',
+          },
+        ],
+        provisionalScore: 1,
+      },
+    }));
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+        ok: true,
+        room: activeRoom,
+        session: controllerSuccess.session,
+        submissionState: privateState,
+      })),
+      submitWord,
+    });
+    const user = userEvent.setup();
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'b'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'QU, tile 1' }));
+    await user.click(screen.getByRole('button', { name: 'A, tile 2' }));
+    await user.click(screen.getByRole('button', { name: 'B, tile 3' }));
+    expect(screen.getByRole('heading', { name: 'QUAB' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Submit Word' }));
+
+    expect(submitWord).toHaveBeenCalledWith({
+      roundId: activeRoom.round?.id,
+      word: 'QUAB',
+      path: [0, 1, 2],
+    });
+    expect(await screen.findByText('QUAB accepted for 1 point.')).toBeVisible();
+    expect(screen.getByText('Provisional points: 1')).toBeVisible();
+    expect(
+      screen.getByText('Shared-word reconciliation is not implemented yet.'),
+    ).toBeVisible();
+  });
+
+  it('restores submission controls and retains the path after an unexpected client rejection', async () => {
+    const activeRoom = createRoundRoom();
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+        ok: true,
+        room: activeRoom,
+        session: controllerSuccess.session,
+        submissionState: {
+          roundId: activeRoom.round?.id ?? '',
+          playerId: controllerPlayer.id,
+          submissionVersion: 0,
+          acceptedWords: [],
+          provisionalScore: 0,
+        },
+      })),
+      submitWord: vi.fn(async () => {
+        throw new Error('Injected client failure.');
+      }),
+    });
+    const user = userEvent.setup();
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'b'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'QU, tile 1' }));
+    await user.click(screen.getByRole('button', { name: 'A, tile 2' }));
+    await user.click(screen.getByRole('button', { name: 'B, tile 3' }));
+    await user.click(screen.getByRole('button', { name: 'Submit Word' }));
+
+    expect(
+      await screen.findByText(
+        'That word could not be checked. Your selection is still here.',
+      ),
+    ).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'QUAB' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Submit Word' })).toBeEnabled();
+  });
+
+  it('does not let an older room snapshot reset newer private submission state', async () => {
+    let reportRoomState: ((room: RoomState) => void) | undefined;
+    const activeRoom = createRoundRoom();
+    const acceptedWord = {
+      sequence: 1,
+      word: 'QUAB',
+      points: 1 as const,
+      acceptedAt: '2026-07-27T20:03:01.000Z',
+    };
+    const staleRoom: RoomState = {
+      ...activeRoom,
+      stateVersion: 2,
+      serverTime: '2026-07-27T20:02:59.000Z',
+      round: activeRoom.round
+        ? {
+            ...activeRoom.round,
+            id: '00000000-0000-4000-8000-000000000199',
+          }
+        : null,
+    };
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+        ok: true,
+        room: activeRoom,
+        session: controllerSuccess.session,
+        submissionState: {
+          roundId: activeRoom.round?.id ?? '',
+          playerId: controllerPlayer.id,
+          submissionVersion: 1,
+          acceptedWords: [acceptedWord],
+          provisionalScore: 1,
+        },
+      })),
+      onRoomState: (listener) => {
+        reportRoomState = listener;
+        return () => undefined;
+      },
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'b'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+
+    expect(await screen.findByText('Provisional points: 1')).toBeVisible();
+    expect(screen.getByText('QUAB')).toBeVisible();
+
+    act(() => reportRoomState?.(staleRoom));
+
+    expect(screen.getByText('Provisional points: 1')).toBeVisible();
+    expect(screen.getByText('QUAB')).toBeVisible();
+  });
+
+  it('prevents client-side non-adjacent selection and supports Undo and Clear', async () => {
+    const activeRoom = createRoundRoom();
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+        ok: true,
+        room: activeRoom,
+        session: controllerSuccess.session,
+        submissionState: {
+          roundId: activeRoom.round?.id ?? '',
+          playerId: controllerPlayer.id,
+          submissionVersion: 0,
+          acceptedWords: [],
+          provisionalScore: 0,
+        },
+      })),
+    });
+    const user = userEvent.setup();
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'b'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'QU, tile 1' }));
+    await user.click(screen.getByRole('button', { name: 'F, tile 7' }));
+    expect(screen.getByRole('heading', { name: 'QU' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(
+      screen.getByRole('heading', { name: 'Select adjacent tiles' }),
+    ).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'A, tile 2' }));
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(
+      screen.getByRole('heading', { name: 'Select adjacent tiles' }),
+    ).toBeVisible();
+  });
+
+  it('preserves native button semantics and keyboard activation inside grid cells', async () => {
+    const activeRoom = createRoundRoom();
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+        ok: true,
+        room: activeRoom,
+        session: controllerSuccess.session,
+        submissionState: {
+          roundId: activeRoom.round?.id ?? '',
+          playerId: controllerPlayer.id,
+          submissionVersion: 0,
+          acceptedWords: [],
+          provisionalScore: 0,
+        },
+      })),
+    });
+    const user = userEvent.setup();
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'b'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+
+    const firstTile = await screen.findByRole('button', {
+      name: 'QU, tile 1',
+    });
+    firstTile.focus();
+    await user.keyboard('{Enter}');
+    expect(firstTile).toHaveAttribute('aria-pressed', 'true');
+
+    const secondTile = screen.getByRole('button', { name: 'A, tile 2' });
+    secondTile.focus();
+    await user.keyboard(' ');
+    expect(secondTile).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('heading', { name: 'QUA' })).toBeVisible();
+  });
+
+  it('prevents a selected candidate from exceeding the 64-letter wire bound', async () => {
+    const baseRoom = createRoundRoom();
+    const longTokenRoom: RoomState = {
+      ...baseRoom,
+      settings: {
+        ...baseRoom.settings,
+        gridSize: 6,
+      },
+      round: baseRoom.round
+        ? {
+            ...baseRoom.round,
+            settings: {
+              ...baseRoom.round.settings,
+              gridSize: 6,
+            },
+            board: {
+              size: 6,
+              tiles: Array.from({ length: 36 }, () => 'AAAA'),
+            },
+          }
+        : null,
+    };
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+        ok: true,
+        room: longTokenRoom,
+        session: controllerSuccess.session,
+        submissionState: {
+          roundId: longTokenRoom.round?.id ?? '',
+          playerId: controllerPlayer.id,
+          submissionVersion: 0,
+          acceptedWords: [],
+          provisionalScore: 0,
+        },
+      })),
+    });
+    const user = userEvent.setup();
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'b'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+
+    const path = [0, 1, 2, 3, 4, 5, 11, 10, 9, 8, 7, 6, 12, 13, 14, 15];
+    for (const tileIndex of path) {
+      await user.click(
+        await screen.findByRole('button', {
+          name: `AAAA, tile ${tileIndex + 1}`,
+        }),
+      );
+    }
+    const grid = screen.getByRole('grid', {
+      name: '6 by 6 official letter grid',
+    });
+    expect(within(grid).getAllByRole('button', { pressed: true })).toHaveLength(
+      16,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'AAAA, tile 17' }));
+    expect(
+      screen.getByText('Words can contain at most 64 letters.'),
+    ).toBeVisible();
+    expect(within(grid).getAllByRole('button', { pressed: true })).toHaveLength(
+      16,
+    );
+    expect(screen.getByRole('heading', { name: 'A'.repeat(64) })).toBeVisible();
+  });
+
+  it('keeps the display and a mid-round joiner passive', async () => {
+    const activeRoom = createRoundRoom(
+      [controllerPlayer, ordinaryPlayer, thirdPlayer],
+      [controllerPlayer, ordinaryPlayer],
+    );
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+        ok: true,
+        room: activeRoom,
+        session: {
+          playerId: thirdPlayer.id,
+          playerReconnectToken: 'd'.repeat(43),
+        },
+        submissionState: null,
+      })),
+    });
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: thirdPlayer.id,
+          playerReconnectToken: 'd'.repeat(43),
+          displayName: thirdPlayer.displayName,
+        })}
+      />,
+    );
+    expect(await screen.findByText('Waiting this round.')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Submit Word' })).toBeNull();
+    expect(screen.queryByText(/Provisional points:/)).toBeNull();
   });
 
   it('keeps the ended board visible and offers the controller the next round', async () => {

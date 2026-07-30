@@ -807,6 +807,10 @@ button:disabled {
   gap: clamp(0.35rem, 1.2vw, 0.75rem);
 }
 
+.letter-grid__cell {
+  min-width: 0;
+}
+
 .letter-tile {
   position: relative;
   display: grid;
@@ -824,6 +828,10 @@ button:disabled {
 }
 
 .letter-tile:nth-child(5n + 2) {
+  background: #edf7e9;
+}
+
+.letter-grid > :nth-child(5n + 2) .letter-tile--button {
   background: #edf7e9;
 }
 
@@ -847,6 +855,23 @@ button:disabled {
   background: var(--ink-950);
   color: var(--paper);
   font-size: 0.66rem;
+}
+
+.letter-tile--button {
+  width: 100%;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.letter-tile--button:focus-visible {
+  outline: 0.22rem solid var(--sun);
+  outline-offset: 0.12rem;
+}
+
+.letter-tile--button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .round-action {
@@ -1012,6 +1037,63 @@ button:disabled {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: rgba(6, 16, 27, 0.35);
+}
+
+.word-entry__actions {
+  flex-flow: row wrap !important;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.word-entry__actions .button {
+  min-height: 2.75rem;
+  padding: 0.65rem 0.9rem;
+}
+
+.word-entry__message {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--sun);
+}
+
+.personal-score {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(6, 16, 27, 0.28);
+}
+
+.personal-score h3 {
+  margin: 0;
+}
+
+.personal-score > small {
+  color: var(--paper-muted);
+}
+
+.accepted-word-list {
+  display: grid;
+  max-height: 14rem;
+  margin: 1rem 0;
+  padding: 0;
+  overflow-y: auto;
+  gap: 0.45rem;
+  list-style-position: inside;
+}
+
+.accepted-word-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.accepted-word-list li strong {
+  color: var(--mint);
 }
 
 .word-entry > div {

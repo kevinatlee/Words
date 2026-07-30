@@ -1,6 +1,14 @@
 import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 
 import {
+  scoreTraditionalWord,
+  validateWordPath,
+  type TraditionalScoringResult,
+  type WordDictionary,
+} from '@words/game-engine';
+import {
+  maximumAcceptedWordsPerPlayerPerRound,
+  playerRoundSubmissionStateSchema,
   productConfig,
   maximumRoundGenerationAttempts,
   roomCodeAlphabet,
@@ -8,16 +16,21 @@ import {
   roomSettingsSchema,
   roundStateSchema,
   type ControllerStatus,
+  type AcceptedWord,
   type DisplaySessionCredentials,
   type DisplayState,
   type GridSize,
   type PlayerSessionCredentials,
+  type PlayerRoundSubmissionState,
   type PlayerState,
   type RoomPhase,
   type RoomErrorCode,
   type RoomSettings,
   type RoomState,
   type RoundState,
+  type SubmissionError,
+  type SubmitWordInput,
+  type SubmitWordResponse,
 } from '@words/shared';
 
 import { createSafeClock } from './safe-clock.js';
@@ -54,6 +67,15 @@ type InternalRoom = {
   players: Map<string, InternalPlayer>;
   settings: RoomSettings;
   round: InternalRound | null;
+  roundSubmissions: Map<string, InternalPlayerSubmissionState> | null;
+};
+
+type InternalPlayerSubmissionState = {
+  readonly roundId: string;
+  readonly playerId: string;
+  readonly submissionVersion: number;
+  readonly acceptedWords: readonly AcceptedWord[];
+  readonly provisionalScore: number;
 };
 
 type InternalRound = {
@@ -125,6 +147,7 @@ export type PlayerSessionResult = {
   session: PlayerSessionCredentials;
   player: PlayerState;
   replacedSocketId: string | null;
+  submissionState: PlayerRoundSubmissionState | null;
 };
 
 export type RoomPresenceResult =
@@ -162,6 +185,11 @@ export type ControllerActionResult = {
   room: RoomState;
 };
 
+export type SubmitWordResult = {
+  response: SubmitWordResponse;
+  reconciledRoom: RoomState | null;
+};
+
 export type RoomStoreOptions = {
   maxPlayers: number;
   maxRooms: number;
@@ -174,6 +202,7 @@ export type RoomStoreOptions = {
   roundIdGenerator?: () => string;
   reconnectTokenGenerator?: () => string;
   roundBoardGenerator?: (size: GridSize) => RoundBoardGenerationResult;
+  scoreWord?: (word: unknown) => TraditionalScoringResult;
   canCreateRooms?: () => boolean;
 };
 
@@ -256,6 +285,7 @@ export class RoomStore {
   private readonly reconnectTokenGenerator: () => string;
   private readonly roundBoardGenerator:
     ((size: GridSize) => RoundBoardGenerationResult) | undefined;
+  private readonly scoreWord: (word: unknown) => TraditionalScoringResult;
 
   constructor(private readonly options: RoomStoreOptions) {
     this.now = createSafeClock(options.now ?? Date.now, () => {
@@ -273,6 +303,7 @@ export class RoomStore {
     this.reconnectTokenGenerator =
       options.reconnectTokenGenerator ?? defaultReconnectTokenGenerator;
     this.roundBoardGenerator = options.roundBoardGenerator;
+    this.scoreWord = options.scoreWord ?? scoreTraditionalWord;
   }
 
   createDisplay(socketId: string): DisplaySessionResult {
@@ -310,6 +341,7 @@ export class RoomStore {
         scoringMode: productConfig.defaultScoringMode,
       },
       round: null,
+      roundSubmissions: null,
     };
 
     this.rooms.set(code, room);
@@ -530,6 +562,18 @@ export class RoomStore {
     }
 
     room.round = round;
+    room.roundSubmissions = new Map(
+      participants.map((participant) => [
+        participant.playerId,
+        Object.freeze({
+          roundId: round.id,
+          playerId: participant.playerId,
+          submissionVersion: 0,
+          acceptedWords: Object.freeze([]),
+          provisionalScore: 0,
+        }),
+      ]),
+    );
     room.phase = 'ROUND_ACTIVE';
     this.touch(room, now);
 
@@ -645,6 +689,171 @@ export class RoomStore {
     }
 
     return this.createPlayerResult(room, player, replacedSocketId);
+  }
+
+  submitWord(
+    session: BoundPlayerSession,
+    socketId: string,
+    input: SubmitWordInput,
+    dictionary: WordDictionary,
+    allowAttempt: () => boolean,
+    receivedAt = this.now(),
+  ): SubmitWordResult {
+    const room = this.rooms.get(session.roomCode);
+    if (!room) {
+      return this.submissionFailure('UNAUTHORIZED', null, null);
+    }
+
+    const now = receivedAt;
+    if (room.expiresAt <= now) {
+      this.deleteRoom(room, now, true);
+      return this.submissionFailure('UNAUTHORIZED', null, null);
+    }
+
+    const reconciled = this.reconcileRound(room, now);
+    const reconciledRoom = reconciled ? this.toRoomState(room) : null;
+    const player = room.players.get(session.playerId);
+    if (
+      !player ||
+      !player.connected ||
+      player.socketId !== socketId ||
+      player.id !== session.playerId
+    ) {
+      return this.submissionFailure('UNAUTHORIZED', null, reconciledRoom);
+    }
+
+    const currentState = this.getPlayerSubmissionState(room, player.id);
+    if (room.phase !== 'ROUND_ACTIVE' || room.round === null) {
+      return this.submissionFailure(
+        'ROUND_NOT_ACTIVE',
+        currentState,
+        reconciledRoom,
+      );
+    }
+    if (input.roundId !== room.round.id) {
+      return this.submissionFailure(
+        'ROUND_MISMATCH',
+        currentState,
+        reconciledRoom,
+      );
+    }
+
+    const internalState = room.roundSubmissions?.get(player.id);
+    if (!internalState) {
+      return this.submissionFailure(
+        'NOT_ROUND_PARTICIPANT',
+        null,
+        reconciledRoom,
+      );
+    }
+    if (!allowAttempt()) {
+      return this.submissionFailure(
+        'RATE_LIMITED',
+        this.copySubmissionState(internalState),
+        reconciledRoom,
+      );
+    }
+
+    let validated;
+    try {
+      validated = validateWordPath({
+        board: room.round.board,
+        path: input.path,
+        submittedWord: input.word,
+        dictionary,
+        minimumLength: 3,
+      });
+    } catch {
+      return this.submissionFailure(
+        'INTERNAL_ERROR',
+        this.copySubmissionState(internalState),
+        reconciledRoom,
+      );
+    }
+    if (!validated.valid) {
+      const code =
+        validated.code === 'INVALID_BOARD' ? 'INTERNAL_ERROR' : validated.code;
+      return this.submissionFailure(
+        code,
+        this.copySubmissionState(internalState),
+        reconciledRoom,
+      );
+    }
+    if (
+      internalState.acceptedWords.some(
+        (acceptedWord) => acceptedWord.word === validated.word,
+      )
+    ) {
+      return this.submissionFailure(
+        'ALREADY_SUBMITTED',
+        this.copySubmissionState(internalState),
+        reconciledRoom,
+      );
+    }
+    if (
+      internalState.acceptedWords.length >=
+      maximumAcceptedWordsPerPlayerPerRound
+    ) {
+      return this.submissionFailure(
+        'SUBMISSION_LIMIT_REACHED',
+        this.copySubmissionState(internalState),
+        reconciledRoom,
+      );
+    }
+
+    let scored: TraditionalScoringResult;
+    try {
+      scored = this.scoreWord(validated.word);
+    } catch {
+      return this.submissionFailure(
+        'INTERNAL_ERROR',
+        this.copySubmissionState(internalState),
+        reconciledRoom,
+      );
+    }
+    if (!scored.valid || scored.word !== validated.word) {
+      return this.submissionFailure(
+        'INTERNAL_ERROR',
+        this.copySubmissionState(internalState),
+        reconciledRoom,
+      );
+    }
+
+    const acceptedWord: AcceptedWord = Object.freeze({
+      sequence: internalState.acceptedWords.length + 1,
+      word: validated.word,
+      points: scored.points,
+      acceptedAt: new Date(now).toISOString(),
+    });
+    const nextCandidate = {
+      roundId: room.round.id,
+      playerId: player.id,
+      submissionVersion: internalState.submissionVersion + 1,
+      acceptedWords: [...internalState.acceptedWords, acceptedWord],
+      provisionalScore: internalState.provisionalScore + scored.points,
+    };
+    const parsed = playerRoundSubmissionStateSchema.safeParse(nextCandidate);
+    if (!parsed.success) {
+      return this.submissionFailure(
+        'INTERNAL_ERROR',
+        this.copySubmissionState(internalState),
+        reconciledRoom,
+      );
+    }
+
+    const committed: InternalPlayerSubmissionState = Object.freeze({
+      ...parsed.data,
+      acceptedWords: Object.freeze([...parsed.data.acceptedWords]),
+    });
+    room.roundSubmissions?.set(player.id, committed);
+    return {
+      reconciledRoom,
+      response: {
+        ok: true,
+        acceptedWord: { ...acceptedWord },
+        state: this.copySubmissionState(committed),
+      },
+    };
   }
 
   disconnect(
@@ -857,13 +1066,16 @@ export class RoomStore {
     return updatedRoomCodes;
   }
 
-  reconcileDueRound(roomCode: string): RoomState | null {
+  reconcileDueRound(
+    roomCode: string,
+    receivedAt = this.now(),
+  ): RoomState | null {
     const room = this.rooms.get(roomCode);
     if (!room) {
       return null;
     }
 
-    const now = this.now();
+    const now = receivedAt;
     if (room.expiresAt <= now || !this.reconcileRound(room, now)) {
       return null;
     }
@@ -1005,6 +1217,7 @@ export class RoomStore {
       room: this.toRoomState(room),
       player: this.toPlayerState(room, player),
       replacedSocketId,
+      submissionState: this.getPlayerSubmissionState(room, player.id),
       session: {
         playerId: player.id,
         playerReconnectToken: player.reconnectToken,
@@ -1031,6 +1244,57 @@ export class RoomStore {
         .map((player) => this.toPlayerState(room, player)),
       settings: { ...room.settings },
       round: room.round ? this.toRoundState(room.round) : null,
+    };
+  }
+
+  private getPlayerSubmissionState(
+    room: InternalRoom,
+    playerId: string,
+  ): PlayerRoundSubmissionState | null {
+    const state = room.roundSubmissions?.get(playerId);
+    return state ? this.copySubmissionState(state) : null;
+  }
+
+  private copySubmissionState(
+    state: InternalPlayerSubmissionState,
+  ): PlayerRoundSubmissionState {
+    return {
+      roundId: state.roundId,
+      playerId: state.playerId,
+      submissionVersion: state.submissionVersion,
+      acceptedWords: state.acceptedWords.map((word) => ({ ...word })),
+      provisionalScore: state.provisionalScore,
+    };
+  }
+
+  private submissionFailure(
+    code: SubmissionError['code'],
+    state: PlayerRoundSubmissionState | null,
+    reconciledRoom: RoomState | null,
+  ): SubmitWordResult {
+    const messages: Record<SubmissionError['code'], string> = {
+      INVALID_PAYLOAD: 'Check that word and try again.',
+      UNAUTHORIZED: 'That player session cannot submit words.',
+      ROUND_NOT_ACTIVE: 'Words can only be submitted during an active round.',
+      ROUND_MISMATCH: 'That word belongs to a different round.',
+      NOT_ROUND_PARTICIPANT: 'You can play when the next round starts.',
+      INVALID_PATH: 'Choose a connected path without reusing a tile.',
+      INVALID_WORD_FORMAT: 'Choose letters from the official board.',
+      WORD_TOO_SHORT: 'Words must contain at least three letters.',
+      PATH_WORD_MISMATCH: 'The selected tiles did not match that word.',
+      WORD_NOT_IN_DICTIONARY: 'That word is not in this game dictionary.',
+      ALREADY_SUBMITTED: 'You already submitted that word this round.',
+      SUBMISSION_LIMIT_REACHED: 'This round has reached its word limit.',
+      RATE_LIMITED: 'Too many words were sent. Wait a moment and try again.',
+      INTERNAL_ERROR: 'That word could not be checked.',
+    };
+    return {
+      reconciledRoom,
+      response: {
+        ok: false,
+        error: { code, message: messages[code] },
+        state,
+      },
     };
   }
 

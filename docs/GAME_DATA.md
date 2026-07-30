@@ -1,11 +1,12 @@
 # Production game data
 
-Stage 3.1 read-only CI and Stage 4A production game data are complete. Stage 4B
-authoritative rounds are in review.
+Stage 3.1 CI, Stage 4A production data, and Stage 4B authoritative rounds are
+complete. Stage 4C private submissions are in review.
 Stage 4A supplies reproducible server-only assets and pure defaults. Stage 4B
 now loads and privately retains the verified dictionary before listening and
-uses the documented board generator for authoritative rounds. No socket action
-queries the dictionary, and no submission or score is connected to the room.
+uses the documented board generator for authoritative rounds and authorized
+private word validation. No dictionary data, accepted word, or personal score
+is connected to public room state.
 
 ## Package boundary
 
@@ -290,10 +291,10 @@ Stage 4B:
 3. generate and retain the authoritative board and deadline in room state;
 4. defines strict shared Zod settings and round-state payloads;
 5. authorize settings and round starts against the connected controller player;
-6. keeps the display passive and exposes no submission action;
+6. keeps the display passive and exposes no display submission action;
 7. adds round-aware reconnect behavior and regression tests.
 
-Stage 4C may add server-authoritative current-participant word and path
-validation against the privately retained dictionary. Submission, scoring,
-results, touch tracing, QR, deployment, container, persistence, and moderation
-remain outside Stage 4B.
+Stage 4C adds server-authoritative current-participant validation against the
+privately retained dictionary plus private provisional scoring. Shared-word
+cancellation, final results, continuous tracing, QR, deployment, container,
+persistence, and moderation remain later work.

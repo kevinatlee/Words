@@ -1,5 +1,35 @@
 # Development log
 
+## 2026-07-30 — Stage 4C final focused review
+
+- Added a separate disconnect-cleared per-socket submission gate so malformed,
+  unauthenticated, display, stale, and otherwise rejected events are bounded
+  before strict parsing without consuming controller-action capacity.
+- Captured one receipt time for deadline acceptance, stable limiting, and
+  `acceptedAt`; added exact-boundary and dependency-failure publication tests.
+- Required submit success acknowledgements to match the final committed
+  private entry and added serialized public/private boundary coverage.
+- Preserved native button semantics inside accessible grid cells, bounded the
+  local candidate at 64 letters, and made unexpected client failures restore
+  submission controls without losing the selected path.
+- Expanded limiter validation, lifecycle isolation, immutable-copy, scoring,
+  Socket.IO hostile-input, and UI regression coverage. Stage 4D behavior
+  remains deferred.
+
+## 2026-07-30 — Stage 4C player-private submissions
+
+- Added the strict `player:submit-word` event and separately versioned private
+  state. Public room state, display responses, and broadcasts contain no words
+  or personal points.
+- Reused `validateWordPath()` with the official board and private production
+  dictionary, then applied pure traditional scoring. Paths are discarded.
+- Added personal duplicate rejection, a 256-word bound, reconnect recovery,
+  atomic schema validation, and a reconnect-stable 10-per-second limiter.
+- Added participant-only accessible tile controls, Undo/Clear, private accepted
+  words, provisional points, and focused privacy/deadline/race tests.
+- Deferred shared-word cancellation, final results, rankings, persistence, and
+  continuous drag tracing to Stage 4D.
+
 Future meaningful work must add a new chronological entry. Record what changed,
 why, what remains open, and the exact verification results.
 

@@ -16,8 +16,8 @@ Stage 4A adds a separate server-oriented `@words/game-data` caller with a
 verified dictionary, derived default weights, and a bounded quality predicate.
 Stage 4B connects the server—not the browser—to default board generation and
 retains each official board and deadline. The client imports neither package.
-Path validation, dictionary checks, submissions, and results remain beyond
-Stage 4B.
+Stage 4C calls path validation and dictionary lookup from the authoritative
+server and adds pure traditional scoring. Final results remain later work.
 
 ## Canonical board and path
 
@@ -135,15 +135,19 @@ normalization code. Core lookup performs no filesystem or network work.
 These package limits complement, but do not replace, Stage 4B network payload
 size limits, controller authorization, phase checks, and deadline enforcement.
 
-## Stage 4B integration and Stage 4C boundary
+## Stage 4C integration
 
 Stage 4B loads the verified dictionary once during controlled server startup,
 injects a cryptographic server-owned random source into
 `generateDefaultBoard`, and makes the server own settings, boards, participant
 snapshots, phase, and deadline. It adds no path or word payload.
 
-Stage 4C may add a strict player-only submission event and call the existing
+Stage 4C adds a strict player-only submission event and calls the existing
 path and dictionary validation APIs. It must enforce current-round
 participation and deadline on the server, keep the display passive, and avoid
-making the engine depend on rooms or sockets. Scoring and results remain
-separate reviewed scope.
+making the engine depend on rooms or sockets.
+
+`scoreTraditionalWord()` safely rejects malformed or shorter-than-three-letter
+input. Valid canonical lengths score 3–4 as 1 point, 5 as 2, 6 as 3, 7 as 5,
+and 8–64 as 11. It counts letters rather than tiles, so `QU` contributes two.
+Shared-word cancellation and final results remain Stage 4D.

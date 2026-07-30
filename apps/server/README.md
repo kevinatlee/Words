@@ -1,7 +1,7 @@
 # Words server
 
 Words uses one trusted Node.js process for the health API, temporary Socket.IO
-rooms, and Stage 4B authoritative rounds. Each room has a separate
+rooms, authoritative rounds, and Stage 4C private submissions. Each room has a separate
 shared-display session, zero to eight phone players, and explicit `none` or
 `assigned` controller state. Display and player reconnect credentials exist
 only in memory and disappear when the process restarts.
@@ -31,6 +31,8 @@ automatically because doing so would discard its temporary rooms; stop and
 restart `npm run dev` after changing server source. Server crashes remain
 visible and terminate the combined command.
 
-Word submission, scoring, results, persistence, production packaging, and
-deployment are not included. The full contract is documented in
-[`../../docs/ROUND_LIFECYCLE.md`](../../docs/ROUND_LIFECYCLE.md).
+Current participants may submit one bounded path through the official board,
+private production dictionary, and traditional scorer. Personal accepted words
+and provisional points are reconnect-safe but never broadcast. Shared-word
+cancellation, final results, persistence, packaging, and deployment are not
+included. See [`../../docs/SUBMISSIONS.md`](../../docs/SUBMISSIONS.md).

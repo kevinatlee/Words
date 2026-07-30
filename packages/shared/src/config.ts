@@ -10,6 +10,8 @@ export const productConfig = {
   defaultRoundDurationSeconds: 180,
   defaultScoringMode: 'traditional',
   maxPlayers: 8,
+  maximumSubmittedWordLength: 64,
+  maximumAcceptedWordsPerPlayerPerRound: 256,
   roomCodeLength: 6,
   reconnectGraceSeconds: 60,
   roomTtlMinutes: 120,

@@ -16,6 +16,7 @@ import {
   reconnectPlayerInputSchema,
   roomSettingsSchema,
   startRoundInputSchema,
+  submitWordInputSchema,
   transferControllerInputSchema,
   type ClientToServerEvents,
   type ControllerActionAcknowledgement,
@@ -32,6 +33,8 @@ import {
   type RoomErrorCode,
   type ServerToClientEvents,
   type StartRoundInput,
+  type SubmitWordAcknowledgement,
+  type SubmitWordInput,
   type TransferControllerInput,
   type UpdateRoomSettingsInput,
 } from '@words/shared';
@@ -43,7 +46,10 @@ import {
   createCryptoRandomSource,
   type ServerRandomSource,
 } from './crypto-random-source.js';
-import { SocketRateLimiter } from './rate-limiter.js';
+import {
+  PlayerSubmissionRateLimiter,
+  SocketRateLimiter,
+} from './rate-limiter.js';
 import {
   RoomOperationError,
   RoomStore,
@@ -231,6 +237,13 @@ export function createWordsServer(
     config.rateLimitWindowMs,
     config.rateLimitAttempts,
   );
+  const submissionRateLimiter = new PlayerSubmissionRateLimiter(
+    1_000,
+    10,
+    config.maxRooms * config.maxPlayers,
+    now,
+  );
+  const submissionSocketRateLimiter = new SocketRateLimiter(1_000, 20, now);
   let gameDataRuntime: Extract<
     ProductionDictionaryLoadResult,
     { success: true }
@@ -243,8 +256,8 @@ export function createWordsServer(
     'created';
   let nextCleanupAt = now() + config.cleanupIntervalMs;
 
-  const broadcastDueRound = (roomCode: string): void => {
-    const room = roomStore.reconcileDueRound(roomCode);
+  const broadcastDueRound = (roomCode: string, receivedAt?: number): void => {
+    const room = roomStore.reconcileDueRound(roomCode, receivedAt);
     if (room) {
       io.to(roomCode).emit('room:state', room);
     }
@@ -443,6 +456,7 @@ export function createWordsServer(
             ok: true,
             room: result.room,
             session: result.session,
+            submissionState: result.submissionState,
           });
           socket.to(result.room.code).emit('player:connected', result.player);
           io.to(result.room.code).emit('room:state', result.room);
@@ -489,11 +503,130 @@ export function createWordsServer(
             ok: true,
             room: result.room,
             session: result.session,
+            submissionState: result.submissionState,
           });
           socket.to(result.room.code).emit('player:connected', result.player);
           io.to(result.room.code).emit('room:state', result.room);
         } catch (error) {
           acknowledgeFailure(acknowledge, toRoomError(error));
+        }
+      },
+    );
+
+    socket.on(
+      'player:submit-word',
+      (payload: SubmitWordInput, acknowledge?: SubmitWordAcknowledgement) => {
+        const sendAcknowledgement = (
+          response: Parameters<SubmitWordAcknowledgement>[0],
+        ): void => {
+          if (typeof acknowledge !== 'function') {
+            return;
+          }
+          try {
+            acknowledge(response);
+          } catch {
+            // A hostile or disconnected client acknowledgement must not escape.
+          }
+        };
+        let receivedAt: number;
+        try {
+          receivedAt = now();
+          if (!submissionSocketRateLimiter.allow(socket.id, receivedAt)) {
+            sendAcknowledgement({
+              ok: false,
+              error: {
+                code: 'RATE_LIMITED',
+                message:
+                  'Too many words were sent. Wait a moment and try again.',
+              },
+              state: null,
+            });
+            return;
+          }
+        } catch {
+          sendAcknowledgement({
+            ok: false,
+            error: {
+              code: 'INTERNAL_ERROR',
+              message: 'That word could not be checked.',
+            },
+            state: null,
+          });
+          return;
+        }
+
+        if (typeof acknowledge !== 'function') {
+          return;
+        }
+
+        const session = socket.data.session;
+        if (session) {
+          try {
+            broadcastDueRound(session.roomCode, receivedAt);
+          } catch {
+            sendAcknowledgement({
+              ok: false,
+              error: {
+                code: 'INTERNAL_ERROR',
+                message: 'That word could not be checked.',
+              },
+              state: null,
+            });
+            return;
+          }
+        }
+
+        const parsed = submitWordInputSchema.safeParse(payload);
+        if (!parsed.success) {
+          sendAcknowledgement({
+            ok: false,
+            error: {
+              code: 'INVALID_PAYLOAD',
+              message: 'Check that word and try again.',
+            },
+            state: null,
+          });
+          return;
+        }
+        if (!session || session.role !== 'player' || !gameDataRuntime) {
+          sendAcknowledgement({
+            ok: false,
+            error: {
+              code: 'UNAUTHORIZED',
+              message: 'That player session cannot submit words.',
+            },
+            state: null,
+          });
+          return;
+        }
+
+        try {
+          const result = roomStore.submitWord(
+            session,
+            socket.id,
+            parsed.data,
+            gameDataRuntime.dictionary,
+            () =>
+              submissionRateLimiter.allow(
+                session.roomCode,
+                session.playerId,
+                receivedAt,
+              ),
+            receivedAt,
+          );
+          if (result.reconciledRoom) {
+            io.to(session.roomCode).emit('room:state', result.reconciledRoom);
+          }
+          sendAcknowledgement(result.response);
+        } catch {
+          sendAcknowledgement({
+            ok: false,
+            error: {
+              code: 'INTERNAL_ERROR',
+              message: 'That word could not be checked.',
+            },
+            state: null,
+          });
         }
       },
     );
@@ -741,6 +874,7 @@ export function createWordsServer(
 
     socket.on('disconnect', () => {
       rateLimiter.clear(socket.id);
+      submissionSocketRateLimiter.clear(socket.id);
       const session = socket.data.session;
 
       if (!session) {

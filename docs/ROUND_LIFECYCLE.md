@@ -1,10 +1,11 @@
 # Authoritative round lifecycle
 
-Stage 4A production game data is complete. Stage 4B is in review and connects
+Stage 4A production game data and Stage 4B rounds are complete. Stage 4C is in
+review and connects
 that verified data to temporary rooms. This stage ends at authoritative room
 settings, official boards, participant snapshots, deadlines, and automatic
-round ending. Stage 4B has no word submission, path networking, dictionary
-socket lookup, duplicate resolution, scoring, rankings, winners, or results.
+round ending to private current-participant submissions. Shared-word
+cancellation, final scoring, rankings, winners, and results remain deferred.
 
 ## Roles and settings ownership
 
@@ -174,14 +175,15 @@ credential also does not increment or broadcast because its public
 replacing an already-connected socket likewise refreshes activity without
 versioning private socket state. Room deletion has no successor snapshot.
 
-## Stage 4C boundary
+## Stage 4C integration
 
-Stage 4C may introduce a strict player-only submission event, bounded
+Stage 4C introduces a strict player-only submission event, bounded
 row-major paths, and server-side dictionary/path validation for current round
 participants before the deadline. It must not expose the dictionary, trust a
 client verdict, allow the display to submit, or move deadline and phase
-authority into the browser.
+authority into the browser. At the exact deadline, submission processing first
+reports the one public ended transition and then rejects the word.
 
-Stage 4B intentionally contains no submission schema or event, word-entry UI,
-score field, result table, rankings, winner selection, persistence, or
-deployment changes.
+Private successes do not increment public state version or extend activity,
+TTL, board, participant, or deadline state. See
+[`SUBMISSIONS.md`](SUBMISSIONS.md).

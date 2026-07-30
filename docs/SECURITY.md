@@ -2,10 +2,10 @@
 
 Stage 2.5 established the network and controller boundary. Stage 3 adds an
 isolated defensive engine, Stage 3.1 adds read-only hosted verification, and
-Stage 4A adds verified server-only production data. Stage 4B authoritative
-settings and round lifecycle are in review. This document separates implemented
-controls from protections still required before public deployment and word
-submission.
+Stage 4A adds verified server-only production data, Stage 4B adds authoritative
+rounds, and Stage 4C adds player-private submissions now in review. This
+document separates implemented controls from protections still required before
+public deployment.
 
 ## Implemented authority controls
 
@@ -36,10 +36,9 @@ submission.
 - Public room state excludes socket IDs, token values, and private token
   indexes.
 
-Stage 4B makes settings, board, participant snapshot, phase, round number, and
-deadline server-owned. Paths, word decisions, scores, and results remain future
-server-authority work. Stage 4B exposes no submission action, and a
-display-bound socket must never gain one.
+Stage 4C keeps paths, word decisions, and provisional points server-owned. Only
+the newest connected socket for a current participant can submit; displays,
+mid-round joiners, removed players, and stale replaced sockets are rejected.
 
 ## Implemented input and output controls
 
@@ -205,6 +204,22 @@ There is no production `Math.random()`, client seed, audit PRNG, per-room timer,
 manual end action, dictionary socket lookup, submission, scoring, or result
 payload in Stage 4B.
 
+## Stage 4C submission privacy
+
+- Public room and round state contains no words, counts, or personal points.
+- Reconnect returns only the bound player's current private state.
+- Strict requests accept no identity, board, time, score, points, or verdict.
+- The server uses `validateWordPath()` with its board and private dictionary,
+  discards paths, stores no rejection history, and never logs submitted words.
+- Personal duplicates, the 256-word cap, scoring, and the complete strict next
+  state are checked before one atomic commit.
+- A 20-per-1,000-ms per-socket submission limiter runs before parsing, bounds
+  malformed and unauthenticated events, and clears on disconnect.
+- The stricter 10-per-1,000-ms limiter is keyed by room/player, survives
+  refresh, and remains separate from controller-action capacity.
+- Exact-deadline processing publishes the ended transition even for malformed,
+  rejected, or rate-limited submissions.
+
 ## Known current limits
 
 - Throttling is per socket, not per IP, subnet, device, or room code.
@@ -217,6 +232,7 @@ payload in Stage 4B.
   durable audit record.
 - The in-memory process is a single availability boundary; restarting it closes
   every room.
+- The room/player submission limiter is not an IP-aware public edge limit.
 
 Before public deployment, add layered IP-aware limits at a trusted boundary,
 review enumeration behavior, verify proxy IP handling, add safe operational
@@ -324,9 +340,10 @@ Hosted verification supplements local review. Branch protection and repository
 Actions settings remain a separate settings task after the real check names
 have completed successfully.
 
-## Future gameplay requirements
+## Gameplay authority requirements
 
-When gameplay is added, the server must:
+Stage 4C implements the submission-related parts of this boundary; later
+gameplay stages must continue to:
 
 - permit only allowlisted grid sizes, durations, and scoring modes
 - authorize settings and round starts against `controllerPlayerId`
