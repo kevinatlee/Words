@@ -1,5 +1,80 @@
 # Development log
 
+## 2026-07-30 — Stage 4D final round results (draft)
+
+- Retained exactly `LOBBY`, `ROUND_ACTIVE`, and `ROUND_ENDED`; ended rounds now
+  require one strictly validated public result inside the existing
+  `room:state` snapshot. No result event or client finalization action was
+  added.
+- Added pure bounded engine reconciliation for canonical accepted words across
+  distinct player IDs. Every accepted word retains its traditional base
+  points, unique words add an exact 25% bonus, and detached output preserves
+  participant and word order.
+- Added strict public result-word, player-result, and round-result contracts
+  with cross-field checks for immutable participant identity, totals,
+  deterministic competition ranks, tied positive winners (including an
+  all-shared tie), and no winner when nobody submitted a scoring word.
+- Made deadline finalization one atomic idempotent room-store transition from
+  the immutable participant snapshot and exact private-state map. Departed,
+  disconnected, grace-expired, and former-controller participants remain;
+  mid-round joiners and same-name replacement identities do not enter the
+  result.
+- Kept active words private, then published the minimal detached word/score
+  projection only after submissions close. Accepted timestamps, paths, private
+  sequences and versions, rate-limit state, credentials, and dictionary data
+  stay private.
+- Added accessible shared-display and phone results with authoritative ranking,
+  single/tied/no-winner wording, textual shared/unique treatment, participant
+  reviews, a quiet live announcement, and controller-only next-round behavior.
+- Expanded engine, schema, room-store, Socket.IO, client race, privacy,
+  lifecycle failure, and 2,048-word boundary coverage.
+- Kept cumulative scoring, previous-round history, custom shared-word rules,
+  continuous tracing, QR rendering, persistence, packaging, deployment, and
+  all Stage 5 work out of scope.
+
+### Verification
+
+- `npm ci` — passed; 407 packages installed from the committed lockfile.
+- `npm run data:verify` — passed for the exact 79,370-word dictionary and all
+  pinned checksums, notices, distributions, and client-source boundaries.
+- `npm run data:dictionary:audit` — passed with deterministic report SHA-256
+  `454efff74f68e3b2e3989a567eb03b4949e04955f2c76a99e62ca608a296a7b8`.
+- `npm run data:boards:audit` — passed with 10,000 accepted boards per grid
+  size, zero generation failures, and deterministic report SHA-256
+  `2b55a682eab2207020ae639e7b5b6b771758822f3a20f6fe91187fd4f0eda789`.
+- `npm run format:check`, `npm run lint`, and `npm run typecheck` — passed.
+- `npm test` — passed; 545 tests across 29 files:
+  - client: 71 tests across 5 files
+  - server: 188 tests across 6 files
+  - game data: 49 tests across 6 files
+  - game engine: 167 tests across 7 files
+  - shared: 70 tests across 5 files
+- `npm run build` — passed; Vite transformed 160 modules and every package
+  build completed.
+- `npm run data:verify -- --client-build` — passed; production game data was
+  absent from the browser bundle.
+- `npm audit --audit-level=high` — passed with 0 vulnerabilities.
+- Manual multi-browser smoke — passed with one display and three phone
+  sessions. During the active round, Alpha saw only `PAD`, `SPADE`, and a
+  provisional base total of 3; Bravo saw only `PAD`, `BEANS`, and the same
+  private base total; the display saw no word, score, or uniqueness data.
+  Charlie joined mid-round and was correctly marked as waiting. Bravo then
+  left without losing the immutable participant result.
+- At the deadline, every role received the same authoritative result: shared
+  `PAD` kept 1 point with no bonus; unique `SPADE` and `BEANS` each kept 2 base
+  points and added an exact 0.5 bonus; Alpha and Bravo therefore tied as
+  winners at 3.5. The departed Bravo remained, Charlie was excluded, and no
+  private path, timestamp, sequence, or submission version appeared.
+- Display and player refreshes restored the same room and role without losing
+  private active progress. A post-result controller transfer to Charlie and
+  next-round settings changes did not alter the completed result. Round 4 then
+  started with Alpha and Charlie, an empty private score, no old result, no
+  Bravo, and no cumulative history.
+- Browser console review found no warnings or errors. Development shutdown was
+  clean and released ports `5173` and `6532`.
+- Hosted CI results will be recorded after the draft pull request runs on the
+  final pushed commit.
+
 ## 2026-07-30 — Stage 4C final focused review
 
 - Added a separate disconnect-cleared per-socket submission gate so malformed,
@@ -27,8 +102,8 @@
   atomic schema validation, and a reconnect-stable 10-per-second limiter.
 - Added participant-only accessible tile controls, Undo/Clear, private accepted
   words, provisional points, and focused privacy/deadline/race tests.
-- Deferred shared-word cancellation, final results, rankings, persistence, and
-  continuous drag tracing to Stage 4D.
+- Deferred cross-player shared-word policy, final results, rankings,
+  persistence, and continuous drag tracing to Stage 4D.
 
 Future meaningful work must add a new chronological entry. Record what changed,
 why, what remains open, and the exact verification results.

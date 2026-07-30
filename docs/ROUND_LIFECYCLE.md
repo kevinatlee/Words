@@ -1,11 +1,9 @@
 # Authoritative round lifecycle
 
-Stage 4A production game data and Stage 4B rounds are complete. Stage 4C is in
-review and connects
-that verified data to temporary rooms. This stage ends at authoritative room
-settings, official boards, participant snapshots, deadlines, and automatic
-round ending to private current-participant submissions. Shared-word
-cancellation, final scoring, rankings, winners, and results remain deferred.
+Stage 4A production game data, Stage 4B rounds, and Stage 4C private
+submissions are complete. Stage 4D is in draft review. It keeps the same
+authoritative settings, boards, participant snapshots, deadlines, and three
+phases while making `ROUND_ENDED` the finalized-results state.
 
 ## Roles and settings ownership
 
@@ -39,13 +37,13 @@ Rooms use exactly three phases:
 | `ROUND_ACTIVE` | active      | transfer only                                |
 | `ROUND_ENDED`  | ended       | update settings, start next round, transfer  |
 
-There is no results phase and no pause, resume, cancel, extend, manual-end, or
-client-end action.
+There is no separate results phase and no pause, resume, cancel, extend,
+manual-end, client-end, or finalize action.
 
-An active round has `endedAt: null`. At or after its deadline, the server
-reconciles it once to `ROUND_ENDED` and sets `endedAt` to the official
-`deadlineAt`, not the later scheduler time. Ending a round does not update room
-activity or extend room TTL.
+An active round has `endedAt: null` and `results: null`. At or after its
+deadline, the server reconciles it once to `ROUND_ENDED`, sets `endedAt` to the
+official `deadlineAt`, and attaches one non-null finalized result projection.
+Ending a round does not update room activity or extend room TTL.
 
 ## Serialized room and round state
 
@@ -62,12 +60,22 @@ The current `round` is either `null` or one strict snapshot:
 - board size and canonical row-major tile array;
 - connected participant IDs and names in deterministic join order;
 - ISO start, deadline, and optional end timestamps;
+- nullable strict final results;
 - bounded positive generation-attempt count.
 
 Board size must match the settings snapshot and tile count must equal size
 squared. Tokens are uppercase ASCII engine tokens; `QU` remains one tile.
 Deadline is exactly start plus the snapshotted configured duration. Unknown
 keys are rejected at every new schema level.
+
+Final results contain every immutable participant exactly once, ordered by
+final score descending and participant snapshot order for ties. Each entry
+contains canonical accepted words, traditional base values, shared/unique
+state, exact 25% unique bonuses, final values, exact base/bonus/final totals,
+and competition rank. Positive tied leaders all appear in `winnerPlayerIds`;
+when nobody submitted a scoring word the all-zero round has no winner. An
+all-shared positive round can have tied winners. Accepted timestamps, paths,
+private versions, sockets, and credentials remain absent.
 
 The room retains only its current round. Starting a later round replaces the
 ended snapshot and increments the round number exactly once, so round history
@@ -141,6 +149,12 @@ transfers, settings updates, starts, and cleanup decisions, the room store
 reconciles an active round whose deadline has arrived. This prevents a stale
 `ROUND_ACTIVE` snapshot from authorizing a forbidden action.
 
+Reconciliation reads only the immutable participant snapshot and the exact
+private map created for those participants. It calculates and validates the
+complete result candidate before mutating phase, `endedAt`, results, or version.
+Repeated reconciliation is a no-op. If `controller:start-round` arrives after
+the deadline, the ended Round 1 snapshot is published before Round 2 starts.
+
 The client calculates approximate remaining time from:
 
 1. the difference between `deadlineAt` and the snapshot’s `serverTime`; and
@@ -175,7 +189,7 @@ credential also does not increment or broadcast because its public
 replacing an already-connected socket likewise refreshes activity without
 versioning private socket state. Room deletion has no successor snapshot.
 
-## Stage 4C integration
+## Stage 4C and Stage 4D integration
 
 Stage 4C introduces a strict player-only submission event, bounded
 row-major paths, and server-side dictionary/path validation for current round
@@ -187,3 +201,8 @@ reports the one public ended transition and then rejects the word.
 Private successes do not increment public state version or extend activity,
 TTL, board, participant, or deadline state. See
 [`SUBMISSIONS.md`](SUBMISSIONS.md).
+
+Stage 4D makes that exact ended transition publish the detached public result.
+Private submission state stays unchanged and owner-reconnectable until the next
+round replaces both the public current-round slot and private map. See
+[`RESULTS.md`](RESULTS.md).

@@ -532,6 +532,22 @@ export function createWordsServer(
         try {
           receivedAt = now();
           if (!submissionSocketRateLimiter.allow(socket.id, receivedAt)) {
+            const session = socket.data.session;
+            if (session) {
+              try {
+                broadcastDueRound(session.roomCode, receivedAt);
+              } catch {
+                sendAcknowledgement({
+                  ok: false,
+                  error: {
+                    code: 'INTERNAL_ERROR',
+                    message: 'That word could not be checked.',
+                  },
+                  state: null,
+                });
+                return;
+              }
+            }
             sendAcknowledgement({
               ok: false,
               error: {

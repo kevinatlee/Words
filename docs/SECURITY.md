@@ -3,9 +3,9 @@
 Stage 2.5 established the network and controller boundary. Stage 3 adds an
 isolated defensive engine, Stage 3.1 adds read-only hosted verification, and
 Stage 4A adds verified server-only production data, Stage 4B adds authoritative
-rounds, and Stage 4C adds player-private submissions now in review. This
-document separates implemented controls from protections still required before
-public deployment.
+rounds, and Stage 4C adds merged player-private submissions. Stage 4D final
+round results are in draft review. This document separates implemented
+controls from protections still required before public deployment.
 
 ## Implemented authority controls
 
@@ -39,6 +39,8 @@ public deployment.
 Stage 4C keeps paths, word decisions, and provisional points server-owned. Only
 the newest connected socket for a current participant can submit; displays,
 mid-round joiners, removed players, and stale replaced sockets are rejected.
+Stage 4D derives final scores, ranks, and winners only from the immutable
+participant snapshot and its server-retained private submission map.
 
 ## Implemented input and output controls
 
@@ -206,7 +208,8 @@ payload in Stage 4B.
 
 ## Stage 4C submission privacy
 
-- Public room and round state contains no words, counts, or personal points.
+- Active public room and round state contains no words, counts, or personal
+  points.
 - Reconnect returns only the bound player's current private state.
 - Strict requests accept no identity, board, time, score, points, or verdict.
 - The server uses `validateWordPath()` with its board and private dictionary,
@@ -219,6 +222,34 @@ payload in Stage 4B.
   refresh, and remains separate from controller-action capacity.
 - Exact-deadline processing publishes the ended transition even for malformed,
   rejected, or rate-limited submissions.
+
+## Stage 4D result publication
+
+- No client event can request finalization or supply a result word, score,
+  rank, winner, shared status, or final point value.
+- Finalization requires exactly one valid private state for every immutable
+  participant and none for a nonparticipant. Departed and grace-expired
+  identities remain in the snapshot; mid-round joiners remain out.
+- Pure bounded reconciliation counts canonical words across distinct player
+  IDs, retains every word's traditional base points, and adds an exact 25%
+  bonus only to words held by one participant. It performs no I/O, randomness,
+  dictionary lookup, rounding, or timestamp comparison.
+- The complete ended round is strictly validated before one atomic commit.
+  Impossible internal failures expose only a bounded `INTERNAL_ERROR`, publish
+  no partial result, leave private state unchanged, and cannot stop other rooms
+  in the lifecycle sweep.
+- The existing `room:state` broadcast is the only publication path.
+  Finalization is idempotent, increments public `stateVersion` exactly once,
+  and does not update `lastActivityAt` or `expiresAt`.
+- Public results are bounded to eight participants and 256 words each. They
+  contain canonical words, base points, shared status, exact quarter-point
+  bonuses and finals, base/bonus/final totals, rank, and winner IDs only.
+- Accepted timestamps, private sequence and submission versions, paths,
+  rejected attempts, rate-limit windows, socket IDs, credentials, and
+  dictionary data remain private.
+- The public result is a detached immutable projection. The owner's unchanged
+  private state remains reconnectable until the next round replaces both the
+  old public result and private submission map.
 
 ## Known current limits
 
@@ -342,8 +373,8 @@ have completed successfully.
 
 ## Gameplay authority requirements
 
-Stage 4C implements the submission-related parts of this boundary; later
-gameplay stages must continue to:
+Stages 4C and 4D implement the submission and single-round result parts of this
+boundary; later gameplay and production stages must continue to:
 
 - permit only allowlisted grid sizes, durations, and scoring modes
 - authorize settings and round starts against `controllerPlayerId`
@@ -354,7 +385,7 @@ gameplay stages must continue to:
   startup
 - enforce the server deadline and phase
 - rate-limit submissions per player and room
-- calculate scores and duplicate handling from accepted server data
+- calculate every future score and duplicate rule from accepted server data
 - add a regression test for each engine or authorization bug
 
 No gameplay event may trust a client-provided score, time, controller role,

@@ -93,7 +93,22 @@ function roundStateFixture() {
     startedAt: '2026-07-27T20:00:00.000Z',
     deadlineAt: '2026-07-27T20:00:30.000Z',
     endedAt: null,
+    results: null,
     generationAttempts: 1,
+  } as const;
+}
+
+function zeroResults() {
+  return {
+    players: roundStateFixture().participants.map((participant) => ({
+      ...participant,
+      rank: 1,
+      baseScore: 0,
+      uniqueBonusScore: 0,
+      finalScore: 0,
+      words: [],
+    })),
+    winnerPlayerIds: [],
   } as const;
 }
 
@@ -301,6 +316,7 @@ describe('lobby contracts', () => {
               ...roundStateFixture(),
               endedAt:
                 phase === 'ROUND_ENDED' ? '2026-07-27T20:00:30.000Z' : null,
+              results: phase === 'ROUND_ENDED' ? zeroResults() : null,
             };
       expect(
         roomStateSchema.safeParse({
@@ -410,6 +426,7 @@ describe('lobby contracts', () => {
       roundStateSchema.safeParse({
         ...roundStateFixture(),
         endedAt: roundStateFixture().deadlineAt,
+        results: zeroResults(),
       }).success,
     ).toBe(true);
   });

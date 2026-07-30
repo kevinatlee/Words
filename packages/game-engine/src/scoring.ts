@@ -1,10 +1,12 @@
 import { normalizeWord } from './word-normalization.js';
 
+export type TraditionalPoints = 1 | 2 | 3 | 5 | 11;
+
 export type TraditionalScoringResult =
   | {
       readonly valid: true;
       readonly word: string;
-      readonly points: 1 | 2 | 3 | 5 | 11;
+      readonly points: TraditionalPoints;
     }
   | {
       readonly valid: false;

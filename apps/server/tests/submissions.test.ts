@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { createWordDictionary, type WordDictionary } from '@words/game-engine';
+import {
+  createWordDictionary,
+  reconcileRoundWords,
+  type WordDictionary,
+} from '@words/game-engine';
 
 import { PlayerSubmissionRateLimiter } from '../src/rate-limiter.js';
 import {
@@ -512,6 +516,534 @@ describe('RoomStore private submissions', () => {
       submissionVersion: 0,
       acceptedWords: [],
       provisionalScore: 0,
+    });
+    expect(next.room.round?.results).toBeNull();
+  });
+
+  it('finalizes unique and shared words into one authoritative public result', () => {
+    const game = setup();
+    const gameDictionary = dictionary(['CAT', 'CATS', 'DOG']);
+    for (const [session, socket, word, path] of [
+      [game.firstSession, 'player-one-socket', 'DOG', [4, 5, 6]],
+      [game.firstSession, 'player-one-socket', 'CATS', [0, 1, 2, 3]],
+      [game.secondSession, 'player-two-socket', 'CATS', [0, 1, 2, 3]],
+    ] as const) {
+      expect(
+        game.store.submitWord(
+          session,
+          socket,
+          { roundId: game.roundId, word, path },
+          gameDictionary,
+          () => true,
+        ).response.ok,
+      ).toBe(true);
+    }
+    const active = game.store.getRoomState(game.display.room.code);
+    expect(active?.round?.results).toBeNull();
+    expect(JSON.stringify(active)).not.toContain('CATS');
+
+    const deadline = Date.parse(active?.round?.deadlineAt ?? '');
+    game.setNow(deadline);
+    const ended = game.store.reconcileDueRound(game.display.room.code);
+
+    expect(ended).toMatchObject({
+      phase: 'ROUND_ENDED',
+      stateVersion: (active?.stateVersion ?? 0) + 1,
+      lastActivityAt: active?.lastActivityAt,
+      expiresAt: active?.expiresAt,
+      round: {
+        endedAt: active?.round?.deadlineAt,
+        results: {
+          winnerPlayerIds: [game.first.session.playerId],
+          players: [
+            {
+              playerId: game.first.session.playerId,
+              displayName: 'Silver Owl',
+              rank: 1,
+              baseScore: 2,
+              uniqueBonusScore: 0.25,
+              finalScore: 2.25,
+              words: [
+                {
+                  word: 'DOG',
+                  basePoints: 1,
+                  shared: false,
+                  uniqueBonusPoints: 0.25,
+                  finalPoints: 1.25,
+                },
+                {
+                  word: 'CATS',
+                  basePoints: 1,
+                  shared: true,
+                  uniqueBonusPoints: 0,
+                  finalPoints: 1,
+                },
+              ],
+            },
+            {
+              playerId: game.second.session.playerId,
+              displayName: 'Copper Fox',
+              rank: 2,
+              baseScore: 1,
+              uniqueBonusScore: 0,
+              finalScore: 1,
+              words: [
+                {
+                  word: 'CATS',
+                  basePoints: 1,
+                  shared: true,
+                  uniqueBonusPoints: 0,
+                  finalPoints: 1,
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+    const serialized = JSON.stringify(ended);
+    for (const privateField of [
+      'acceptedAt',
+      'submissionVersion',
+      'path',
+      'ReconnectToken',
+      'socketId',
+    ]) {
+      expect(serialized).not.toContain(privateField);
+    }
+  });
+
+  it('uses the immutable participant snapshot after leave and excludes a mid-round joiner', () => {
+    const game = setup();
+    const gameDictionary = dictionary(['CAT', 'DOG']);
+    game.store.submitWord(
+      game.firstSession,
+      'player-one-socket',
+      { roundId: game.roundId, word: 'CAT', path: [0, 1, 2] },
+      gameDictionary,
+      () => true,
+    );
+    game.store.submitWord(
+      game.secondSession,
+      'player-two-socket',
+      { roundId: game.roundId, word: 'DOG', path: [4, 5, 6] },
+      gameDictionary,
+      () => true,
+    );
+    const late = game.store.joinPlayer(
+      game.display.room.code,
+      'Late Lynx',
+      'late-socket',
+    );
+    game.store.leave(game.secondSession, 'player-two-socket');
+    const active = game.store.getRoomState(game.display.room.code);
+    const deadline = Date.parse(active?.round?.deadlineAt ?? '');
+    game.setNow(deadline);
+
+    const results = game.store.reconcileDueRound(game.display.room.code)?.round
+      ?.results;
+    expect(results?.players.map((player) => player.playerId)).toEqual([
+      game.first.session.playerId,
+      game.second.session.playerId,
+    ]);
+    expect(results?.players.map((player) => player.displayName)).toEqual([
+      'Silver Owl',
+      'Copper Fox',
+    ]);
+    expect(
+      results?.players.some(
+        (player) => player.playerId === late.session.playerId,
+      ),
+    ).toBe(false);
+  });
+
+  it('keeps a former controller identity when a departed name is reused', () => {
+    const game = setup();
+    game.store.submitWord(
+      game.firstSession,
+      'player-one-socket',
+      { roundId: game.roundId, word: 'CAT', path: [0, 1, 2] },
+      dictionary(['CAT']),
+      () => true,
+    );
+    game.store.transferController(
+      game.firstSession,
+      game.second.session.playerId,
+      'player-one-socket',
+    );
+    game.store.leave(game.firstSession, 'player-one-socket');
+    const replacement = game.store.joinPlayer(
+      game.display.room.code,
+      'Silver Owl',
+      'replacement-socket',
+    );
+    const active = game.store.getRoomState(game.display.room.code);
+    game.setNow(Date.parse(active?.round?.deadlineAt ?? ''));
+
+    const results = game.store.reconcileDueRound(game.display.room.code)?.round
+      ?.results;
+    expect(results?.players).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          playerId: game.first.session.playerId,
+          displayName: 'Silver Owl',
+          words: [expect.objectContaining({ word: 'CAT' })],
+        }),
+      ]),
+    );
+    expect(
+      results?.players.some(
+        (player) => player.playerId === replacement.session.playerId,
+      ),
+    ).toBe(false);
+  });
+
+  it('retains a disconnected and grace-expired participant in final results', () => {
+    const game = setup({ reconnectGraceMs: 1_000 });
+    game.store.submitWord(
+      game.secondSession,
+      'player-two-socket',
+      { roundId: game.roundId, word: 'DOG', path: [4, 5, 6] },
+      dictionary(['DOG']),
+      () => true,
+    );
+    game.store.disconnect(game.secondSession, 'player-two-socket');
+    const active = game.store.getRoomState(game.display.room.code);
+    game.setNow(Date.parse(active?.round?.startedAt ?? '') + 1_001);
+    game.store.cleanupExpired();
+    expect(
+      game.store
+        .getRoomState(game.display.room.code)
+        ?.players.some((player) => player.id === game.second.session.playerId),
+    ).toBe(false);
+
+    game.setNow(Date.parse(active?.round?.deadlineAt ?? ''));
+    const results = game.store.reconcileDueRound(game.display.room.code)?.round
+      ?.results;
+    expect(results?.players).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          playerId: game.second.session.playerId,
+          displayName: 'Copper Fox',
+          finalScore: 1.25,
+        }),
+      ]),
+    );
+  });
+
+  it('keeps base points and tied winners when every word is shared', () => {
+    const game = setup();
+    for (const [session, socket] of [
+      [game.firstSession, 'player-one-socket'],
+      [game.secondSession, 'player-two-socket'],
+    ] as const) {
+      game.store.submitWord(
+        session,
+        socket,
+        { roundId: game.roundId, word: 'CAT', path: [0, 1, 2] },
+        dictionary(['CAT']),
+        () => true,
+      );
+    }
+    const active = game.store.getRoomState(game.display.room.code);
+    game.setNow(Date.parse(active?.round?.deadlineAt ?? ''));
+    const results = game.store.reconcileDueRound(game.display.room.code)?.round
+      ?.results;
+
+    expect(results?.winnerPlayerIds).toEqual([
+      game.first.session.playerId,
+      game.second.session.playerId,
+    ]);
+    expect(results?.players.map((player) => player.rank)).toEqual([1, 1]);
+    expect(results?.players.map((player) => player.baseScore)).toEqual([1, 1]);
+    expect(results?.players.map((player) => player.uniqueBonusScore)).toEqual([
+      0, 0,
+    ]);
+    expect(results?.players.map((player) => player.finalScore)).toEqual([1, 1]);
+  });
+
+  it('finalizes idempotently without rewriting private state or room lifetime', () => {
+    const game = setup();
+    game.store.submitWord(
+      game.firstSession,
+      'player-one-socket',
+      { roundId: game.roundId, word: 'CAT', path: [0, 1, 2] },
+      dictionary(['CAT']),
+      () => true,
+    );
+    const active = game.store.getRoomState(game.display.room.code);
+    game.setNow(Date.parse(active?.round?.deadlineAt ?? ''));
+    const first = game.store.reconcileDueRound(game.display.room.code);
+    const second = game.store.reconcileDueRound(game.display.room.code);
+
+    expect(first).not.toBeNull();
+    expect(second).toBeNull();
+    expect(game.store.getRoomState(game.display.room.code)).toMatchObject({
+      stateVersion: (active?.stateVersion ?? 0) + 1,
+      lastActivityAt: active?.lastActivityAt,
+      expiresAt: active?.expiresAt,
+      round: { results: first?.round?.results },
+    });
+    const reconnected = game.store.reconnectPlayer(
+      game.display.room.code,
+      game.first.session.playerReconnectToken,
+      'player-one-new',
+    );
+    expect(reconnected.submissionState).toMatchObject({
+      submissionVersion: 1,
+      provisionalScore: 1,
+      acceptedWords: [{ word: 'CAT', points: 1 }],
+    });
+
+    const callerResult = first?.round?.results;
+    Reflect.set(callerResult?.players[0]?.words[0] ?? {}, 'word', 'DOG');
+    expect(
+      game.store.getRoomState(game.display.room.code)?.round?.results
+        ?.players[0]?.words[0]?.word,
+    ).toBe('CAT');
+  });
+
+  it('preserves ended results through settings, transfer, and board failure', () => {
+    let generationCall = 0;
+    const game = setup({
+      roundBoardGenerator: (size) => {
+        generationCall += 1;
+        return generationCall === 1
+          ? {
+              success: true,
+              board: { size, tiles },
+              attempts: 1,
+            }
+          : {
+              success: false,
+              code: 'NO_ACCEPTABLE_BOARD',
+              attempts: 8,
+            };
+      },
+    });
+    game.store.submitWord(
+      game.firstSession,
+      'player-one-socket',
+      { roundId: game.roundId, word: 'CAT', path: [0, 1, 2] },
+      dictionary(['CAT']),
+      () => true,
+    );
+    const active = game.store.getRoomState(game.display.room.code);
+    game.setNow(Date.parse(active?.round?.deadlineAt ?? ''));
+    const ended = game.store.reconcileDueRound(game.display.room.code);
+    if (!ended?.round?.results) throw new Error('Result setup failed.');
+    const results = ended.round.results;
+
+    const updated = game.store.updateSettings(
+      game.firstSession,
+      {
+        gridSize: 5,
+        roundDurationSeconds: 60,
+        scoringMode: 'traditional',
+      },
+      'player-one-socket',
+    ).room;
+    expect(updated.round?.settings.gridSize).toBe(4);
+    expect(updated.round?.results).toEqual(results);
+    const transferred = game.store.transferController(
+      game.firstSession,
+      game.second.session.playerId,
+      'player-one-socket',
+    ).room;
+    expect(transferred.round?.results).toEqual(results);
+    const beforeFailure = game.store.getRoomState(game.display.room.code);
+    expect(() =>
+      game.store.startRound(game.secondSession, 'player-two-socket'),
+    ).toThrowError('A playable board could not be generated.');
+    expect(game.store.getRoomState(game.display.room.code)).toEqual(
+      beforeFailure,
+    );
+
+    const recovered = game.store.reconnectPlayer(
+      game.display.room.code,
+      game.first.session.playerReconnectToken,
+      'player-one-new',
+    );
+    expect(recovered.submissionState).toMatchObject({
+      roundId: game.roundId,
+      submissionVersion: 1,
+      acceptedWords: [{ word: 'CAT' }],
+    });
+  });
+
+  it('contains an impossible reconciliation failure without partial mutation', () => {
+    let allowFinalization = false;
+    const game = setup({
+      reconcileWords: (participants) =>
+        allowFinalization
+          ? reconcileRoundWords(participants)
+          : { success: false, code: 'INVALID_WORD' },
+    });
+    game.store.submitWord(
+      game.firstSession,
+      'player-one-socket',
+      { roundId: game.roundId, word: 'CAT', path: [0, 1, 2] },
+      dictionary(['CAT']),
+      () => true,
+    );
+    const active = game.store.getRoomState(game.display.room.code);
+    game.setNow(Date.parse(active?.round?.deadlineAt ?? ''));
+
+    expect(() =>
+      game.store.reconcileDueRound(game.display.room.code),
+    ).toThrowError('The authoritative round could not be finalized.');
+    allowFinalization = true;
+    const ended = game.store.reconcileDueRound(game.display.room.code);
+    expect(ended).toMatchObject({
+      stateVersion: (active?.stateVersion ?? 0) + 1,
+      lastActivityAt: active?.lastActivityAt,
+      expiresAt: active?.expiresAt,
+      round: {
+        results: {
+          players: [
+            {
+              playerId: game.first.session.playerId,
+              words: [{ word: 'CAT' }],
+            },
+            {
+              playerId: game.second.session.playerId,
+              words: [],
+            },
+          ],
+        },
+      },
+    });
+  });
+
+  it.each(['missing', 'extra', 'malformed'] as const)(
+    'requires an exact valid private participant map: %s',
+    (failure) => {
+      const game = setup();
+      const internal = game.store as unknown as {
+        rooms: Map<
+          string,
+          {
+            roundSubmissions: Map<string, unknown>;
+          }
+        >;
+      };
+      const room = internal.rooms.get(game.display.room.code);
+      if (!room) throw new Error('Internal test room was not found.');
+
+      if (failure === 'missing') {
+        room.roundSubmissions.delete(game.second.session.playerId);
+      } else if (failure === 'extra') {
+        room.roundSubmissions.set(uuid(999), {
+          roundId: game.roundId,
+          playerId: uuid(999),
+          submissionVersion: 0,
+          acceptedWords: [],
+          provisionalScore: 0,
+        });
+      } else {
+        room.roundSubmissions.set(game.first.session.playerId, {
+          roundId: game.roundId,
+          playerId: game.first.session.playerId,
+          submissionVersion: 1,
+          acceptedWords: [],
+          provisionalScore: 11,
+        });
+      }
+
+      const active = game.store.getRoomState(game.display.room.code);
+      const deadline = Date.parse(
+        active?.round?.deadlineAt ?? '2026-07-30T20:00:30.000Z',
+      );
+      game.setNow(deadline);
+      const before = {
+        phase: 'ROUND_ACTIVE',
+        stateVersion: active?.stateVersion,
+      };
+
+      expect(() =>
+        game.store.reconcileDueRound(game.display.room.code),
+      ).toThrowError('The authoritative round could not be finalized.');
+      expect(
+        (game.store as unknown as { rooms: Map<string, unknown> }).rooms.get(
+          game.display.room.code,
+        ),
+      ).toMatchObject(before);
+    },
+  );
+
+  it('contains one invalid room without blocking another due room', () => {
+    let now = Date.parse('2026-07-30T20:00:00.000Z');
+    let codeIndex = 0;
+    let playerIndex = 0;
+    let roundIndex = 0;
+    const store = new RoomStore({
+      maxPlayers: 8,
+      maxRooms: 20,
+      roomTtlMs: 120 * 60_000,
+      reconnectGraceMs: 60_000,
+      now: () => now,
+      roomCodeGenerator: () => ['ABC234', 'DEF567'][codeIndex++] ?? 'GHJ678',
+      displaySessionIdGenerator: () => uuid(100 + codeIndex),
+      playerIdGenerator: () => uuid(++playerIndex),
+      roundIdGenerator: () => uuid(500 + ++roundIndex),
+      reconnectTokenGenerator: () =>
+        `${String(playerIndex + roundIndex).padStart(3, '0')}${'t'.repeat(40)}`,
+      roundBoardGenerator: (size) => ({
+        success: true,
+        board: {
+          size,
+          tiles: Array.from({ length: size * size }, () => 'A'),
+        },
+        attempts: 1,
+      }),
+    });
+    const firstDisplay = store.createDisplay('display-one');
+    const firstPlayer = store.joinPlayer(
+      firstDisplay.room.code,
+      'Silver Owl',
+      'player-one',
+    );
+    store.startRound(
+      {
+        role: 'player',
+        roomCode: firstDisplay.room.code,
+        playerId: firstPlayer.session.playerId,
+      },
+      'player-one',
+    );
+    const secondDisplay = store.createDisplay('display-two');
+    const secondPlayer = store.joinPlayer(
+      secondDisplay.room.code,
+      'Copper Fox',
+      'player-two',
+    );
+    store.startRound(
+      {
+        role: 'player',
+        roomCode: secondDisplay.room.code,
+        playerId: secondPlayer.session.playerId,
+      },
+      'player-two',
+    );
+    const internal = store as unknown as {
+      rooms: Map<string, { roundSubmissions: Map<string, unknown> }>;
+    };
+    internal.rooms
+      .get(firstDisplay.room.code)
+      ?.roundSubmissions.delete(firstPlayer.session.playerId);
+    now = Date.parse(
+      store.getRoomState(secondDisplay.room.code)?.round?.deadlineAt ?? '',
+    );
+
+    expect(store.advanceDueRounds()).toEqual([secondDisplay.room.code]);
+    expect(internal.rooms.get(firstDisplay.room.code)).toMatchObject({
+      phase: 'ROUND_ACTIVE',
+    });
+    expect(store.getRoomState(secondDisplay.room.code)).toMatchObject({
+      phase: 'ROUND_ENDED',
+      round: {
+        results: { players: [{ playerId: secondPlayer.session.playerId }] },
+      },
     });
   });
 });

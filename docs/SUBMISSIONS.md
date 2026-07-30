@@ -1,6 +1,6 @@
 # Player-private submissions
 
-Stage 4C adds one player-only Socket.IO action, `player:submit-word`, for
+Stage 4C added one player-only Socket.IO action, `player:submit-word`, for
 current-round participants. The server remains authoritative for the socket
 identity, participant snapshot, official board, deadline, path and word
 validation, production dictionary lookup, duplicate decision, and provisional
@@ -8,17 +8,19 @@ points.
 
 ## Privacy boundary
 
-`RoomState` and `RoundState` remain public room snapshots. They never contain
-submitted or accepted words, submission counts, personal scores, or
-cross-player duplicate information. A display and other players therefore
-cannot observe one player's submission activity.
+`RoomState` and `RoundState` remain public room snapshots. During
+`ROUND_ACTIVE`, they contain no submitted or accepted words, submission counts,
+personal scores, or cross-player duplicate information. A display and other
+players therefore cannot observe one player's submission activity while words
+can still be found.
 
 Each participant instead has one bounded `PlayerRoundSubmissionState` held
 privately beside the current round. It contains only canonical accepted words,
 traditional points, acceptance time, deterministic sequence, and the exact
 provisional total. Paths are discarded after validation. Rejected attempts are
-not retained. Starting the next round replaces every private submission map;
-there is no previous-round history or persistence.
+not retained. Stage 4D derives a detached public result projection from this
+map only after the deadline. Starting the next round replaces every private
+submission map; there is no previous-round history or persistence.
 
 Player join and reconnect acknowledgements include `submissionState`, which is
 `null` before a round and for a mid-round joiner. A reconnecting participant
@@ -71,7 +73,14 @@ it consistently for revision or retry. Native buttons remain inside accessible
 grid cells for keyboard activation, and selection stops with local feedback
 before the derived candidate exceeds the 64-letter wire bound.
 
-The phone shows only **Your accepted words** and **Provisional points**, plus
-“Shared-word reconciliation is not implemented yet.” Provisional totals are
-not final scores. Continuous drag tracing, cross-player duplicate
-cancellation, final results, rankings, and winners remain Stage 4D.
+During the active round, the phone shows only **Your accepted words** and
+**Provisional points**. Provisional totals are not final scores. At the
+automatic `ROUND_ENDED` transition, Stage 4D makes only the result projection
+public to the room: canonical words, shared/unique status, point treatment,
+final totals, ranks, and winners. `acceptedAt`, private sequence and version,
+paths, rejected attempts, and rate-limit state remain private. The owner can
+still recover their unchanged private state on reconnect until the next round.
+
+See [`RESULTS.md`](RESULTS.md) for the timed visibility transition, exact 25%
+unique-word bonus, rankings, and next-round lifecycle. Continuous drag tracing
+remains separately reviewed future scope.

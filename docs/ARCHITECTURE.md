@@ -1,7 +1,8 @@
 # Architecture
 
 This document describes the completed lobby, engine, CI, production game data,
-authoritative rounds, and Stage 4C player-private submissions now in review.
+authoritative rounds, merged Stage 4C private submissions, and Stage 4D final
+results now in draft review.
 
 ## Runtime pieces
 
@@ -21,9 +22,10 @@ Socket.IO event maps. Both client and server import the same contract.
 
 **Game-engine package (`packages/game-engine`):** Pure TypeScript for immutable
 board validation, injected-random weighted generation, bounded rejection,
-row-major paths, adjacency, word normalization, exact path-word matching, and
-an injected dictionary. It has no runtime dependencies and does not import the
-lobby, browser, Socket.IO, or Node runtime APIs.
+row-major paths, adjacency, word normalization, exact path-word matching, an
+injected dictionary, traditional scoring, and pure cross-participant word
+reconciliation. It has no runtime dependencies and does not import the lobby,
+browser, Socket.IO, clocks, or Node runtime APIs.
 
 **Game-data package (`packages/game-data`):** Private server-oriented TypeScript
 and committed data for the verified production dictionary, immutable
@@ -34,8 +36,8 @@ the engine but not on the browser, React, Express, Socket.IO, or room store.
 The Stage 4B server imports game data and uses its bounded default board
 generator. The client still imports neither game data nor the engine.
 Dictionary contents remain private to the server. Stage 4C uses them through
-one player-only action while accepted words and provisional scores stay out of
-public room state.
+one player-only action. Stage 4D exposes only a detached result projection
+after the deadline; dictionary data never enters public room state.
 
 ## Roles
 
@@ -220,11 +222,12 @@ server-only board, creates the official deadline, increments the round number,
 and broadcasts one state.
 
 Room phases are exactly `LOBBY`, `ROUND_ACTIVE`, and `ROUND_ENDED`. One 250 ms
-server interval reconciles due rounds and broadcasts only changes. Reconnect,
-disconnect, leave, controller transfer, and mid-round join preserve the board,
-participant snapshot, and deadline. See
-[`ROUND_LIFECYCLE.md`](ROUND_LIFECYCLE.md) for the full invariants and Stage 4C
-boundary.
+server interval reconciles due rounds and broadcasts only changes. At the
+deadline, `ROUND_ENDED` contains one complete validated result projection.
+Reconnect, disconnect, leave, controller transfer, and mid-round join preserve
+the board, participant snapshot, deadline, and finalized result. See
+[`ROUND_LIFECYCLE.md`](ROUND_LIFECYCLE.md) and
+[`RESULTS.md`](RESULTS.md).
 
 ## Automatic controller succession
 
@@ -258,6 +261,7 @@ Rooms are keyed by normalized room code. Each internal room holds:
 - authoritative next-round settings
 - at most one current immutable round snapshot
 - one bounded private submission map for current-round participants
+- a nullable bounded public result projection inside the current round
 
 The internal display holds a server UUID, connection status, creation time,
 current socket ID, reconnect-token reference, and disconnect deadline.
@@ -340,7 +344,7 @@ room state, so two requests from a formerly authorized socket cannot both win.
 A stale replaced socket cannot disconnect the newest valid socket. Room TTL
 still bounds every room, including one with no connected controller candidate.
 
-## Player-private submission boundary
+## Private submissions and timed result publication
 
 Immutable public round metadata is separate from mutable private submission
 runtime. A new round creates one empty state for each participant. `RoomState`
@@ -355,14 +359,31 @@ parsing; the separate room/player limiter survives socket replacement and has
 bounded, age-pruned keys without another timer. The server then uses its
 official board and private dictionary. See [`SUBMISSIONS.md`](SUBMISSIONS.md).
 
+At the deadline, the room store validates that the private map contains exactly
+one state for every immutable participant. The engine reconciles canonical
+words across distinct player IDs. The server maps the result back to
+snapshotted display names, sorts final scores with participant order as the tie
+stabilizer, assigns competition ranks and tied positive winners, validates the
+complete ended-round candidate, and only then commits one public transition.
+
+The public result contains words, traditional base values, shared/unique
+status, exact 25% unique bonuses, final values, base/bonus/final player totals,
+ranks, and winner IDs. Shared words retain base points without a bonus. It
+excludes accepted timestamps, paths, private sequence/version data, sockets,
+credentials, dictionary internals, rejected attempts, and limiter state. The
+owner's private state remains available on reconnect and is replaced only when
+the controller starts the next round.
+
 ## Server-authority boundary
 
 Browsers are controlled by users and can send invented events. The server
 trusts only strict shared payloads mapped to a current server-bound role and
 socket. It owns settings, board generation, participants, round number,
-timestamps, phase, and deadline. The client never supplies an official score,
+timestamps, phase, deadline, shared detection, final scores, ranks, winner
+IDs, and result publication. The client never supplies an official score,
 controller role, board, seed, timer, dictionary verdict, or round result. A
-display-bound socket has no submission action.
+display-bound socket has no submission action, and no client finalization
+action exists.
 
 ## Generic board dimensions
 
@@ -471,5 +492,8 @@ The eventual production topology is one public HTTPS origin forwarding to one
 Words process on port `6532`. That process will serve the built client, health
 API, Socket.IO, game engine, and an openly licensed dictionary.
 
-Container packaging, static serving, tunnel configuration, deployment
-automation, and image publishing are not implemented through Stage 4A.
+Stage 5 will add production hardening, static-client serving from the Node
+process, one-container packaging, production image publishing, server
+configuration, health and graceful shutdown, Unraid-oriented installation,
+and reverse-proxy/tunnel documentation. Those concerns are not implemented by
+Stage 4D.
