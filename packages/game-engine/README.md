@@ -6,7 +6,7 @@ normalization, and injected dictionary lookup. It has no runtime dependencies
 and does not import React, Express, Socket.IO, the DOM, Node runtime APIs, or
 the room store.
 
-The package is not connected to live rooms yet. Stage 4 must call it from
+The package is not connected to live rooms yet. Stage 4B must call it from
 server-authorized round and submission handlers; browsers must never decide the
 official board or dictionary result.
 
@@ -108,9 +108,9 @@ Returning `false` consumes one attempt. If the predicate throws, that exception
 is a programmer error and propagates unchanged rather than being converted to
 an ordinary rejection or exhaustion result.
 
-Stage 3 deliberately supplies no default letter distribution. A production
-profile needs a documented, non-proprietary derivation and is a Stage 4
-decision.
+Stage 3 deliberately supplies no default letter distribution. Stage 4A keeps
+the documented non-proprietary production derivation in the separate
+server-oriented `@words/game-data` package, preserving this engine boundary.
 
 ## Dictionary boundary
 

@@ -1,0 +1,27 @@
+{
+  "name": "@words/game-data",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "exports": {
+    ".": {
+      "browser": null,
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "build": "tsc --noEmit -p tsconfig.json && node scripts/build-package.mjs"
+  },
+  "dependencies": {
+    "@words/game-engine": "*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1",
+    "tsx": "^4.20.6"
+  }
+}

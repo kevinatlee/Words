@@ -2,7 +2,7 @@
 
 ## Decision
 
-**Outcome A:** Stage 4 should use a reproducible English Speller Database
+**Outcome A:** Stage 4A uses a reproducible English Speller Database
 (ESDB, formerly SCOWL) size-60 export pinned to release
 [`rel-2026.02.25`](https://github.com/en-wl/wordlist/releases/tag/rel-2026.02.25),
 commit
@@ -12,9 +12,15 @@ deaccent, remove non-word categories and unsuitable parts of speech, retain
 only lowercase source entries containing ASCII letters, convert those entries
 to uppercase, and keep lengths 3 through 64.
 
-No external word data is committed in Stage 3. Stage 4 must reproduce and
-review the export, retain the required copyright and permission notice, and
-record its output checksum before adding it.
+Stage 4A independently reproduced and committed the reviewed export: 79,370
+words, 757,056 bytes, SHA-256
+`f5f3d22bd07b8f8d2dd8cf4f3caff211b6f3249a24da02c5aa2a21bf2210f352`,
+and 212,238 bytes under `gzip -9 -n`, with compressed SHA-256
+`1dccc79270a4c044e78f5b3c9f1cf6184feb40cab706e809ef6e70a2cac0fc39`. It
+preserves the complete applicable notice and provides offline verification,
+deterministic vocabulary auditing, and a server-only loader. See
+[`GAME_DATA.md`](GAME_DATA.md) for the final manifest, audit findings,
+distribution derivation, and Stage 4B boundary.
 
 ## Product policy
 
@@ -65,12 +71,12 @@ and ENABLE2K, and describes the use of licensed corpus data. A generated
 American/Canadian word list at size 60 does not select the separate Australian
 source terms and stays below the greater-than-80 threshold that invokes an
 additional source notice. The main ESDB notice is therefore the applicable
-redistribution condition for the proposed generated word list.
+redistribution condition for the selected generated word list.
 
 Redistribution and filtering in this MIT repository are permitted if the
-notice is preserved. Stage 4 should place the full notice beside the generated
-data and in the repository’s third-party notices. ESDB’s exporter and database
-use the project permission grant; no exporter code needs to ship at runtime.
+notice is preserved. Stage 4A places the full notice beside the generated data
+and in the repository’s third-party notices. ESDB’s exporter and database use
+the project permission grant; no exporter code ships at runtime.
 
 ### Content controls
 
@@ -120,10 +126,11 @@ make
   LC_ALL=C sort -u > words-stage4.txt
 ```
 
-Stage 4 should implement this as a reviewed repository script, verify that the
-release tag still resolves to the pinned commit, copy the upstream notice, and
-record SHA-256, line count, uncompressed bytes, and compressed bytes. The
-generated file should not depend on the current default branch.
+Stage 4A implements this as a reviewed repository script, verifies that the
+release tag resolves and peels to the pinned commit, copies the upstream
+notice, and records SHA-256, line count, uncompressed bytes, and metadata-free
+compressed bytes. The generated file does not depend on the current default
+branch.
 
 ### Measured exports
 
@@ -234,14 +241,15 @@ filtered with source metadata.
 - the exact mirror is trustworthy only because it was compared with the
   archived original, not because the mirror’s wrapper licence says MIT.
 
-## Recommendation for Stage 4
+## Stage 4A implementation
 
-Use the pinned ESDB size-60 American-plus-Canadian export above. Do not use
+The pinned ESDB size-60 American-plus-Canadian export above is now the committed
+production list. Words did not use
 ENABLE 2K as the default production list. Keep ENABLE as a public-domain
 comparison corpus for offline evaluation only if that comparison is useful;
 do not commit it merely because it has more words.
 
-Before committing the ESDB output in Stage 4:
+Stage 4A completed the earlier review checklist:
 
 1. turn the exact command into a reproducible script;
 2. preserve the complete applicable ESDB notice;
@@ -249,5 +257,8 @@ Before committing the ESDB output in Stage 4:
 4. test representative Canadian and American variants and exclusions;
 5. audit a deterministic sample plus high-risk proper-name, abbreviation,
    misspelling, obscurity, and sensitive-term cases;
-6. decide and document any separate family-mode presentation policy;
-7. load the final immutable Set once on the authoritative server.
+6. kept moderation separate rather than inventing a family-mode blacklist;
+7. added a verified loader without calling it from the lobby.
+
+Stage 4B should call that loader once during controlled authoritative-server
+startup and retain the returned dictionary interface.

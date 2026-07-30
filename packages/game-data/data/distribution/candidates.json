@@ -1,0 +1,1750 @@
+{
+  "schemaVersion": 1,
+  "dictionarySha256": "f5f3d22bd07b8f8d2dd8cf4f3caff211b6f3249a24da02c5aa2a21bf2210f352",
+  "generationScriptVersion": "1.0.0",
+  "sampleBoardsPerSize": 10000,
+  "auditRandomSource": "Seeded xorshift32 for deterministic audit/test evaluation only; not for production board generation.",
+  "vowelTokens": [
+    "A",
+    "E",
+    "I",
+    "O",
+    "U"
+  ],
+  "rareTokens": [
+    "J",
+    "QU",
+    "X",
+    "Z"
+  ],
+  "candidates": [
+    {
+      "id": "raw-character-frequency",
+      "description": "Every ASCII character in every accepted dictionary word contributes once.",
+      "perWordLetterCap": null,
+      "tokenWeights": [
+        {
+          "token": "A",
+          "weight": 50063
+        },
+        {
+          "token": "B",
+          "weight": 13301
+        },
+        {
+          "token": "C",
+          "weight": 27575
+        },
+        {
+          "token": "D",
+          "weight": 26070
+        },
+        {
+          "token": "E",
+          "weight": 78707
+        },
+        {
+          "token": "F",
+          "weight": 9539
+        },
+        {
+          "token": "G",
+          "weight": 20470
+        },
+        {
+          "token": "H",
+          "weight": 15170
+        },
+        {
+          "token": "I",
+          "weight": 58398
+        },
+        {
+          "token": "J",
+          "weight": 1230
+        },
+        {
+          "token": "K",
+          "weight": 6350
+        },
+        {
+          "token": "L",
+          "weight": 35730
+        },
+        {
+          "token": "M",
+          "weight": 18180
+        },
+        {
+          "token": "N",
+          "weight": 47277
+        },
+        {
+          "token": "O",
+          "weight": 41618
+        },
+        {
+          "token": "P",
+          "weight": 19582
+        },
+        {
+          "token": "QU",
+          "weight": 1229
+        },
+        {
+          "token": "R",
+          "weight": 49534
+        },
+        {
+          "token": "S",
+          "weight": 60246
+        },
+        {
+          "token": "T",
+          "weight": 46163
+        },
+        {
+          "token": "U",
+          "weight": 22752
+        },
+        {
+          "token": "V",
+          "weight": 6938
+        },
+        {
+          "token": "W",
+          "weight": 6168
+        },
+        {
+          "token": "X",
+          "weight": 1852
+        },
+        {
+          "token": "Y",
+          "weight": 10655
+        },
+        {
+          "token": "Z",
+          "weight": 2889
+        }
+      ],
+      "totalWeight": 677686,
+      "normalizedPercentages": [
+        {
+          "token": "A",
+          "percent": 7.387345
+        },
+        {
+          "token": "B",
+          "percent": 1.962708
+        },
+        {
+          "token": "C",
+          "percent": 4.068994
+        },
+        {
+          "token": "D",
+          "percent": 3.846914
+        },
+        {
+          "token": "E",
+          "percent": 11.614081
+        },
+        {
+          "token": "F",
+          "percent": 1.407584
+        },
+        {
+          "token": "G",
+          "percent": 3.020573
+        },
+        {
+          "token": "H",
+          "percent": 2.2385
+        },
+        {
+          "token": "I",
+          "percent": 8.617265
+        },
+        {
+          "token": "J",
+          "percent": 0.1815
+        },
+        {
+          "token": "K",
+          "percent": 0.937012
+        },
+        {
+          "token": "L",
+          "percent": 5.272353
+        },
+        {
+          "token": "M",
+          "percent": 2.682658
+        },
+        {
+          "token": "N",
+          "percent": 6.97624
+        },
+        {
+          "token": "O",
+          "percent": 6.141192
+        },
+        {
+          "token": "P",
+          "percent": 2.889539
+        },
+        {
+          "token": "QU",
+          "percent": 0.181352
+        },
+        {
+          "token": "R",
+          "percent": 7.309285
+        },
+        {
+          "token": "S",
+          "percent": 8.889958
+        },
+        {
+          "token": "T",
+          "percent": 6.811857
+        },
+        {
+          "token": "U",
+          "percent": 3.357307
+        },
+        {
+          "token": "V",
+          "percent": 1.023778
+        },
+        {
+          "token": "W",
+          "percent": 0.910156
+        },
+        {
+          "token": "X",
+          "percent": 0.273283
+        },
+        {
+          "token": "Y",
+          "percent": 1.572262
+        },
+        {
+          "token": "Z",
+          "percent": 0.426304
+        }
+      ],
+      "vowelTokenPercent": 37.11719,
+      "rareTokenPercent": 1.062439,
+      "expectedQuTokenPercent": 0.181352,
+      "repeatBehaviour": "All repeated occurrences contribute.",
+      "rawBoardSimulations": [
+        {
+          "size": 4,
+          "boardCount": 10000,
+          "meanVowelTokens": 5.9564,
+          "meanMaximumRepeatedToken": 3.2147,
+          "boardsWithRepeatedTokenPercent": 99.99,
+          "boardsWithTripleTokenPercent": 82.54,
+          "observedTokenPercentages": [
+            {
+              "token": "A",
+              "percent": 7.428125
+            },
+            {
+              "token": "B",
+              "percent": 1.9975
+            },
+            {
+              "token": "C",
+              "percent": 3.97625
+            },
+            {
+              "token": "D",
+              "percent": 3.835625
+            },
+            {
+              "token": "E",
+              "percent": 11.6725
+            },
+            {
+              "token": "F",
+              "percent": 1.38375
+            },
+            {
+              "token": "G",
+              "percent": 3.025625
+            },
+            {
+              "token": "H",
+              "percent": 2.17
+            },
+            {
+              "token": "I",
+              "percent": 8.588125
+            },
+            {
+              "token": "J",
+              "percent": 0.205
+            },
+            {
+              "token": "K",
+              "percent": 0.96125
+            },
+            {
+              "token": "L",
+              "percent": 5.251875
+            },
+            {
+              "token": "M",
+              "percent": 2.600625
+            },
+            {
+              "token": "N",
+              "percent": 7.07375
+            },
+            {
+              "token": "O",
+              "percent": 6.133125
+            },
+            {
+              "token": "P",
+              "percent": 2.92625
+            },
+            {
+              "token": "QU",
+              "percent": 0.1925
+            },
+            {
+              "token": "R",
+              "percent": 7.31125
+            },
+            {
+              "token": "S",
+              "percent": 8.924375
+            },
+            {
+              "token": "T",
+              "percent": 6.735
+            },
+            {
+              "token": "U",
+              "percent": 3.405625
+            },
+            {
+              "token": "V",
+              "percent": 1.021875
+            },
+            {
+              "token": "W",
+              "percent": 0.89125
+            },
+            {
+              "token": "X",
+              "percent": 0.268125
+            },
+            {
+              "token": "Y",
+              "percent": 1.616875
+            },
+            {
+              "token": "Z",
+              "percent": 0.40375
+            }
+          ]
+        },
+        {
+          "size": 5,
+          "boardCount": 10000,
+          "meanVowelTokens": 9.2733,
+          "meanMaximumRepeatedToken": 4.3955,
+          "boardsWithRepeatedTokenPercent": 100,
+          "boardsWithTripleTokenPercent": 99.83,
+          "observedTokenPercentages": [
+            {
+              "token": "A",
+              "percent": 7.3848
+            },
+            {
+              "token": "B",
+              "percent": 1.9316
+            },
+            {
+              "token": "C",
+              "percent": 4.1052
+            },
+            {
+              "token": "D",
+              "percent": 3.8584
+            },
+            {
+              "token": "E",
+              "percent": 11.6108
+            },
+            {
+              "token": "F",
+              "percent": 1.4396
+            },
+            {
+              "token": "G",
+              "percent": 3.0112
+            },
+            {
+              "token": "H",
+              "percent": 2.2416
+            },
+            {
+              "token": "I",
+              "percent": 8.5824
+            },
+            {
+              "token": "J",
+              "percent": 0.1912
+            },
+            {
+              "token": "K",
+              "percent": 0.958
+            },
+            {
+              "token": "L",
+              "percent": 5.32
+            },
+            {
+              "token": "M",
+              "percent": 2.584
+            },
+            {
+              "token": "N",
+              "percent": 6.9856
+            },
+            {
+              "token": "O",
+              "percent": 6.1364
+            },
+            {
+              "token": "P",
+              "percent": 2.8816
+            },
+            {
+              "token": "QU",
+              "percent": 0.1728
+            },
+            {
+              "token": "R",
+              "percent": 7.366
+            },
+            {
+              "token": "S",
+              "percent": 8.8908
+            },
+            {
+              "token": "T",
+              "percent": 6.7784
+            },
+            {
+              "token": "U",
+              "percent": 3.3788
+            },
+            {
+              "token": "V",
+              "percent": 1
+            },
+            {
+              "token": "W",
+              "percent": 0.8936
+            },
+            {
+              "token": "X",
+              "percent": 0.2568
+            },
+            {
+              "token": "Y",
+              "percent": 1.608
+            },
+            {
+              "token": "Z",
+              "percent": 0.4324
+            }
+          ]
+        },
+        {
+          "size": 6,
+          "boardCount": 10000,
+          "meanVowelTokens": 13.3407,
+          "meanMaximumRepeatedToken": 5.7582,
+          "boardsWithRepeatedTokenPercent": 100,
+          "boardsWithTripleTokenPercent": 100,
+          "observedTokenPercentages": [
+            {
+              "token": "A",
+              "percent": 7.403056
+            },
+            {
+              "token": "B",
+              "percent": 1.998056
+            },
+            {
+              "token": "C",
+              "percent": 4.019722
+            },
+            {
+              "token": "D",
+              "percent": 3.860556
+            },
+            {
+              "token": "E",
+              "percent": 11.566111
+            },
+            {
+              "token": "F",
+              "percent": 1.380278
+            },
+            {
+              "token": "G",
+              "percent": 3.043611
+            },
+            {
+              "token": "H",
+              "percent": 2.261667
+            },
+            {
+              "token": "I",
+              "percent": 8.597222
+            },
+            {
+              "token": "J",
+              "percent": 0.174167
+            },
+            {
+              "token": "K",
+              "percent": 0.925556
+            },
+            {
+              "token": "L",
+              "percent": 5.235833
+            },
+            {
+              "token": "M",
+              "percent": 2.713611
+            },
+            {
+              "token": "N",
+              "percent": 6.971667
+            },
+            {
+              "token": "O",
+              "percent": 6.188333
+            },
+            {
+              "token": "P",
+              "percent": 2.868056
+            },
+            {
+              "token": "QU",
+              "percent": 0.180278
+            },
+            {
+              "token": "R",
+              "percent": 7.323333
+            },
+            {
+              "token": "S",
+              "percent": 8.968611
+            },
+            {
+              "token": "T",
+              "percent": 6.834444
+            },
+            {
+              "token": "U",
+              "percent": 3.302778
+            },
+            {
+              "token": "V",
+              "percent": 1.033056
+            },
+            {
+              "token": "W",
+              "percent": 0.905
+            },
+            {
+              "token": "X",
+              "percent": 0.261667
+            },
+            {
+              "token": "Y",
+              "percent": 1.5575
+            },
+            {
+              "token": "Z",
+              "percent": 0.425833
+            }
+          ]
+        }
+      ],
+      "advantages": [
+        "Directly represents the complete accepted dictionary corpus.",
+        "Simple to reproduce and explain.",
+        "Retains natural repeated-letter signals."
+      ],
+      "disadvantages": [
+        "Long words contribute more weight than short words.",
+        "Repeated letters in one word contribute without a per-word limit."
+      ]
+    },
+    {
+      "id": "per-word-presence",
+      "description": "Each letter contributes at most once for each accepted dictionary word.",
+      "perWordLetterCap": 1,
+      "tokenWeights": [
+        {
+          "token": "A",
+          "weight": 40720
+        },
+        {
+          "token": "B",
+          "weight": 12187
+        },
+        {
+          "token": "C",
+          "weight": 24007
+        },
+        {
+          "token": "D",
+          "weight": 22917
+        },
+        {
+          "token": "E",
+          "weight": 54794
+        },
+        {
+          "token": "F",
+          "weight": 8460
+        },
+        {
+          "token": "G",
+          "weight": 18352
+        },
+        {
+          "token": "H",
+          "weight": 14107
+        },
+        {
+          "token": "I",
+          "weight": 43990
+        },
+        {
+          "token": "J",
+          "weight": 1217
+        },
+        {
+          "token": "K",
+          "weight": 6065
+        },
+        {
+          "token": "L",
+          "weight": 29618
+        },
+        {
+          "token": "M",
+          "weight": 16380
+        },
+        {
+          "token": "N",
+          "weight": 37564
+        },
+        {
+          "token": "O",
+          "weight": 33066
+        },
+        {
+          "token": "P",
+          "weight": 17289
+        },
+        {
+          "token": "QU",
+          "weight": 1229
+        },
+        {
+          "token": "R",
+          "weight": 40886
+        },
+        {
+          "token": "S",
+          "weight": 44495
+        },
+        {
+          "token": "T",
+          "weight": 37070
+        },
+        {
+          "token": "U",
+          "weight": 20860
+        },
+        {
+          "token": "V",
+          "weight": 6730
+        },
+        {
+          "token": "W",
+          "weight": 5938
+        },
+        {
+          "token": "X",
+          "weight": 1842
+        },
+        {
+          "token": "Y",
+          "weight": 10370
+        },
+        {
+          "token": "Z",
+          "weight": 2675
+        }
+      ],
+      "totalWeight": 552828,
+      "normalizedPercentages": [
+        {
+          "token": "A",
+          "percent": 7.365763
+        },
+        {
+          "token": "B",
+          "percent": 2.204483
+        },
+        {
+          "token": "C",
+          "percent": 4.34258
+        },
+        {
+          "token": "D",
+          "percent": 4.145412
+        },
+        {
+          "token": "E",
+          "percent": 9.911582
+        },
+        {
+          "token": "F",
+          "percent": 1.530313
+        },
+        {
+          "token": "G",
+          "percent": 3.319658
+        },
+        {
+          "token": "H",
+          "percent": 2.551788
+        },
+        {
+          "token": "I",
+          "percent": 7.957267
+        },
+        {
+          "token": "J",
+          "percent": 0.220141
+        },
+        {
+          "token": "K",
+          "percent": 1.097086
+        },
+        {
+          "token": "L",
+          "percent": 5.357543
+        },
+        {
+          "token": "M",
+          "percent": 2.962947
+        },
+        {
+          "token": "N",
+          "percent": 6.79488
+        },
+        {
+          "token": "O",
+          "percent": 5.981246
+        },
+        {
+          "token": "P",
+          "percent": 3.127374
+        },
+        {
+          "token": "QU",
+          "percent": 0.222311
+        },
+        {
+          "token": "R",
+          "percent": 7.39579
+        },
+        {
+          "token": "S",
+          "percent": 8.048615
+        },
+        {
+          "token": "T",
+          "percent": 6.705521
+        },
+        {
+          "token": "U",
+          "percent": 3.773326
+        },
+        {
+          "token": "V",
+          "percent": 1.217377
+        },
+        {
+          "token": "W",
+          "percent": 1.074113
+        },
+        {
+          "token": "X",
+          "percent": 0.333196
+        },
+        {
+          "token": "Y",
+          "percent": 1.875809
+        },
+        {
+          "token": "Z",
+          "percent": 0.483876
+        }
+      ],
+      "vowelTokenPercent": 34.989183,
+      "rareTokenPercent": 1.259524,
+      "expectedQuTokenPercent": 0.222311,
+      "repeatBehaviour": "Repeated occurrences within one word do not add weight.",
+      "rawBoardSimulations": [
+        {
+          "size": 4,
+          "boardCount": 10000,
+          "meanVowelTokens": 5.6025,
+          "meanMaximumRepeatedToken": 3.0836,
+          "boardsWithRepeatedTokenPercent": 99.98,
+          "boardsWithTripleTokenPercent": 77.65,
+          "observedTokenPercentages": [
+            {
+              "token": "A",
+              "percent": 7.325625
+            },
+            {
+              "token": "B",
+              "percent": 2.16875
+            },
+            {
+              "token": "C",
+              "percent": 4.366875
+            },
+            {
+              "token": "D",
+              "percent": 4.121875
+            },
+            {
+              "token": "E",
+              "percent": 10.10375
+            },
+            {
+              "token": "F",
+              "percent": 1.5725
+            },
+            {
+              "token": "G",
+              "percent": 3.270625
+            },
+            {
+              "token": "H",
+              "percent": 2.575
+            },
+            {
+              "token": "I",
+              "percent": 7.90375
+            },
+            {
+              "token": "J",
+              "percent": 0.22625
+            },
+            {
+              "token": "K",
+              "percent": 1.085
+            },
+            {
+              "token": "L",
+              "percent": 5.295625
+            },
+            {
+              "token": "M",
+              "percent": 3.083125
+            },
+            {
+              "token": "N",
+              "percent": 6.76125
+            },
+            {
+              "token": "O",
+              "percent": 5.93
+            },
+            {
+              "token": "P",
+              "percent": 3.095625
+            },
+            {
+              "token": "QU",
+              "percent": 0.211875
+            },
+            {
+              "token": "R",
+              "percent": 7.38375
+            },
+            {
+              "token": "S",
+              "percent": 7.943125
+            },
+            {
+              "token": "T",
+              "percent": 6.733125
+            },
+            {
+              "token": "U",
+              "percent": 3.7525
+            },
+            {
+              "token": "V",
+              "percent": 1.24
+            },
+            {
+              "token": "W",
+              "percent": 1.100625
+            },
+            {
+              "token": "X",
+              "percent": 0.34
+            },
+            {
+              "token": "Y",
+              "percent": 1.878125
+            },
+            {
+              "token": "Z",
+              "percent": 0.53125
+            }
+          ]
+        },
+        {
+          "size": 5,
+          "boardCount": 10000,
+          "meanVowelTokens": 8.7835,
+          "meanMaximumRepeatedToken": 4.1523,
+          "boardsWithRepeatedTokenPercent": 100,
+          "boardsWithTripleTokenPercent": 99.59,
+          "observedTokenPercentages": [
+            {
+              "token": "A",
+              "percent": 7.3912
+            },
+            {
+              "token": "B",
+              "percent": 2.2564
+            },
+            {
+              "token": "C",
+              "percent": 4.3572
+            },
+            {
+              "token": "D",
+              "percent": 4.1092
+            },
+            {
+              "token": "E",
+              "percent": 9.868
+            },
+            {
+              "token": "F",
+              "percent": 1.5388
+            },
+            {
+              "token": "G",
+              "percent": 3.28
+            },
+            {
+              "token": "H",
+              "percent": 2.5008
+            },
+            {
+              "token": "I",
+              "percent": 8.0596
+            },
+            {
+              "token": "J",
+              "percent": 0.22
+            },
+            {
+              "token": "K",
+              "percent": 1.1192
+            },
+            {
+              "token": "L",
+              "percent": 5.3396
+            },
+            {
+              "token": "M",
+              "percent": 2.9756
+            },
+            {
+              "token": "N",
+              "percent": 6.7096
+            },
+            {
+              "token": "O",
+              "percent": 6.0508
+            },
+            {
+              "token": "P",
+              "percent": 3.1836
+            },
+            {
+              "token": "QU",
+              "percent": 0.2152
+            },
+            {
+              "token": "R",
+              "percent": 7.394
+            },
+            {
+              "token": "S",
+              "percent": 7.9468
+            },
+            {
+              "token": "T",
+              "percent": 6.7056
+            },
+            {
+              "token": "U",
+              "percent": 3.7644
+            },
+            {
+              "token": "V",
+              "percent": 1.2236
+            },
+            {
+              "token": "W",
+              "percent": 1.0924
+            },
+            {
+              "token": "X",
+              "percent": 0.328
+            },
+            {
+              "token": "Y",
+              "percent": 1.8712
+            },
+            {
+              "token": "Z",
+              "percent": 0.4992
+            }
+          ]
+        },
+        {
+          "size": 6,
+          "boardCount": 10000,
+          "meanVowelTokens": 12.6435,
+          "meanMaximumRepeatedToken": 5.4279,
+          "boardsWithRepeatedTokenPercent": 100,
+          "boardsWithTripleTokenPercent": 100,
+          "observedTokenPercentages": [
+            {
+              "token": "A",
+              "percent": 7.338611
+            },
+            {
+              "token": "B",
+              "percent": 2.191944
+            },
+            {
+              "token": "C",
+              "percent": 4.334722
+            },
+            {
+              "token": "D",
+              "percent": 4.134167
+            },
+            {
+              "token": "E",
+              "percent": 9.976389
+            },
+            {
+              "token": "F",
+              "percent": 1.506389
+            },
+            {
+              "token": "G",
+              "percent": 3.354722
+            },
+            {
+              "token": "H",
+              "percent": 2.540278
+            },
+            {
+              "token": "I",
+              "percent": 7.953889
+            },
+            {
+              "token": "J",
+              "percent": 0.216944
+            },
+            {
+              "token": "K",
+              "percent": 1.119444
+            },
+            {
+              "token": "L",
+              "percent": 5.375833
+            },
+            {
+              "token": "M",
+              "percent": 2.975833
+            },
+            {
+              "token": "N",
+              "percent": 6.735833
+            },
+            {
+              "token": "O",
+              "percent": 6.036389
+            },
+            {
+              "token": "P",
+              "percent": 3.111667
+            },
+            {
+              "token": "QU",
+              "percent": 0.214444
+            },
+            {
+              "token": "R",
+              "percent": 7.328889
+            },
+            {
+              "token": "S",
+              "percent": 8.023333
+            },
+            {
+              "token": "T",
+              "percent": 6.683056
+            },
+            {
+              "token": "U",
+              "percent": 3.815556
+            },
+            {
+              "token": "V",
+              "percent": 1.2125
+            },
+            {
+              "token": "W",
+              "percent": 1.069167
+            },
+            {
+              "token": "X",
+              "percent": 0.345
+            },
+            {
+              "token": "Y",
+              "percent": 1.9025
+            },
+            {
+              "token": "Z",
+              "percent": 0.5025
+            }
+          ]
+        }
+      ],
+      "advantages": [
+        "Every word has equal maximum influence on one letter.",
+        "Strongly limits repeated-letter amplification."
+      ],
+      "disadvantages": [
+        "Discards all within-word repetition information.",
+        "Produces the lowest vowel share of the evaluated candidates."
+      ]
+    },
+    {
+      "id": "per-word-capped-occurrence-2",
+      "description": "Each letter contributes at most twice for each accepted dictionary word.",
+      "perWordLetterCap": 2,
+      "tokenWeights": [
+        {
+          "token": "A",
+          "weight": 49322
+        },
+        {
+          "token": "B",
+          "weight": 13232
+        },
+        {
+          "token": "C",
+          "weight": 27382
+        },
+        {
+          "token": "D",
+          "weight": 25850
+        },
+        {
+          "token": "E",
+          "weight": 74285
+        },
+        {
+          "token": "F",
+          "weight": 9511
+        },
+        {
+          "token": "G",
+          "weight": 20260
+        },
+        {
+          "token": "H",
+          "weight": 15153
+        },
+        {
+          "token": "I",
+          "weight": 56041
+        },
+        {
+          "token": "J",
+          "weight": 1230
+        },
+        {
+          "token": "K",
+          "weight": 6343
+        },
+        {
+          "token": "L",
+          "weight": 35167
+        },
+        {
+          "token": "M",
+          "weight": 18097
+        },
+        {
+          "token": "N",
+          "weight": 46103
+        },
+        {
+          "token": "O",
+          "weight": 40728
+        },
+        {
+          "token": "P",
+          "weight": 19476
+        },
+        {
+          "token": "QU",
+          "weight": 1229
+        },
+        {
+          "token": "R",
+          "weight": 48891
+        },
+        {
+          "token": "S",
+          "weight": 57352
+        },
+        {
+          "token": "T",
+          "weight": 45407
+        },
+        {
+          "token": "U",
+          "weight": 22662
+        },
+        {
+          "token": "V",
+          "weight": 6938
+        },
+        {
+          "token": "W",
+          "weight": 6160
+        },
+        {
+          "token": "X",
+          "weight": 1852
+        },
+        {
+          "token": "Y",
+          "weight": 10652
+        },
+        {
+          "token": "Z",
+          "weight": 2884
+        }
+      ],
+      "totalWeight": 662207,
+      "normalizedPercentages": [
+        {
+          "token": "A",
+          "percent": 7.448124
+        },
+        {
+          "token": "B",
+          "percent": 1.998167
+        },
+        {
+          "token": "C",
+          "percent": 4.134961
+        },
+        {
+          "token": "D",
+          "percent": 3.903613
+        },
+        {
+          "token": "E",
+          "percent": 11.217791
+        },
+        {
+          "token": "F",
+          "percent": 1.436258
+        },
+        {
+          "token": "G",
+          "percent": 3.059466
+        },
+        {
+          "token": "H",
+          "percent": 2.288257
+        },
+        {
+          "token": "I",
+          "percent": 8.462762
+        },
+        {
+          "token": "J",
+          "percent": 0.185743
+        },
+        {
+          "token": "K",
+          "percent": 0.957858
+        },
+        {
+          "token": "L",
+          "percent": 5.310575
+        },
+        {
+          "token": "M",
+          "percent": 2.732831
+        },
+        {
+          "token": "N",
+          "percent": 6.962022
+        },
+        {
+          "token": "O",
+          "percent": 6.150343
+        },
+        {
+          "token": "P",
+          "percent": 2.941074
+        },
+        {
+          "token": "QU",
+          "percent": 0.185592
+        },
+        {
+          "token": "R",
+          "percent": 7.383039
+        },
+        {
+          "token": "S",
+          "percent": 8.660736
+        },
+        {
+          "token": "T",
+          "percent": 6.856919
+        },
+        {
+          "token": "U",
+          "percent": 3.422193
+        },
+        {
+          "token": "V",
+          "percent": 1.047709
+        },
+        {
+          "token": "W",
+          "percent": 0.930223
+        },
+        {
+          "token": "X",
+          "percent": 0.279671
+        },
+        {
+          "token": "Y",
+          "percent": 1.60856
+        },
+        {
+          "token": "Z",
+          "percent": 0.435513
+        }
+      ],
+      "vowelTokenPercent": 36.701213,
+      "rareTokenPercent": 1.086518,
+      "expectedQuTokenPercent": 0.185592,
+      "repeatBehaviour": "Up to two occurrences of one letter per word contribute.",
+      "rawBoardSimulations": [
+        {
+          "size": 4,
+          "boardCount": 10000,
+          "meanVowelTokens": 5.8289,
+          "meanMaximumRepeatedToken": 3.1809,
+          "boardsWithRepeatedTokenPercent": 99.99,
+          "boardsWithTripleTokenPercent": 81.27,
+          "observedTokenPercentages": [
+            {
+              "token": "A",
+              "percent": 7.32875
+            },
+            {
+              "token": "B",
+              "percent": 2.008125
+            },
+            {
+              "token": "C",
+              "percent": 4.173125
+            },
+            {
+              "token": "D",
+              "percent": 3.938125
+            },
+            {
+              "token": "E",
+              "percent": 11.085625
+            },
+            {
+              "token": "F",
+              "percent": 1.4075
+            },
+            {
+              "token": "G",
+              "percent": 3.14375
+            },
+            {
+              "token": "H",
+              "percent": 2.2175
+            },
+            {
+              "token": "I",
+              "percent": 8.41125
+            },
+            {
+              "token": "J",
+              "percent": 0.1775
+            },
+            {
+              "token": "K",
+              "percent": 0.936875
+            },
+            {
+              "token": "L",
+              "percent": 5.305625
+            },
+            {
+              "token": "M",
+              "percent": 2.744375
+            },
+            {
+              "token": "N",
+              "percent": 6.945
+            },
+            {
+              "token": "O",
+              "percent": 6.185
+            },
+            {
+              "token": "P",
+              "percent": 2.98625
+            },
+            {
+              "token": "QU",
+              "percent": 0.19625
+            },
+            {
+              "token": "R",
+              "percent": 7.430625
+            },
+            {
+              "token": "S",
+              "percent": 8.68
+            },
+            {
+              "token": "T",
+              "percent": 7.010625
+            },
+            {
+              "token": "U",
+              "percent": 3.42
+            },
+            {
+              "token": "V",
+              "percent": 1.020625
+            },
+            {
+              "token": "W",
+              "percent": 0.928125
+            },
+            {
+              "token": "X",
+              "percent": 0.27625
+            },
+            {
+              "token": "Y",
+              "percent": 1.598125
+            },
+            {
+              "token": "Z",
+              "percent": 0.445
+            }
+          ]
+        },
+        {
+          "size": 5,
+          "boardCount": 10000,
+          "meanVowelTokens": 9.1266,
+          "meanMaximumRepeatedToken": 4.3406,
+          "boardsWithRepeatedTokenPercent": 100,
+          "boardsWithTripleTokenPercent": 99.85,
+          "observedTokenPercentages": [
+            {
+              "token": "A",
+              "percent": 7.4004
+            },
+            {
+              "token": "B",
+              "percent": 1.9924
+            },
+            {
+              "token": "C",
+              "percent": 4.1184
+            },
+            {
+              "token": "D",
+              "percent": 3.8912
+            },
+            {
+              "token": "E",
+              "percent": 11.1612
+            },
+            {
+              "token": "F",
+              "percent": 1.4328
+            },
+            {
+              "token": "G",
+              "percent": 3.0988
+            },
+            {
+              "token": "H",
+              "percent": 2.29
+            },
+            {
+              "token": "I",
+              "percent": 8.478
+            },
+            {
+              "token": "J",
+              "percent": 0.196
+            },
+            {
+              "token": "K",
+              "percent": 0.9576
+            },
+            {
+              "token": "L",
+              "percent": 5.2164
+            },
+            {
+              "token": "M",
+              "percent": 2.7664
+            },
+            {
+              "token": "N",
+              "percent": 7.1028
+            },
+            {
+              "token": "O",
+              "percent": 6.124
+            },
+            {
+              "token": "P",
+              "percent": 2.962
+            },
+            {
+              "token": "QU",
+              "percent": 0.182
+            },
+            {
+              "token": "R",
+              "percent": 7.4052
+            },
+            {
+              "token": "S",
+              "percent": 8.688
+            },
+            {
+              "token": "T",
+              "percent": 6.874
+            },
+            {
+              "token": "U",
+              "percent": 3.3428
+            },
+            {
+              "token": "V",
+              "percent": 1.0264
+            },
+            {
+              "token": "W",
+              "percent": 0.9252
+            },
+            {
+              "token": "X",
+              "percent": 0.2856
+            },
+            {
+              "token": "Y",
+              "percent": 1.6384
+            },
+            {
+              "token": "Z",
+              "percent": 0.444
+            }
+          ]
+        },
+        {
+          "size": 6,
+          "boardCount": 10000,
+          "meanVowelTokens": 13.2438,
+          "meanMaximumRepeatedToken": 5.6742,
+          "boardsWithRepeatedTokenPercent": 100,
+          "boardsWithTripleTokenPercent": 100,
+          "observedTokenPercentages": [
+            {
+              "token": "A",
+              "percent": 7.494167
+            },
+            {
+              "token": "B",
+              "percent": 1.996111
+            },
+            {
+              "token": "C",
+              "percent": 4.143056
+            },
+            {
+              "token": "D",
+              "percent": 3.910278
+            },
+            {
+              "token": "E",
+              "percent": 11.178889
+            },
+            {
+              "token": "F",
+              "percent": 1.404722
+            },
+            {
+              "token": "G",
+              "percent": 3.098889
+            },
+            {
+              "token": "H",
+              "percent": 2.273889
+            },
+            {
+              "token": "I",
+              "percent": 8.5125
+            },
+            {
+              "token": "J",
+              "percent": 0.190278
+            },
+            {
+              "token": "K",
+              "percent": 0.978333
+            },
+            {
+              "token": "L",
+              "percent": 5.319167
+            },
+            {
+              "token": "M",
+              "percent": 2.7225
+            },
+            {
+              "token": "N",
+              "percent": 6.935278
+            },
+            {
+              "token": "O",
+              "percent": 6.154167
+            },
+            {
+              "token": "P",
+              "percent": 2.961944
+            },
+            {
+              "token": "QU",
+              "percent": 0.198333
+            },
+            {
+              "token": "R",
+              "percent": 7.389722
+            },
+            {
+              "token": "S",
+              "percent": 8.535278
+            },
+            {
+              "token": "T",
+              "percent": 6.868889
+            },
+            {
+              "token": "U",
+              "percent": 3.448611
+            },
+            {
+              "token": "V",
+              "percent": 1.049167
+            },
+            {
+              "token": "W",
+              "percent": 0.956389
+            },
+            {
+              "token": "X",
+              "percent": 0.2575
+            },
+            {
+              "token": "Y",
+              "percent": 1.588056
+            },
+            {
+              "token": "Z",
+              "percent": 0.433889
+            }
+          ]
+        }
+      ],
+      "advantages": [
+        "Keeps useful repeated-letter evidence while bounding each word’s influence.",
+        "Preserves a vowel share close to the raw corpus.",
+        "Uses a single transparent integer cap with no blended or proprietary table."
+      ],
+      "disadvantages": [
+        "The cap is a project policy rather than a linguistic law.",
+        "A third or later repeated occurrence in one word does not add weight."
+      ]
+    }
+  ],
+  "selection": {
+    "candidateId": "per-word-capped-occurrence-2",
+    "rationale": "The cap-of-two profile preserves nearly all raw-corpus vowel balance and meaningful repeated-letter evidence while bounding the influence of long repeated-letter words. It requires no blend and no adjustments."
+  }
+}

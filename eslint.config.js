@@ -9,6 +9,36 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    files: ['packages/game-data/scripts/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      globals: globals.node,
+    },
+  },
+  {
+    files: ['apps/client/**/*.{ts,tsx}', 'packages/shared/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@words/game-data',
+                '@words/game-data/*',
+                '**/packages/game-data/**',
+                '**/game-data/src/**',
+                '**/game-data/data/**',
+              ],
+              message:
+                'Production game data is server-only and must not enter browser-reachable code.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
       ecmaVersion: 2022,

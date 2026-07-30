@@ -14,6 +14,11 @@
   ],
   "scripts": {
     "dev": "concurrently --kill-others-on-fail --names server,client --prefix-colors blue,green \"npm run dev --workspace @words/server\" \"npm run dev --workspace @words/client\"",
+    "data:verify": "node packages/game-data/scripts/verify-data.mjs",
+    "data:dictionary:build": "node packages/game-data/scripts/build-dictionary.mjs",
+    "data:dictionary:audit": "node packages/game-data/scripts/audit-vocabulary.mjs",
+    "data:distribution:derive": "node packages/game-data/scripts/derive-distribution.mjs",
+    "data:boards:audit": "tsx packages/game-data/scripts/audit-boards.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
