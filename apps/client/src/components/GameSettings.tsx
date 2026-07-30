@@ -66,17 +66,6 @@ export function GameSettings({
           ))}
         </div>
       </fieldset>
-
-      <div className="setting-summary">
-        <span>
-          <small>Scoring mode</small>
-          <strong>Traditional</strong>
-        </span>
-        <span>
-          <small>Shared words</small>
-          <strong>Score zero</strong>
-        </span>
-      </div>
     </section>
   );
 }

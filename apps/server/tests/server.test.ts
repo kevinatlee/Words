@@ -5,7 +5,10 @@ import {
   type Socket as ClientSocket,
 } from 'socket.io-client';
 
-import type { ProductionDictionaryLoadResult } from '@words/game-data';
+import {
+  PRODUCTION_DICTIONARY_IDENTITY,
+  type ProductionDictionaryLoadResult,
+} from '@words/game-data';
 import type {
   ClientToServerEvents,
   ControllerActionResponse,
@@ -40,7 +43,7 @@ const successfulDictionaryLoad: Extract<
   success: true,
   dictionary: {} as never,
   wordCount: 79_370,
-  manifest: {} as never,
+  manifest: PRODUCTION_DICTIONARY_IDENTITY as never,
 };
 
 const testDependencies = {

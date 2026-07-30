@@ -84,6 +84,12 @@ Vite client on :5173
 The Vite proxy means the browser connects to its current origin. The current
 production build does not yet serve the React build from Express.
 
+Vite keeps client hot reload. The development server process is intentionally
+single-run rather than watched: workspace dependency activity previously
+restarted it and silently discarded temporary rooms. Server source changes
+therefore require stopping and restarting `npm run dev`; a real server crash
+still remains visible and ends the combined command.
+
 ## Health endpoint
 
 `GET /api/health` returns:

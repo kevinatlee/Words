@@ -190,10 +190,10 @@ export const roundStateSchema = z
       });
     }
 
-    if (round.endedAt !== null && Date.parse(round.endedAt) < deadlineAt) {
+    if (round.endedAt !== null && Date.parse(round.endedAt) !== deadlineAt) {
       context.addIssue({
         code: 'custom',
-        message: 'A round cannot end before its deadline.',
+        message: 'An ended round timestamp must equal its deadline.',
         path: ['endedAt'],
       });
     }

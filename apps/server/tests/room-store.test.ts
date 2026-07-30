@@ -71,6 +71,44 @@ function expectRoomError(
 }
 
 describe('RoomStore display and player sessions', () => {
+  it.each([
+    ['NaN', Number.NaN],
+    ['positive infinity', Number.POSITIVE_INFINITY],
+    ['a negative value', -1],
+    ['a timestamp too close to the Date range limit', 8_640_000_000_000_000],
+  ])(
+    'fails closed before creating state when the clock returns %s',
+    (_label, invalidNow) => {
+      const store = createStore({ now: () => invalidNow });
+
+      expectRoomError(
+        () => store.createDisplay('socket-display'),
+        'INTERNAL_ERROR',
+      );
+      expect(store.roomCount).toBe(0);
+    },
+  );
+
+  it('keeps the last safe time when an injected clock becomes invalid or moves backward', () => {
+    const initialNow = Date.parse('2026-07-27T20:00:00.000Z');
+    let now = initialNow;
+    const store = createStore({ now: () => now });
+    const created = store.createDisplay('socket-display');
+
+    now = Number.NaN;
+    expect(store.getRoomState(created.room.code)?.serverTime).toBe(
+      '2026-07-27T20:00:00.000Z',
+    );
+    now = initialNow - 1_000;
+    const joined = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-player',
+    );
+    expect(joined.room.serverTime).toBe('2026-07-27T20:00:00.000Z');
+    expect(joined.player.joinedAt).toBe('2026-07-27T20:00:00.000Z');
+  });
+
   it('creates a LOBBY room with one display session and no player', () => {
     const store = createStore();
     const result = store.createDisplay('socket-display');
@@ -1217,12 +1255,17 @@ describe('RoomStore display and player sessions', () => {
       },
       'socket-display',
     );
+    const beforeCredentialExpiry = store.getRoomState(created.room.code);
     now += 60_000;
 
-    expect(store.cleanupExpired().deletedRoomCodes).toEqual([]);
-    expect(store.getRoomState(created.room.code)?.players).toHaveLength(1);
-    expect(store.getRoomState(created.room.code)?.display.connected).toBe(
-      false,
+    const cleanup = store.cleanupExpired();
+    const afterCredentialExpiry = store.getRoomState(created.room.code);
+    expect(cleanup.deletedRoomCodes).toEqual([]);
+    expect(cleanup.updatedRoomCodes).toEqual([]);
+    expect(afterCredentialExpiry?.players).toHaveLength(1);
+    expect(afterCredentialExpiry?.display.connected).toBe(false);
+    expect(afterCredentialExpiry?.stateVersion).toBe(
+      beforeCredentialExpiry?.stateVersion,
     );
   });
 
@@ -1477,6 +1520,30 @@ describe('RoomStore authoritative settings and rounds', () => {
     expect(after?.stateVersion).toBe(before?.stateVersion);
   });
 
+  it('treats an unchanged settings update as an idempotent no-op', () => {
+    let now = Date.parse('2026-07-29T20:00:00.000Z');
+    const { store, display, controllerSession } = createRoundRoom({
+      now: () => now,
+    });
+    const before = store.getRoomState(display.room.code);
+    now += 1_000;
+
+    const response = store.updateSettings(
+      controllerSession,
+      {
+        gridSize: 4,
+        roundDurationSeconds: 180,
+        scoringMode: 'traditional',
+      },
+      'socket-controller',
+    ).room;
+
+    expect(response.stateVersion).toBe(before?.stateVersion);
+    expect(response.lastActivityAt).toBe(before?.lastActivityAt);
+    expect(response.expiresAt).toBe(before?.expiresAt);
+    expect(response.serverTime).toBe('2026-07-29T20:00:01.000Z');
+  });
+
   it('creates a server-owned active round from the current settings', () => {
     const now = Date.parse('2026-07-29T20:00:00.000Z');
     const { store, controllerSession } = createRoundRoom({ now: () => now });
@@ -1641,6 +1708,227 @@ describe('RoomStore authoritative settings and rounds', () => {
     expect(store.getRoomState(display.room.code)?.phase).toBe('LOBBY');
   });
 
+  it.each([
+    [
+      'a thrown error',
+      () => {
+        throw new Error('private generator detail');
+      },
+    ],
+    [
+      'the wrong board size',
+      () =>
+        ({
+          success: true,
+          board: {
+            size: 5,
+            tiles: Array.from({ length: 25 }, () => 'A'),
+          },
+          attempts: 1,
+        }) as never,
+    ],
+    [
+      'a malformed token',
+      (size: 4 | 5 | 6) =>
+        ({
+          success: true,
+          board: {
+            size,
+            tiles: [
+              'lowercase',
+              ...Array.from({ length: size * size - 1 }, () => 'A'),
+            ],
+          },
+          attempts: 1,
+        }) as never,
+    ],
+    [
+      'zero attempts',
+      (size: 4 | 5 | 6) =>
+        ({
+          ...createSuccessfulBoard(size),
+          attempts: 0,
+        }) as never,
+    ],
+    [
+      'nine attempts',
+      (size: 4 | 5 | 6) =>
+        ({
+          ...createSuccessfulBoard(size),
+          attempts: 9,
+        }) as never,
+    ],
+    [
+      'NaN attempts',
+      (size: 4 | 5 | 6) =>
+        ({
+          ...createSuccessfulBoard(size),
+          attempts: Number.NaN,
+        }) as never,
+    ],
+  ])('rejects generator output with %s atomically', (_label, generator) => {
+    const { store, display, controllerSession } = createRoundRoom({
+      generator,
+    });
+    const before = store.getRoomState(display.room.code);
+
+    expectRoomError(
+      () => store.startRound(controllerSession, 'socket-controller'),
+      'BOARD_GENERATION_FAILED',
+    );
+    expect(store.getRoomState(display.room.code)).toMatchObject({
+      phase: before?.phase,
+      stateVersion: before?.stateVersion,
+      settings: before?.settings,
+      lastActivityAt: before?.lastActivityAt,
+      expiresAt: before?.expiresAt,
+      controllerPlayerId: before?.controllerPlayerId,
+      players: before?.players,
+      round: before?.round,
+    });
+  });
+
+  it('copies mutable generator output before publishing a round', () => {
+    const tiles = Array.from({ length: 16 }, () => 'A');
+    const { store, display, controllerSession } = createRoundRoom({
+      generator: (size) => ({
+        success: true,
+        board: { size, tiles },
+        attempts: 1,
+      }),
+    });
+
+    store.startRound(controllerSession, 'socket-controller');
+    tiles[0] = 'ZZ';
+
+    expect(store.getRoomState(display.room.code)?.round?.board.tiles[0]).toBe(
+      'A',
+    );
+  });
+
+  it('rejects a malformed round ID without mutating authoritative room state', () => {
+    let now = Date.parse('2026-07-29T20:00:00.000Z');
+    const storeWithMalformedId = createStore({
+      now: () => now,
+      roundIds: ['not-a-round-uuid'],
+      roundBoardGenerator: (size) => createSuccessfulBoard(size),
+    });
+    const malformedDisplay =
+      storeWithMalformedId.createDisplay('socket-display');
+    const malformedController = storeWithMalformedId.joinPlayer(
+      malformedDisplay.room.code,
+      'Silver Owl',
+      'socket-controller',
+    );
+    const malformedSession = {
+      role: 'player' as const,
+      roomCode: malformedDisplay.room.code,
+      playerId: malformedController.session.playerId,
+    };
+    const before = storeWithMalformedId.getRoomState(
+      malformedDisplay.room.code,
+    );
+    now += 1_000;
+
+    expectRoomError(
+      () =>
+        storeWithMalformedId.startRound(malformedSession, 'socket-controller'),
+      'INTERNAL_ERROR',
+    );
+    expect(
+      storeWithMalformedId.getRoomState(malformedDisplay.room.code),
+    ).toMatchObject({
+      phase: before?.phase,
+      stateVersion: before?.stateVersion,
+      lastActivityAt: before?.lastActivityAt,
+      expiresAt: before?.expiresAt,
+      settings: before?.settings,
+      round: null,
+    });
+  });
+
+  it('rejects a duplicate round ID without replacing an ended round', () => {
+    let now = Date.parse('2026-07-29T20:00:00.000Z');
+    const duplicateId = createUuid(711);
+    const store = createStore({
+      now: () => now,
+      roundIds: [duplicateId, duplicateId],
+      roundBoardGenerator: (size) => createSuccessfulBoard(size),
+    });
+    const display = store.createDisplay('socket-display');
+    const controller = store.joinPlayer(
+      display.room.code,
+      'Silver Owl',
+      'socket-controller',
+    );
+    const session = {
+      role: 'player' as const,
+      roomCode: display.room.code,
+      playerId: controller.session.playerId,
+    };
+    const started = store.startRound(session, 'socket-controller').room;
+    now = Date.parse(started.round?.deadlineAt ?? '');
+    const ended = store.getRoomState(display.room.code);
+
+    expectRoomError(
+      () => store.startRound(session, 'socket-controller'),
+      'INTERNAL_ERROR',
+    );
+    expect(store.getRoomState(display.room.code)).toMatchObject({
+      phase: 'ROUND_ENDED',
+      stateVersion: ended?.stateVersion,
+      lastActivityAt: ended?.lastActivityAt,
+      expiresAt: ended?.expiresAt,
+      round: ended?.round,
+    });
+  });
+
+  it('bounds a thrown round ID generator error without mutating the room', () => {
+    let tokenIndex = 0;
+    const store = new RoomStore({
+      maxPlayers: 8,
+      maxRooms: 20,
+      roomTtlMs: 120 * 60 * 1_000,
+      reconnectGraceMs: 60_000,
+      roomCodeGenerator: () => 'ABC234',
+      displaySessionIdGenerator: () => createUuid(100),
+      playerIdGenerator: () => createUuid(1),
+      reconnectTokenGenerator: () =>
+        `${String(++tokenIndex).padStart(3, '0')}${'t'.repeat(40)}`,
+      roundIdGenerator: () => {
+        throw new Error('private UUID generator detail');
+      },
+      roundBoardGenerator: (size) => createSuccessfulBoard(size),
+    });
+    const display = store.createDisplay('socket-display');
+    const controller = store.joinPlayer(
+      display.room.code,
+      'Silver Owl',
+      'socket-controller',
+    );
+    const before = store.getRoomState(display.room.code);
+
+    expectRoomError(
+      () =>
+        store.startRound(
+          {
+            role: 'player',
+            roomCode: display.room.code,
+            playerId: controller.session.playerId,
+          },
+          'socket-controller',
+        ),
+      'INTERNAL_ERROR',
+    );
+    expect(store.getRoomState(display.room.code)).toMatchObject({
+      phase: before?.phase,
+      stateVersion: before?.stateVersion,
+      lastActivityAt: before?.lastActivityAt,
+      expiresAt: before?.expiresAt,
+      round: null,
+    });
+  });
+
   it('rejects a start by an ordinary player or stale controller socket', () => {
     const { store, display, controllerSession } = createRoundRoom();
     const ordinary = store.joinPlayer(
@@ -1713,6 +2001,95 @@ describe('RoomStore authoritative settings and rounds', () => {
 
     expect(store.advanceDueRounds()).toEqual(['ABC234']);
     expect(store.advanceDueRounds()).toEqual([]);
+  });
+
+  it('advances multiple due rooms once in the same bounded sweep', () => {
+    let now = Date.parse('2026-07-29T20:00:00.000Z');
+    const store = createStore({
+      now: () => now,
+      codes: ['ABC234', 'DEF567'],
+      roundIds: [createUuid(721), createUuid(722)],
+      roundBoardGenerator: (size) => createSuccessfulBoard(size),
+    });
+    const firstDisplay = store.createDisplay('socket-display-one');
+    const firstController = store.joinPlayer(
+      firstDisplay.room.code,
+      'Silver Owl',
+      'socket-controller-one',
+    );
+    const secondDisplay = store.createDisplay('socket-display-two');
+    const secondController = store.joinPlayer(
+      secondDisplay.room.code,
+      'Amber Kite',
+      'socket-controller-two',
+    );
+    const firstSession = {
+      role: 'player' as const,
+      roomCode: firstDisplay.room.code,
+      playerId: firstController.session.playerId,
+    };
+    const secondSession = {
+      role: 'player' as const,
+      roomCode: secondDisplay.room.code,
+      playerId: secondController.session.playerId,
+    };
+    for (const [session, socketId] of [
+      [firstSession, 'socket-controller-one'],
+      [secondSession, 'socket-controller-two'],
+    ] as const) {
+      store.updateSettings(
+        session,
+        {
+          gridSize: 4,
+          roundDurationSeconds: 30,
+          scoringMode: 'traditional',
+        },
+        socketId,
+      );
+      store.startRound(session, socketId);
+    }
+
+    now += 30_000;
+    expect(store.advanceDueRounds()).toEqual(['ABC234', 'DEF567']);
+    expect(store.advanceDueRounds()).toEqual([]);
+  });
+
+  it('lets room expiration win when TTL and round deadline share a sweep', () => {
+    let now = Date.parse('2026-07-29T20:00:00.000Z');
+    const store = createStore({
+      now: () => now,
+      roomTtlMs: 30_000,
+      roundIds: [createUuid(731)],
+      roundBoardGenerator: (size) => createSuccessfulBoard(size),
+    });
+    const display = store.createDisplay('socket-display');
+    const controller = store.joinPlayer(
+      display.room.code,
+      'Silver Owl',
+      'socket-controller',
+    );
+    const session = {
+      role: 'player' as const,
+      roomCode: display.room.code,
+      playerId: controller.session.playerId,
+    };
+    store.updateSettings(
+      session,
+      {
+        gridSize: 4,
+        roundDurationSeconds: 30,
+        scoringMode: 'traditional',
+      },
+      'socket-controller',
+    );
+    store.startRound(session, 'socket-controller');
+
+    now += 30_000;
+    expect(store.cleanupExpired()).toEqual({
+      deletedRoomCodes: ['ABC234'],
+      updatedRoomCodes: [],
+    });
+    expect(store.getRoomState(display.room.code)).toBeNull();
   });
 
   it('reconciles an expired round before a controller action', () => {

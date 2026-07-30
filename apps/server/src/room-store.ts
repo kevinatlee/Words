@@ -6,6 +6,7 @@ import {
   roomCodeAlphabet,
   roomCodeSchema,
   roomSettingsSchema,
+  roundStateSchema,
   type ControllerStatus,
   type DisplaySessionCredentials,
   type DisplayState,
@@ -18,6 +19,8 @@ import {
   type RoomState,
   type RoundState,
 } from '@words/shared';
+
+import { createSafeClock } from './safe-clock.js';
 
 type InternalDisplay = {
   id: string;
@@ -203,6 +206,43 @@ function comparePlayersByJoinOrder(
   return joinedAtDifference || left.id.localeCompare(right.id);
 }
 
+function isValidRoundBoardGenerationResult(
+  generated: unknown,
+  expectedSize: GridSize,
+): generated is Extract<RoundBoardGenerationResult, { success: true }> {
+  if (
+    typeof generated !== 'object' ||
+    generated === null ||
+    Array.isArray(generated)
+  ) {
+    return false;
+  }
+
+  const result = generated as Record<string, unknown>;
+  const board = result.board;
+  if (
+    result.success !== true ||
+    !Number.isInteger(result.attempts) ||
+    (result.attempts as number) < 1 ||
+    (result.attempts as number) > maximumRoundGenerationAttempts ||
+    typeof board !== 'object' ||
+    board === null ||
+    Array.isArray(board)
+  ) {
+    return false;
+  }
+
+  const boardResult = board as Record<string, unknown>;
+  return (
+    boardResult.size === expectedSize &&
+    Array.isArray(boardResult.tiles) &&
+    boardResult.tiles.length === expectedSize * expectedSize &&
+    boardResult.tiles.every(
+      (tile) => typeof tile === 'string' && /^[A-Z]{1,4}$/.test(tile),
+    )
+  );
+}
+
 export class RoomStore {
   private readonly rooms = new Map<string, InternalRoom>();
   private readonly displaySessions = new Map<string, DisplaySessionReference>();
@@ -218,7 +258,12 @@ export class RoomStore {
     ((size: GridSize) => RoundBoardGenerationResult) | undefined;
 
   constructor(private readonly options: RoomStoreOptions) {
-    this.now = options.now ?? Date.now;
+    this.now = createSafeClock(options.now ?? Date.now, () => {
+      return new RoomOperationError(
+        'INTERNAL_ERROR',
+        'The server clock is unavailable.',
+      );
+    });
     this.roomCodeGenerator =
       options.roomCodeGenerator ?? defaultRoomCodeGenerator;
     this.displaySessionIdGenerator =
@@ -395,6 +440,15 @@ export class RoomStore {
       );
     }
 
+    if (
+      room.settings.gridSize === parsedSettings.data.gridSize &&
+      room.settings.roundDurationSeconds ===
+        parsedSettings.data.roundDurationSeconds &&
+      room.settings.scoringMode === parsedSettings.data.scoringMode
+    ) {
+      return { room: this.toRoomState(room) };
+    }
+
     room.settings = Object.freeze({ ...parsedSettings.data });
     this.touch(room, this.now());
 
@@ -415,7 +469,7 @@ export class RoomStore {
       );
     }
 
-    let generated: RoundBoardGenerationResult | undefined;
+    let generated: unknown;
     try {
       generated = this.roundBoardGenerator?.(room.settings.gridSize);
     } catch {
@@ -424,17 +478,7 @@ export class RoomStore {
         'A playable board could not be generated. Try starting the round again.',
       );
     }
-    if (
-      !generated?.success ||
-      !Number.isInteger(generated.attempts) ||
-      generated.board.size !== room.settings.gridSize ||
-      !Array.isArray(generated.board.tiles) ||
-      generated.board.tiles.length !==
-        room.settings.gridSize * room.settings.gridSize ||
-      generated.attempts < 1 ||
-      generated.attempts > maximumRoundGenerationAttempts ||
-      generated.board.tiles.some((tile) => !/^[A-Z]{1,4}$/.test(tile))
-    ) {
+    if (!isValidRoundBoardGenerationResult(generated, room.settings.gridSize)) {
       throw new RoomOperationError(
         'BOARD_GENERATION_FAILED',
         'A playable board could not be generated. Try starting the round again.',
@@ -458,17 +502,32 @@ export class RoomStore {
       size: generated.board.size,
       tiles: Object.freeze([...generated.board.tiles]),
     });
-    const round: InternalRound = Object.freeze({
-      id: this.roundIdGenerator(),
-      number: (room.round?.number ?? 0) + 1,
-      settings,
-      board,
-      participants,
-      startedAt: now,
-      deadlineAt: now + settings.roundDurationSeconds * 1_000,
-      endedAt: null,
-      generationAttempts: generated.attempts,
-    });
+    let round: InternalRound;
+    try {
+      round = Object.freeze({
+        id: this.roundIdGenerator(),
+        number: (room.round?.number ?? 0) + 1,
+        settings,
+        board,
+        participants,
+        startedAt: now,
+        deadlineAt: now + settings.roundDurationSeconds * 1_000,
+        endedAt: null,
+        generationAttempts: generated.attempts,
+      });
+
+      if (
+        round.id === room.round?.id ||
+        !roundStateSchema.safeParse(this.toRoundState(round)).success
+      ) {
+        throw new Error('Invalid authoritative round identity or state.');
+      }
+    } catch {
+      throw new RoomOperationError(
+        'INTERNAL_ERROR',
+        'The authoritative round could not be created.',
+      );
+    }
 
     room.round = round;
     room.phase = 'ROUND_ACTIVE';
@@ -718,8 +777,6 @@ export class RoomStore {
         }
         display.reconnectToken = null;
         display.disconnectExpiresAt = null;
-        room.stateVersion += 1;
-        updatedRoomCodes.add(room.code);
       }
 
       const expiredPlayers = [...room.players.values()].filter(

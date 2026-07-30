@@ -49,8 +49,9 @@ activity or extend room TTL.
 ## Serialized room and round state
 
 Every `RoomState` includes a server-owned `stateVersion` and ISO `serverTime`.
-Clients use the monotonically increasing version to ignore stale
-acknowledgements. `serverTime` records serialization time without touching
+Clients reject a lower version. At an equal version, they reject an older
+`serverTime`; action acknowledgements must also match the current room, role,
+and session ID. `serverTime` records serialization time without touching
 activity or TTL.
 
 The current `round` is either `null` or one strict snapshot:
@@ -92,10 +93,15 @@ ordered by `joinedAt`, then player ID.
 
 `@words/server` has a runtime dependency on `@words/game-data`. Each server
 instance calls `loadProductionDictionary()` exactly once from `start()`, before
-the HTTP listener begins accepting connections. Startup requires a successful
-79,370-word result. Failure produces one stable public startup error, prevents
-listening and room creation, and leaves the partial HTTP/Socket.IO resources
-safe to stop.
+the HTTP listener begins accepting connections. Startup requires the pinned
+79,370-word count, exact SHA-256, release, and source commit. Failure produces a
+bounded startup error, prevents listening and room creation, and leaves the
+partial HTTP/Socket.IO resources safe to stop.
+
+Each server instance is explicitly single-use. Concurrent starts share one load
+and listener attempt; stopping cancels pending startup, clears the one
+scheduler, and prevents a late loader or listener completion from reviving the
+instance. Later start attempts reject with a stable bounded stopped error.
 
 The immutable dictionary and safe provenance remain in a private server
 runtime object for Stage 4C. Dictionary entries are never logged, placed in
@@ -121,7 +127,10 @@ One unreferenced 250 ms lifecycle interval belongs to each started server
 instance. It scans bounded in-memory rooms, reconciles due rounds
 idempotently, broadcasts only actual transitions, and also triggers the slower
 bounded room cleanup cadence. There is no interval per room or per client.
-`stop()` clears the one interval.
+`stop()` clears the one interval. A failed sweep is contained so the next
+bounded interval can retry instead of raising an unhandled timer exception.
+When a room deadline and room TTL arrive in the same cleanup sweep, expiration
+takes precedence and no ended snapshot is broadcast for the deleted room.
 
 Before state reads, joins, reconnects, disconnects, leaves, controller
 transfers, settings updates, starts, and cleanup decisions, the room store
@@ -134,9 +143,32 @@ The client calculates approximate remaining time from:
 2. elapsed `performance.now()` time since receiving that snapshot.
 
 It clamps the display to zero, resets its anchor after reconnect or a newer
-snapshot, and cleans up its browser interval. It never uses browser wall time
-as authority and never locally invents `ROUND_ENDED`; the server phase remains
-final.
+snapshot, and stops its browser interval once it reaches zero. It never uses
+browser wall time as authority and never locally invents `ROUND_ENDED`; the
+server phase remains final.
+
+This display-only estimate cannot subtract one-way network transit time without
+a clock-offset protocol. It may therefore show up to the snapshot's one-way
+delivery delay plus at most one 250 ms rendering step more than the server's
+remaining time. A stalled connection can make that delay larger, but the value
+still reaches zero locally and the next authoritative snapshot restores the
+server phase. Stage 4B does not add a more complex clock-synchronization
+protocol.
+
+## State-version transitions
+
+Room creation begins at version zero. Each serialized membership, presence,
+controller, settings, active-round, or ended-round change increments the
+version once. Player grace expiry combines removal and any controller
+succession into one logical increment. Automatic ending increments once but
+does not touch activity or TTL.
+
+Serialization, `serverTime` refresh, rejected actions, failed generation,
+repeated deadline reconciliation, unchanged settings, and unchanged cleanup do
+not increment the version. Expiring a disconnected display's private reconnect
+credential also does not increment or broadcast because its public
+`display.connected` state was already false. Room deletion has no successor
+snapshot.
 
 ## Stage 4C boundary
 

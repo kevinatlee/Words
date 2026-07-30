@@ -28,19 +28,30 @@ export function useRoundCountdown(room: RoomState): number | null {
     }
 
     const anchor = performance.now();
+    let timer: number | null = null;
     const update = () => {
-      setCountdown({
+      const nextCountdown = {
         snapshotKey: `${round.id}:${room.serverTime}`,
         remainingMs: calculateRemainingRoundMs(
           room.serverTime,
           round.deadlineAt,
           performance.now() - anchor,
         ),
-      });
+      };
+      setCountdown(nextCountdown);
+
+      if (nextCountdown.remainingMs === 0 && timer !== null) {
+        window.clearInterval(timer);
+        timer = null;
+      }
     };
 
-    const timer = window.setInterval(update, 250);
-    return () => window.clearInterval(timer);
+    timer = window.setInterval(update, 250);
+    return () => {
+      if (timer !== null) {
+        window.clearInterval(timer);
+      }
+    };
   }, [room.phase, room.serverTime, round]);
 
   if (!round) {

@@ -256,7 +256,11 @@ export function RoomLobby({
               </span>
             </div>
             {room.round && (
-              <div className="round-clock" aria-live="polite">
+              <div
+                className="round-clock"
+                role="timer"
+                aria-live={roundIsActive ? 'off' : 'polite'}
+              >
                 <small>
                   {room.phase === 'ROUND_ACTIVE'
                     ? 'Authoritative time remaining'
@@ -274,7 +278,7 @@ export function RoomLobby({
               <p>
                 {roundIsActive
                   ? `${room.round?.participants.length ?? 0} players were present when this round started.`
-                  : `Next round: ${room.settings.roundDurationSeconds} seconds, traditional scoring.`}
+                  : `Next round: ${room.settings.roundDurationSeconds} seconds with a server-owned board.`}
               </p>
               <button
                 className="button button--primary"

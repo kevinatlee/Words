@@ -83,6 +83,13 @@ const EXPECTED_PRODUCTION_MANIFEST: ProductionDictionaryManifest =
       '1dccc79270a4c044e78f5b3c9f1cf6184feb40cab706e809ef6e70a2cac0fc39',
   });
 
+export const PRODUCTION_DICTIONARY_IDENTITY = Object.freeze({
+  wordCount: EXPECTED_PRODUCTION_MANIFEST.wordCount,
+  sha256: EXPECTED_PRODUCTION_MANIFEST.sha256,
+  sourceRelease: EXPECTED_PRODUCTION_MANIFEST.sourceRelease,
+  sourceCommit: EXPECTED_PRODUCTION_MANIFEST.sourceCommit,
+});
+
 export type ProductionDictionaryLoadErrorCode =
   | 'UNSUPPORTED_DATA_URL'
   | 'MANIFEST_READ_FAILED'

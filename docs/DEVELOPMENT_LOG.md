@@ -3,6 +3,64 @@
 Future meaningful work must add a new chronological entry. Record what changed,
 why, what remains open, and the exact verification results.
 
+## 2026-07-30 — Stage 4B final lifecycle review
+
+### Findings and corrections
+
+- Added an explicit single-use server lifecycle so concurrent starts share one
+  attempt, stop cancels pending dictionary/listener work, later starts reject
+  with a bounded stopped error, and repeated stop remains harmless.
+- Required startup to match the pinned production dictionary count, SHA-256,
+  release, and source commit, while retaining the full Stage 4A verification in
+  its existing loader.
+- Validated injected lifecycle intervals and server clocks at runtime. Invalid
+  or backward clock readings cannot create malformed or backward-moving room
+  timestamps, and lifecycle sweep exceptions are contained for a later retry.
+- Validated complete candidate rounds and UUIDs before mutation, rejected a
+  duplicate successive round ID, and expanded atomic generator-failure tests.
+- Scoped controller acknowledgements to the originating room, role, and session
+  ID; equal-version snapshots now reject an older `serverTime`.
+- Tightened ended-round state to require `endedAt === deadlineAt`, stopped the
+  local countdown interval at zero, made unchanged settings idempotent, and
+  removed a false version increment when only a private display credential
+  expires.
+
+### Scope boundary
+
+- Added no submission, word/path payload, validation gameplay, duplicate-word
+  handling, scoring, result, QR rendering, persistence, deployment, or
+  repository-setting behavior. Stage 4C was not started.
+
+### Verification
+
+- `npm ci` — passed; 407 packages installed.
+- `npm run data:verify` — passed; 79,370 words and all pinned checksums,
+  notices, distributions, and the server-only source boundary matched.
+- `npm run data:dictionary:audit` — passed; deterministic report SHA-256
+  `454efff74f68e3b2e3989a567eb03b4949e04955f2c76a99e62ca608a296a7b8`.
+- `npm run data:boards:audit` — passed; 10,000 accepted boards per grid size,
+  zero generation failures, and deterministic report SHA-256
+  `2b55a682eab2207020ae639e7b5b6b771758822f3a20f6fe91187fd4f0eda789`.
+- `npm run format:check`, `npm run lint`, and `npm run typecheck` — passed.
+- `npm test` — passed; 401 tests across 23 files:
+  - client: 55 tests across 4 files
+  - server: 127 tests across 5 files
+  - game data: 49 tests across 6 files
+  - game engine: 135 tests across 5 files
+  - shared: 35 tests across 3 files
+- `npm run build` — passed; Vite transformed 159 modules, all TypeScript
+  boundaries passed, and the built data loader worked from an unrelated
+  directory.
+- `npm run data:verify -- --client-build` — passed; production game data was
+  absent from the client build.
+- `npm audit --audit-level=high` — passed; 0 vulnerabilities.
+- Manual multi-browser smoke — passed with one display and three players:
+  settings, start, refresh, mid-round join, controller transfer, deadline
+  expiry, and the next round all preserved the authoritative round state.
+- Development process check — passed; client hot-module replacement retained
+  the live room, the intentionally non-watched server stayed stable, shutdown
+  was clean, and ports `5173` and `6532` were released.
+
 ## 2026-07-29 — Stage 4B authoritative settings and round lifecycle
 
 ### Implementation

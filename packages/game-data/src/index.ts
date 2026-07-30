@@ -7,6 +7,7 @@ export {
 } from './board-profile.js';
 export {
   loadProductionDictionary,
+  PRODUCTION_DICTIONARY_IDENTITY,
   type ProductionDictionaryLoadErrorCode,
   type ProductionDictionaryLoadResult,
   type ProductionDictionaryManifest,

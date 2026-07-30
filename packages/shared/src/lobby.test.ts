@@ -394,13 +394,24 @@ describe('lobby contracts', () => {
     ).toBe(false);
   });
 
-  it('does not allow a round to end before its deadline', () => {
+  it('requires an ended round timestamp to equal its deadline exactly', () => {
+    for (const endedAt of [
+      '2026-07-27T20:00:29.999Z',
+      '2026-07-27T20:00:30.001Z',
+    ]) {
+      expect(
+        roundStateSchema.safeParse({
+          ...roundStateFixture(),
+          endedAt,
+        }).success,
+      ).toBe(false);
+    }
     expect(
       roundStateSchema.safeParse({
         ...roundStateFixture(),
-        endedAt: '2026-07-27T20:00:29.999Z',
+        endedAt: roundStateFixture().deadlineAt,
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('requires unique bounded participant IDs', () => {

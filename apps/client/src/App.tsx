@@ -57,6 +57,26 @@ const replaceableDisplayCredentialErrors = new Set<RoomErrorCode>([
   'ROOM_NOT_FOUND',
 ]);
 
+function isSameSession(
+  left: StoredLobbySession | null,
+  right: StoredLobbySession | null,
+): boolean {
+  if (
+    left === null ||
+    right === null ||
+    left.role !== right.role ||
+    left.roomCode !== right.roomCode
+  ) {
+    return false;
+  }
+
+  return left.role === 'display' && right.role === 'display'
+    ? left.displaySessionId === right.displaySessionId
+    : left.role === 'player' &&
+        right.role === 'player' &&
+        left.playerId === right.playerId;
+}
+
 export function App({
   routePath,
   client = defaultLobbyClient,
@@ -76,20 +96,39 @@ export function App({
   const sessionRef = useRef<StoredLobbySession | null>(null);
   const reconnectNeededRef = useRef(false);
   const reconnectingRef = useRef(false);
+  const pendingReconnectRef = useRef<StoredLobbySession | null>(null);
   const displayStartupStartedRef = useRef(false);
   const attemptedRoomCodeRef = useRef<string | null>(null);
 
-  const acceptRoomSnapshot = useCallback((nextRoom: RoomState) => {
-    setRoom((currentRoom) => {
+  const acceptRoomSnapshot = useCallback(
+    (nextRoom: RoomState, expectedSession?: StoredLobbySession) => {
+      const currentSession = sessionRef.current;
       if (
-        currentRoom?.code === nextRoom.code &&
-        nextRoom.stateVersion < currentRoom.stateVersion
+        currentSession?.roomCode !== nextRoom.code ||
+        (expectedSession !== undefined &&
+          !isSameSession(currentSession, expectedSession))
       ) {
-        return currentRoom;
+        return;
       }
-      return nextRoom;
-    });
-  }, []);
+
+      setRoom((currentRoom) => {
+        if (currentRoom?.code !== nextRoom.code) {
+          return nextRoom;
+        }
+        if (nextRoom.stateVersion < currentRoom.stateVersion) {
+          return currentRoom;
+        }
+        if (
+          nextRoom.stateVersion === currentRoom.stateVersion &&
+          Date.parse(nextRoom.serverTime) < Date.parse(currentRoom.serverTime)
+        ) {
+          return currentRoom;
+        }
+        return nextRoom;
+      });
+    },
+    [],
+  );
 
   const navigate = useCallback(
     (path: string) => {
@@ -119,56 +158,85 @@ export function App({
   );
 
   const reconnectSession = useCallback(
-    async (storedSession: StoredLobbySession) => {
+    async (storedSession: StoredLobbySession): Promise<void> => {
       if (reconnectingRef.current) {
+        pendingReconnectRef.current = storedSession;
         return;
       }
 
       reconnectingRef.current = true;
       setReconnecting(true);
+      let requestedSession: StoredLobbySession | null = storedSession;
 
-      const response =
-        storedSession.role === 'display'
-          ? await client.reconnectDisplay({
-              roomCode: storedSession.roomCode,
-              displayReconnectToken: storedSession.displayReconnectToken,
-            })
-          : await client.reconnectPlayer({
-              roomCode: storedSession.roomCode,
-              playerReconnectToken: storedSession.playerReconnectToken,
+      try {
+        while (requestedSession) {
+          pendingReconnectRef.current = null;
+          const response =
+            requestedSession.role === 'display'
+              ? await client.reconnectDisplay({
+                  roomCode: requestedSession.roomCode,
+                  displayReconnectToken: requestedSession.displayReconnectToken,
+                })
+              : await client.reconnectPlayer({
+                  roomCode: requestedSession.roomCode,
+                  playerReconnectToken: requestedSession.playerReconnectToken,
+                });
+
+          if (!isSameSession(sessionRef.current, requestedSession)) {
+            if (response.ok) {
+              const leaveResponse =
+                requestedSession.role === 'display'
+                  ? await client.leaveDisplay()
+                  : await client.leavePlayer();
+              if (!leaveResponse.ok) {
+                setRoomError(leaveResponse.error);
+                return;
+              }
+            }
+
+            requestedSession =
+              pendingReconnectRef.current ?? sessionRef.current;
+            continue;
+          }
+
+          if (!response.ok) {
+            sessionStore.clear(requestedSession);
+            sessionRef.current = null;
+            setSession(null);
+            setRoom(null);
+            setRoomError(response.error);
+            return;
+          }
+
+          if (
+            requestedSession.role === 'display' &&
+            'displaySessionId' in response.session
+          ) {
+            rememberSession(response.room, {
+              role: 'display',
+              roomCode: response.room.code,
+              ...response.session,
             });
+            return;
+          }
 
-      reconnectingRef.current = false;
-      setReconnecting(false);
-
-      if (!response.ok) {
-        sessionStore.clear(storedSession);
-        sessionRef.current = null;
-        setSession(null);
-        setRoom(null);
-        setRoomError(response.error);
-        return;
-      }
-
-      if (
-        storedSession.role === 'display' &&
-        'displaySessionId' in response.session
-      ) {
-        rememberSession(response.room, {
-          role: 'display',
-          roomCode: response.room.code,
-          ...response.session,
-        });
-        return;
-      }
-
-      if (storedSession.role === 'player' && 'playerId' in response.session) {
-        rememberSession(response.room, {
-          role: 'player',
-          roomCode: response.room.code,
-          ...response.session,
-          displayName: storedSession.displayName,
-        });
+          if (
+            requestedSession.role === 'player' &&
+            'playerId' in response.session
+          ) {
+            rememberSession(response.room, {
+              role: 'player',
+              roomCode: response.room.code,
+              ...response.session,
+              displayName: requestedSession.displayName,
+            });
+            return;
+          }
+        }
+      } finally {
+        pendingReconnectRef.current = null;
+        reconnectingRef.current = false;
+        setReconnecting(false);
       }
     },
     [client, rememberSession, sessionStore],
@@ -391,13 +459,17 @@ export function App({
   const transferController = async (
     targetPlayerId: string,
   ): Promise<RoomError | null> => {
+    const actionSession = sessionRef.current;
     const response = await client.transferController({ targetPlayerId });
 
+    if (!isSameSession(sessionRef.current, actionSession)) {
+      return null;
+    }
     if (!response.ok) {
       return response.error;
     }
 
-    acceptRoomSnapshot(response.room);
+    acceptRoomSnapshot(response.room, actionSession ?? undefined);
     setRoomError(null);
     return null;
   };
@@ -405,25 +477,33 @@ export function App({
   const updateSettings = async (
     settings: RoomSettings,
   ): Promise<RoomError | null> => {
+    const actionSession = sessionRef.current;
     const response = await client.updateSettings(settings);
 
+    if (!isSameSession(sessionRef.current, actionSession)) {
+      return null;
+    }
     if (!response.ok) {
       return response.error;
     }
 
-    acceptRoomSnapshot(response.room);
+    acceptRoomSnapshot(response.room, actionSession ?? undefined);
     setRoomError(null);
     return null;
   };
 
   const startRound = async (): Promise<RoomError | null> => {
+    const actionSession = sessionRef.current;
     const response = await client.startRound();
 
+    if (!isSameSession(sessionRef.current, actionSession)) {
+      return null;
+    }
     if (!response.ok) {
       return response.error;
     }
 
-    acceptRoomSnapshot(response.room);
+    acceptRoomSnapshot(response.room, actionSession ?? undefined);
     setRoomError(null);
     return null;
   };

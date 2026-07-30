@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import {
   generateDefaultBoard,
   loadProductionDictionary,
+  PRODUCTION_DICTIONARY_IDENTITY,
   type ProductionDictionaryLoadResult,
 } from '@words/game-data';
 import {
@@ -48,6 +49,7 @@ import {
   RoomStore,
   type BoundSession,
 } from './room-store.js';
+import { createSafeClock } from './safe-clock.js';
 
 type SocketData = {
   session?: BoundSession;
@@ -75,16 +77,38 @@ export type WordsServerDependencies = {
   lifecycleIntervalMs?: number;
   setInterval?: (callback: () => void, milliseconds: number) => LifecycleTimer;
   clearInterval?: (timer: LifecycleTimer) => void;
+  listen?: (
+    httpServer: ReturnType<typeof createHttpServer>,
+    port: number,
+  ) => Promise<number>;
 };
 
-export class WordsServerStartupError extends Error {
-  readonly code = 'GAME_DATA_STARTUP_FAILED';
+type WordsServerStartupErrorCode =
+  | 'GAME_DATA_STARTUP_FAILED'
+  | 'SERVER_LISTEN_FAILED'
+  | 'SERVER_LIFECYCLE_FAILED';
 
-  constructor() {
+export class WordsServerStartupError extends Error {
+  constructor(
+    readonly code: WordsServerStartupErrorCode = 'GAME_DATA_STARTUP_FAILED',
+  ) {
     super(
-      'Words server startup failed because production game data is unavailable.',
+      code === 'GAME_DATA_STARTUP_FAILED'
+        ? 'Words server startup failed because production game data is unavailable.'
+        : code === 'SERVER_LISTEN_FAILED'
+          ? 'Words server startup failed while opening its network port.'
+          : 'Words server startup failed while scheduling room lifecycle work.',
     );
     this.name = 'WordsServerStartupError';
+  }
+}
+
+export class WordsServerStoppedError extends Error {
+  readonly code = 'SERVER_STOPPED';
+
+  constructor() {
+    super('Words server startup was cancelled because the server was stopped.');
+    this.name = 'WordsServerStoppedError';
   }
 }
 
@@ -147,13 +171,23 @@ export function createWordsServer(
   stop: () => Promise<void>;
 } {
   const config = { ...createServerConfig(), ...overrides };
-  const now = dependencies.now ?? Date.now;
+  const now = createSafeClock(dependencies.now ?? Date.now, () => {
+    return new RoomOperationError(
+      'INTERNAL_ERROR',
+      'The server clock is unavailable.',
+    );
+  });
   const dictionaryLoader =
     dependencies.dictionaryLoader ?? loadProductionDictionary;
   const boardGenerator = dependencies.boardGenerator ?? generateDefaultBoard;
   const randomSource = dependencies.randomSource ?? createCryptoRandomSource();
   const lifecycleIntervalMs = dependencies.lifecycleIntervalMs ?? 250;
-  if (lifecycleIntervalMs < 250 || lifecycleIntervalMs > 500) {
+  if (
+    !Number.isInteger(lifecycleIntervalMs) ||
+    !Number.isFinite(lifecycleIntervalMs) ||
+    lifecycleIntervalMs < 250 ||
+    lifecycleIntervalMs > 500
+  ) {
     throw new Error(
       'The lifecycle interval must be from 250 to 500 milliseconds.',
     );
@@ -202,6 +236,10 @@ export function createWordsServer(
   > | null = null;
   let lifecycleTimer: LifecycleTimer | null = null;
   let startupPromise: Promise<number> | null = null;
+  let stopPromise: Promise<void> | null = null;
+  let lifecycleState:
+    'created' | 'starting' | 'listening' | 'failed' | 'stopping' | 'stopped' =
+    'created';
   let nextCleanupAt = now() + config.cleanupIntervalMs;
 
   const closeConnectedRoom = (roomCode: string, error: RoomError): void => {
@@ -715,11 +753,17 @@ export function createWordsServer(
     if (lifecycleTimer !== null) {
       return;
     }
-    lifecycleTimer = scheduleInterval(runLifecycleSweep, lifecycleIntervalMs);
+    lifecycleTimer = scheduleInterval(() => {
+      try {
+        runLifecycleSweep();
+      } catch {
+        // A later bounded sweep retries; timer callbacks must not crash the process.
+      }
+    }, lifecycleIntervalMs);
     lifecycleTimer.unref?.();
   };
 
-  const listen = (port: number): Promise<number> =>
+  const listenHttpServer = (port: number): Promise<number> =>
     new Promise((resolve, reject) => {
       const onError = (error: Error) => {
         httpServer.off('listening', onListening);
@@ -734,6 +778,75 @@ export function createWordsServer(
       httpServer.once('listening', onListening);
       httpServer.listen(port);
     });
+  const listen = dependencies.listen ?? ((_, port) => listenHttpServer(port));
+
+  const closeHttpServerIfListening = (): Promise<void> =>
+    new Promise((resolve) => {
+      if (!httpServer.listening) {
+        resolve();
+        return;
+      }
+      httpServer.close(() => resolve());
+    });
+
+  const stop = (): Promise<void> => {
+    if (stopPromise !== null) {
+      return stopPromise;
+    }
+
+    lifecycleState = 'stopping';
+    acceptingRooms = false;
+    if (lifecycleTimer !== null) {
+      cancelInterval(lifecycleTimer);
+      lifecycleTimer = null;
+    }
+
+    stopPromise = new Promise((resolve) => {
+      io.close(() => {
+        void closeHttpServerIfListening().then(() => {
+          lifecycleState = 'stopped';
+          resolve();
+        });
+      });
+    });
+    return stopPromise;
+  };
+
+  const isExpectedProductionDictionary = (
+    loaded: unknown,
+  ): loaded is Extract<ProductionDictionaryLoadResult, { success: true }> => {
+    if (
+      typeof loaded !== 'object' ||
+      loaded === null ||
+      Array.isArray(loaded)
+    ) {
+      return false;
+    }
+
+    const result = loaded as Record<string, unknown>;
+    if (result.success !== true || result.wordCount !== 79_370) {
+      return false;
+    }
+
+    const manifest = result.manifest;
+    if (
+      typeof manifest !== 'object' ||
+      manifest === null ||
+      Array.isArray(manifest)
+    ) {
+      return false;
+    }
+
+    const fields = manifest as Record<string, unknown>;
+    return (
+      fields.wordCount === PRODUCTION_DICTIONARY_IDENTITY.wordCount &&
+      fields.sha256 === PRODUCTION_DICTIONARY_IDENTITY.sha256 &&
+      fields.sourceRelease === PRODUCTION_DICTIONARY_IDENTITY.sourceRelease &&
+      fields.sourceCommit === PRODUCTION_DICTIONARY_IDENTITY.sourceCommit
+    );
+  };
+  const isStoppingOrStopped = (): boolean =>
+    lifecycleState === 'stopping' || lifecycleState === 'stopped';
 
   return {
     app,
@@ -742,41 +855,74 @@ export function createWordsServer(
     io,
     roomStore,
     start: (port = config.port) => {
+      if (isStoppingOrStopped()) {
+        return Promise.reject(new WordsServerStoppedError());
+      }
+      if (startupPromise !== null) {
+        return startupPromise;
+      }
+
+      lifecycleState = 'starting';
       startupPromise ??= (async () => {
-        let loaded: ProductionDictionaryLoadResult;
+        let loaded: unknown;
         try {
           loaded = await dictionaryLoader();
         } catch {
+          if (isStoppingOrStopped()) {
+            throw new WordsServerStoppedError();
+          }
+          lifecycleState = 'failed';
           throw new WordsServerStartupError();
         }
 
-        if (!loaded.success || loaded.wordCount !== 79_370) {
+        if (lifecycleState !== 'starting') {
+          throw new WordsServerStoppedError();
+        }
+
+        if (!isExpectedProductionDictionary(loaded)) {
+          lifecycleState = 'failed';
           throw new WordsServerStartupError();
         }
 
         gameDataRuntime = loaded;
-        const listeningPort = await listen(port);
+        let listeningPort: number;
+        try {
+          listeningPort = await listen(httpServer, port);
+        } catch {
+          if (isStoppingOrStopped()) {
+            if (stopPromise !== null) {
+              await stopPromise;
+            }
+            await closeHttpServerIfListening();
+            throw new WordsServerStoppedError();
+          }
+          lifecycleState = 'failed';
+          throw new WordsServerStartupError('SERVER_LISTEN_FAILED');
+        }
+
+        if (lifecycleState !== 'starting') {
+          if (stopPromise !== null) {
+            await stopPromise;
+          }
+          await closeHttpServerIfListening();
+          throw new WordsServerStoppedError();
+        }
+
         acceptingRooms = true;
-        beginLifecycleSweep();
+        lifecycleState = 'listening';
+        try {
+          beginLifecycleSweep();
+        } catch {
+          acceptingRooms = false;
+          lifecycleState = 'failed';
+          const error = new WordsServerStartupError('SERVER_LIFECYCLE_FAILED');
+          await stop();
+          throw error;
+        }
         return listeningPort;
       })();
       return startupPromise;
     },
-    stop: () =>
-      new Promise((resolve) => {
-        acceptingRooms = false;
-        if (lifecycleTimer !== null) {
-          cancelInterval(lifecycleTimer);
-          lifecycleTimer = null;
-        }
-        io.close(() => {
-          if (!httpServer.listening) {
-            resolve();
-            return;
-          }
-
-          httpServer.close(() => resolve());
-        });
-      }),
+    stop,
   };
 }

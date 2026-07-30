@@ -139,4 +139,26 @@ describe('authoritative round countdown', () => {
     unmount();
     expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
   });
+
+  it('stops its browser interval after the local countdown reaches zero', () => {
+    vi.useFakeTimers();
+    let monotonicTime = 100;
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
+    const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
+    const room = createRoom();
+    const { result } = renderHook(() => useRoundCountdown(room));
+
+    act(() => {
+      monotonicTime += 30_000;
+      vi.advanceTimersByTime(250);
+    });
+
+    expect(result.current).toBe(0);
+    expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+    act(() => {
+      monotonicTime += 10_000;
+      vi.advanceTimersByTime(10_000);
+    });
+    expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+  });
 });

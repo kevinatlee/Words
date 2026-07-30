@@ -25,4 +25,9 @@ describe('createCryptoRandomSource', () => {
     const random = createCryptoRandomSource(() => Buffer.alloc(5));
     expect(() => random.next()).toThrow(/exactly 6 bytes/i);
   });
+
+  it('fails closed when an injected source returns a non-Buffer value', () => {
+    const random = createCryptoRandomSource((() => new Uint8Array(6)) as never);
+    expect(() => random.next()).toThrow(/exactly 6 bytes/i);
+  });
 });

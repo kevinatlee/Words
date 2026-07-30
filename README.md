@@ -131,6 +131,11 @@ One command starts both processes:
 | Node server | `http://localhost:6532` | Express health API and Socket.IO   |
 
 Vite proxies `/api` and `/socket.io` to the Node server.
+Client source changes continue to refresh through Vite. The in-memory Node
+server intentionally does not watch its source or workspace dependencies,
+because an automatic restart would discard active rooms. After a server source
+change, stop `npm run dev` and start it again; an unexpected server crash still
+ends the combined command visibly.
 
 Try the lobby:
 
