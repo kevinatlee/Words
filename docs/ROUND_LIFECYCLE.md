@@ -131,6 +131,9 @@ bounded room cleanup cadence. There is no interval per room or per client.
 bounded interval can retry instead of raising an unhandled timer exception.
 When a room deadline and room TTL arrive in the same cleanup sweep, expiration
 takes precedence and no ended snapshot is broadcast for the deleted room.
+If a valid request reaches a due room before the scheduler, the server
+reconciles and broadcasts the ended state before processing the request. The
+transition is therefore not lost when the request is later rejected.
 
 Before state reads, joins, reconnects, disconnects, leaves, controller
 transfers, settings updates, starts, and cleanup decisions, the room store
@@ -167,8 +170,9 @@ Serialization, `serverTime` refresh, rejected actions, failed generation,
 repeated deadline reconciliation, unchanged settings, and unchanged cleanup do
 not increment the version. Expiring a disconnected display's private reconnect
 credential also does not increment or broadcast because its public
-`display.connected` state was already false. Room deletion has no successor
-snapshot.
+`display.connected` state was already false. Rotating a credential while
+replacing an already-connected socket likewise refreshes activity without
+versioning private socket state. Room deletion has no successor snapshot.
 
 ## Stage 4C boundary
 

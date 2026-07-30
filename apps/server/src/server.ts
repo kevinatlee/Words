@@ -48,6 +48,7 @@ import {
   RoomOperationError,
   RoomStore,
   type BoundSession,
+  type RoomPresenceResult,
 } from './room-store.js';
 import { createSafeClock } from './safe-clock.js';
 
@@ -242,6 +243,13 @@ export function createWordsServer(
     'created';
   let nextCleanupAt = now() + config.cleanupIntervalMs;
 
+  const broadcastDueRound = (roomCode: string): void => {
+    const room = roomStore.reconcileDueRound(roomCode);
+    if (room) {
+      io.to(roomCode).emit('room:state', room);
+    }
+  };
+
   const closeConnectedRoom = (roomCode: string, error: RoomError): void => {
     const socketIds = io.sockets.adapter.rooms.get(roomCode);
 
@@ -376,6 +384,7 @@ export function createWordsServer(
         }
 
         try {
+          broadcastDueRound(parsed.data.roomCode);
           const result = roomStore.reconnectDisplay(
             parsed.data.roomCode,
             parsed.data.displayReconnectToken,
@@ -418,6 +427,7 @@ export function createWordsServer(
         }
 
         try {
+          broadcastDueRound(parsed.data.roomCode);
           const result = roomStore.joinPlayer(
             parsed.data.roomCode,
             parsed.data.displayName,
@@ -462,6 +472,7 @@ export function createWordsServer(
         }
 
         try {
+          broadcastDueRound(parsed.data.roomCode);
           const result = roomStore.reconnectPlayer(
             parsed.data.roomCode,
             parsed.data.playerReconnectToken,
@@ -514,6 +525,12 @@ export function createWordsServer(
           });
           return;
         }
+        try {
+          broadcastDueRound(session.roomCode);
+        } catch (error) {
+          acknowledgeFailure(acknowledge, toRoomError(error));
+          return;
+        }
         if (session.role !== 'player') {
           acknowledgeFailure(acknowledge, {
             code: 'NOT_CONTROLLER',
@@ -561,6 +578,12 @@ export function createWordsServer(
             code: 'UNAUTHORIZED',
             message: publicErrorMessages.UNAUTHORIZED,
           });
+          return;
+        }
+        try {
+          broadcastDueRound(session.roomCode);
+        } catch (error) {
+          acknowledgeFailure(acknowledge, toRoomError(error));
           return;
         }
         if (session.role !== 'player') {
@@ -612,6 +635,12 @@ export function createWordsServer(
           });
           return;
         }
+        try {
+          broadcastDueRound(session.roomCode);
+        } catch (error) {
+          acknowledgeFailure(acknowledge, toRoomError(error));
+          return;
+        }
         if (session.role !== 'player') {
           acknowledgeFailure(acknowledge, {
             code: 'NOT_CONTROLLER',
@@ -647,6 +676,12 @@ export function createWordsServer(
           return;
         }
 
+        try {
+          broadcastDueRound(session.roomCode);
+        } catch (error) {
+          acknowledgeFailure(acknowledge, toRoomError(error));
+          return;
+        }
         const result = roomStore.leave(session, socket.id);
         if (!result || result.role !== 'display') {
           acknowledgeFailure(acknowledge, {
@@ -681,6 +716,12 @@ export function createWordsServer(
           return;
         }
 
+        try {
+          broadcastDueRound(session.roomCode);
+        } catch (error) {
+          acknowledgeFailure(acknowledge, toRoomError(error));
+          return;
+        }
         const result = roomStore.leave(session, socket.id);
         if (!result || result.role !== 'player') {
           acknowledgeFailure(acknowledge, {
@@ -706,7 +747,13 @@ export function createWordsServer(
         return;
       }
 
-      const result = roomStore.disconnect(session, socket.id);
+      let result: RoomPresenceResult | null;
+      try {
+        broadcastDueRound(session.roomCode);
+        result = roomStore.disconnect(session, socket.id);
+      } catch {
+        return;
+      }
       if (!result) {
         return;
       }

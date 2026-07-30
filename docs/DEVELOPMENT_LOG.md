@@ -24,6 +24,9 @@ why, what remains open, and the exact verification results.
   local countdown interval at zero, made unchanged settings idempotent, and
   removed a false version increment when only a private display credential
   expires.
+- Ensured a request that reconciles a due round broadcasts that transition even
+  when authorization later rejects the request, and kept connected-socket
+  credential rotation from versioning otherwise unchanged public state.
 
 ### Scope boundary
 
@@ -42,9 +45,9 @@ why, what remains open, and the exact verification results.
   zero generation failures, and deterministic report SHA-256
   `2b55a682eab2207020ae639e7b5b6b771758822f3a20f6fe91187fd4f0eda789`.
 - `npm run format:check`, `npm run lint`, and `npm run typecheck` — passed.
-- `npm test` — passed; 401 tests across 23 files:
+- `npm test` — passed; 403 tests across 23 files:
   - client: 55 tests across 4 files
-  - server: 127 tests across 5 files
+  - server: 129 tests across 5 files
   - game data: 49 tests across 6 files
   - game engine: 135 tests across 5 files
   - shared: 35 tests across 3 files

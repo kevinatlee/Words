@@ -571,6 +571,7 @@ export class RoomStore {
     }
 
     const replacedSocketId = display.socketId;
+    const wasConnected = display.connected;
     this.displaySessions.delete(displayReconnectToken);
     display.reconnectToken = this.createReconnectToken(displayReconnectToken);
     display.socketId = socketId;
@@ -580,7 +581,11 @@ export class RoomStore {
       roomCode: room.code,
       displaySessionId: display.id,
     });
-    this.touch(room, now);
+    if (wasConnected) {
+      this.refreshActivity(room, now);
+    } else {
+      this.touch(room, now);
+    }
 
     return this.createDisplayResult(room, display, replacedSocketId);
   }
@@ -616,6 +621,8 @@ export class RoomStore {
     }
 
     const replacedSocketId = player.socketId;
+    const wasConnected = player.connected;
+    const previousControllerPlayerId = room.controllerPlayerId;
     this.playerSessions.delete(playerReconnectToken);
     player.reconnectToken = this.createReconnectToken(playerReconnectToken);
     player.socketId = socketId;
@@ -628,7 +635,14 @@ export class RoomStore {
     if (room.controllerPlayerId === null) {
       this.assignEarliestConnectedController(room);
     }
-    this.touch(room, now);
+    if (
+      wasConnected &&
+      previousControllerPlayerId === room.controllerPlayerId
+    ) {
+      this.refreshActivity(room, now);
+    } else {
+      this.touch(room, now);
+    }
 
     return this.createPlayerResult(room, player, replacedSocketId);
   }
@@ -843,6 +857,20 @@ export class RoomStore {
     return updatedRoomCodes;
   }
 
+  reconcileDueRound(roomCode: string): RoomState | null {
+    const room = this.rooms.get(roomCode);
+    if (!room) {
+      return null;
+    }
+
+    const now = this.now();
+    if (room.expiresAt <= now || !this.reconcileRound(room, now)) {
+      return null;
+    }
+
+    return this.toRoomState(room);
+  }
+
   get roomCount(): number {
     return this.rooms.size;
   }
@@ -1047,9 +1075,13 @@ export class RoomStore {
   }
 
   private touch(room: InternalRoom, now: number): void {
+    this.refreshActivity(room, now);
+    room.stateVersion += 1;
+  }
+
+  private refreshActivity(room: InternalRoom, now: number): void {
     room.lastActivityAt = now;
     room.expiresAt = now + this.options.roomTtlMs;
-    room.stateVersion += 1;
   }
 
   private reconcileRound(room: InternalRoom, now: number): boolean {

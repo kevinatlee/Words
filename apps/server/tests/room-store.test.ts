@@ -583,6 +583,31 @@ describe('RoomStore display and player sessions', () => {
 
     expect(reconnected.replacedSocketId).toBe('socket-display');
     expect(reconnected.room.players).toHaveLength(0);
+    expect(reconnected.room.stateVersion).toBe(created.room.stateVersion);
+  });
+
+  it('rotates connected role credentials without versioning private socket state', () => {
+    const store = createStore();
+    const created = store.createDisplay('socket-display');
+    const joined = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-player',
+    );
+
+    const displayReconnected = store.reconnectDisplay(
+      created.room.code,
+      created.session.displayReconnectToken,
+      'socket-display-new',
+    );
+    const playerReconnected = store.reconnectPlayer(
+      created.room.code,
+      joined.session.playerReconnectToken,
+      'socket-player-new',
+    );
+
+    expect(displayReconnected.room.stateVersion).toBe(joined.room.stateVersion);
+    expect(playerReconnected.room.stateVersion).toBe(joined.room.stateVersion);
   });
 
   it('never accepts display credentials as player credentials or vice versa', () => {

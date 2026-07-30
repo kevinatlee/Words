@@ -1383,6 +1383,74 @@ describe('Words Stage 4B server', () => {
     expect(clearLifecycleTimer).toHaveBeenCalledWith(fakeTimer);
   });
 
+  it('broadcasts a deadline transition even when the triggering action is rejected', async () => {
+    await server.stop();
+    let now = Date.parse('2026-07-29T20:00:00.000Z');
+    let lifecycleSweep: (() => void) | undefined;
+    server = createWordsServer(
+      {
+        port: 0,
+        cleanupIntervalMs: 60_000,
+      },
+      {
+        ...testDependencies,
+        now: () => now,
+        setInterval: (callback) => {
+          lifecycleSweep = callback;
+          return { unref: vi.fn() } as unknown as ReturnType<
+            typeof setInterval
+          >;
+        },
+        clearInterval: vi.fn(),
+      },
+    );
+    port = await server.start(0);
+
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) {
+      throw new Error('Display creation failed in test setup.');
+    }
+    const controller = await connectClient();
+    await emitJoinPlayer(controller, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+    const ordinary = await connectClient();
+    await emitJoinPlayer(ordinary, {
+      roomCode: created.room.code,
+      displayName: 'Amber Kite',
+    });
+    const started = await emitStartRound(controller);
+    if (!started.ok || !started.room.round) {
+      throw new Error('Round start failed in test setup.');
+    }
+
+    const endedBroadcasts: RoomState[] = [];
+    display.on('room:state', (room) => {
+      if (room.phase === 'ROUND_ENDED') {
+        endedBroadcasts.push(room);
+      }
+    });
+    const endedState = nextRoomState(
+      display,
+      (room) => room.phase === 'ROUND_ENDED',
+    );
+    now = Date.parse(started.room.round.deadlineAt);
+
+    expect(await emitStartRound(ordinary)).toMatchObject({
+      ok: false,
+      error: { code: 'NOT_CONTROLLER' },
+    });
+    const ended = await endedState;
+    expect(ended.round?.endedAt).toBe(started.room.round.deadlineAt);
+    expect(endedBroadcasts).toHaveLength(1);
+
+    lifecycleSweep?.();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(endedBroadcasts).toHaveLength(1);
+  });
+
   it('returns a bounded board-generation error without a partial start', async () => {
     await server.stop();
     server = createWordsServer(
