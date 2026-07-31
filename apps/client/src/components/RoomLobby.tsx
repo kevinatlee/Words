@@ -35,7 +35,6 @@ type RoomLobbyProps = {
   sessionRole: 'display' | 'player';
   currentPlayerId: string | null;
   connectionStatus: ConnectionStatus;
-  onLeave: () => Promise<void>;
   onTransferController: (targetPlayerId: string) => Promise<RoomError | null>;
   onUpdateSettings: (settings: RoomSettings) => Promise<RoomError | null>;
   onStartRound: () => Promise<RoomError | null>;
@@ -48,7 +47,6 @@ export function RoomLobby({
   sessionRole,
   currentPlayerId,
   connectionStatus,
-  onLeave,
   onTransferController,
   onUpdateSettings,
   onStartRound,
@@ -277,19 +275,17 @@ export function RoomLobby({
         </section>
       )}
 
-      <div
-        className={`lobby-toolbar${isDisplay ? '' : ' lobby-toolbar--phone'}`}
-      >
-        <span
-          className={`connection-status connection-status--${connectionStatus}`}
-        >
-          {connectionStatus === 'connected'
-            ? 'Connected'
-            : connectionStatus === 'connecting'
-              ? 'Reconnecting…'
-              : 'Disconnected'}
-        </span>
-        {isDisplay && (
+      {isDisplay && (
+        <div className="lobby-toolbar">
+          <span
+            className={`connection-status connection-status--${connectionStatus}`}
+          >
+            {connectionStatus === 'connected'
+              ? 'Connected'
+              : connectionStatus === 'connecting'
+                ? 'Reconnecting…'
+                : 'Disconnected'}
+          </span>
           <span className="status-label">
             {room.phase === 'LOBBY'
               ? 'Lobby'
@@ -297,17 +293,8 @@ export function RoomLobby({
                 ? 'Round active'
                 : 'Round ended'}
           </span>
-        )}
-        {!isDisplay && (
-          <button
-            className="text-button"
-            type="button"
-            onClick={() => void onLeave()}
-          >
-            Leave room
-          </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {actionError && (
         <p className="form-error" role="alert">
@@ -419,7 +406,9 @@ export function RoomLobby({
               >
                 <small>
                   {room.phase === 'ROUND_ACTIVE'
-                    ? 'Authoritative time remaining'
+                    ? isDisplay
+                      ? 'Authoritative time remaining'
+                      : 'Timer'
                     : 'Round complete'}
                 </small>
                 <strong>{Math.ceil((countdownMs ?? 0) / 1_000)} seconds</strong>
@@ -535,11 +524,6 @@ export function RoomLobby({
                 </div>
               </section>
             )}
-            {!isDisplay && roundIsEnded && (
-              <p className="phone-round-message" role="status">
-                Round complete — results are on the TV.
-              </p>
-            )}
             {!isDisplay &&
               !roundIsActive &&
               !roundIsEnded &&
@@ -548,15 +532,6 @@ export function RoomLobby({
                   Waiting for the game host to start the round.
                 </p>
               )}
-            {!isDisplay && showControllerAdministration && (
-              <GameSettings
-                settings={room.settings}
-                disabled={!canChangeSettings || actionPending}
-                pending={actionPending}
-                canEdit={canChangeSettings}
-                onChange={(settings) => void runSettingsUpdate(settings)}
-              />
-            )}
             {(isDisplay || (isConnectedController && !roundIsActive)) && (
               <div className="round-action">
                 {isDisplay && (
@@ -584,14 +559,23 @@ export function RoomLobby({
                 )}
               </div>
             )}
-            {!isDisplay && showControllerAdministration && (
-              <ControllerPanel
-                room={room}
-                currentPlayerId={currentPlayerId}
-                onTransfer={onTransferController}
-              />
-            )}
           </section>
+          {!isDisplay && showControllerAdministration && (
+            <GameSettings
+              settings={room.settings}
+              disabled={!canChangeSettings || actionPending}
+              pending={actionPending}
+              canEdit={canChangeSettings}
+              onChange={(settings) => void runSettingsUpdate(settings)}
+            />
+          )}
+          {!isDisplay && showControllerAdministration && (
+            <ControllerPanel
+              room={room}
+              currentPlayerId={currentPlayerId}
+              onTransfer={onTransferController}
+            />
+          )}
         </div>
       </div>
     </div>

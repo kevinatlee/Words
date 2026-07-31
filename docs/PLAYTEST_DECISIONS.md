@@ -58,17 +58,21 @@ This is planned, not implemented by Stage 4F:
 
 ## Implemented phone information architecture
 
-- Phone rooms lead with the puzzle and retain only compact connection state and
-  Leave room beside it; room codes, QR, player lists, display details, and
-  phase labels stay on the shared display.
+- Phone rooms lead with the puzzle. Their compact connection state sits in the
+  main app header; there is no phone toolbar or Leave room control. Room codes,
+  QR, player lists, display details, and phase labels stay on the shared
+  display.
 - Ordinary players see a concise waiting message between rounds and never see
   settings or controller delegation.
-- The controller sees the puzzle before Game Settings, Start Round, and
-  controller delegation in the lobby and after results. Those administration
-  controls are absent during active gameplay for every phone.
-- Phones show a concise TV-results message after a round instead of rankings,
-  scores, winner copy, or detailed word review. The shared display retains its
-  existing results presentation.
+- The controller sees three distinct sibling bubbles in the lobby and after
+  results: Puzzle (including Start Round or Start Next Round), Game Settings,
+  then Player Authority. Those administration bubbles are absent during active
+  gameplay for every phone.
+- Phone active timers use the concise `Timer` label. After a round, phones show
+  the completed Puzzle bubble only (plus the controller's two administration
+  bubbles) instead of rankings, scores, winner copy, detailed word review, or
+  a redundant TV-results message. The shared display retains its existing
+  results presentation.
 
 ## Current boundary
 

@@ -551,33 +551,6 @@ export function App({
     return null;
   };
 
-  const leaveSession = async (): Promise<void> => {
-    const currentSession = sessionRef.current;
-    if (!currentSession) {
-      return;
-    }
-
-    const response =
-      currentSession.role === 'display'
-        ? await client.leaveDisplay()
-        : await client.leavePlayer();
-
-    if (!response.ok) {
-      setRoomError(response.error);
-      return;
-    }
-
-    sessionStore.clear(currentSession);
-    sessionRef.current = null;
-    setSession(null);
-    roomRef.current = null;
-    setRoom(null);
-    setSubmissionState(null);
-    setRoomError(null);
-    attemptedRoomCodeRef.current = null;
-    navigate(currentSession.role === 'display' ? '/' : '/join');
-  };
-
   const retryDisplay = () => {
     displayStartupStartedRef.current = true;
     void startDisplay();
@@ -687,7 +660,6 @@ export function App({
             sessionRole="display"
             currentPlayerId={null}
             connectionStatus={connectionStatus}
-            onLeave={leaveSession}
             onTransferController={transferController}
             onUpdateSettings={updateSettings}
             onStartRound={startRound}
@@ -752,7 +724,6 @@ export function App({
               session.role === 'player' ? session.playerId : null
             }
             connectionStatus={connectionStatus}
-            onLeave={leaveSession}
             onTransferController={transferController}
             onUpdateSettings={updateSettings}
             onStartRound={startRound}
@@ -785,7 +756,13 @@ export function App({
   }
 
   return (
-    <AppShell currentPath={currentPath} pageClassName={pageClassName}>
+    <AppShell
+      currentPath={currentPath}
+      pageClassName={pageClassName}
+      phoneConnectionStatus={
+        room && session?.role === 'player' ? connectionStatus : null
+      }
+    >
       {page}
     </AppShell>
   );

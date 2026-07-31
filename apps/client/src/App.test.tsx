@@ -339,7 +339,7 @@ describe('Stage 4B display and player room routes', () => {
     const client = createFakeClient();
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
-    render(
+    const { container } = render(
       <App
         routePath="/"
         client={client}
@@ -364,6 +364,12 @@ describe('Stage 4B display and player room routes', () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Leave room' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Start Round' })).toBeDisabled();
+    expect(
+      screen.getByText('Connected').closest('.lobby-toolbar'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('.site-header .connection-status'),
+    ).toBeNull();
     expect(
       screen.getByRole('link', {
         name: 'http://localhost:3000/join/ABC234',
@@ -566,7 +572,7 @@ describe('Stage 4B display and player room routes', () => {
       ),
     });
 
-    render(
+    const { container } = render(
       <App
         routePath="/join"
         client={client}
@@ -597,6 +603,11 @@ describe('Stage 4B display and player room routes', () => {
       screen.getByRole('heading', { name: 'Game Settings' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start Round' })).toBeEnabled();
+    expect(
+      within(screen.getByRole('banner')).getByText('Connected'),
+    ).toBeVisible();
+    expect(container.querySelector('.lobby-toolbar--phone')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Leave room' })).toBeNull();
     expect(screen.queryByText('Live temporary room')).toBeNull();
     expect(screen.queryByLabelText('Room code ABC234')).toBeNull();
     expect(screen.queryByText('Shared screen')).toBeNull();
@@ -1460,7 +1471,10 @@ describe('Stage 4B display and player room routes', () => {
 
       await user.click(await screen.findByRole('button', { name: buttonName }));
       await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
-      await user.click(screen.getByRole('button', { name: 'Leave room' }));
+      act(() => {
+        window.history.pushState({}, '', '/join');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      });
       await user.type(
         await screen.findByRole('textbox', { name: 'Room code' }),
         'DEF567',
@@ -1570,7 +1584,7 @@ describe('Stage 4B display and player room routes', () => {
       />,
     );
     expect(
-      await screen.findByText('Round complete — results are on the TV.'),
+      await screen.findByRole('button', { name: 'Start Next Round' }),
     ).toBeVisible();
 
     act(() =>
@@ -1592,7 +1606,7 @@ describe('Stage 4B display and player room routes', () => {
     );
 
     expect(
-      screen.getByText('Round complete — results are on the TV.'),
+      screen.getByRole('button', { name: 'Start Next Round' }),
     ).toBeVisible();
     expect(
       screen.queryByRole('heading', { name: 'Silver Owl wins' }),
@@ -1629,7 +1643,7 @@ describe('Stage 4B display and player room routes', () => {
     await screen.findByRole('button', { name: 'Submit' });
     act(() => reportRoomState?.(createEndedRoom(activeRoom)));
     expect(
-      await screen.findByText('Round complete — results are on the TV.'),
+      await screen.findByRole('button', { name: 'Start Next Round' }),
     ).toBeVisible();
 
     act(() =>
@@ -1639,7 +1653,7 @@ describe('Stage 4B display and player room routes', () => {
       }),
     );
     expect(
-      screen.getByText('Round complete — results are on the TV.'),
+      screen.getByRole('button', { name: 'Start Next Round' }),
     ).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Submit' })).toBeNull();
   });
@@ -1684,18 +1698,18 @@ describe('Stage 4B display and player room routes', () => {
       />,
     );
     expect(
-      await screen.findByText('Round complete — results are on the TV.'),
+      await screen.findByRole('button', { name: 'Start Next Round' }),
     ).toBeVisible();
     act(() => reportRoomState?.(secondRound));
     expect(await screen.findByRole('button', { name: 'Submit' })).toBeVisible();
     expect(
-      screen.queryByText('Round complete — results are on the TV.'),
+      screen.queryByRole('button', { name: 'Start Next Round' }),
     ).toBeNull();
 
     act(() => reportRoomState?.(endedRoom));
     expect(screen.getByRole('button', { name: 'Submit' })).toBeVisible();
     expect(
-      screen.queryByText('Round complete — results are on the TV.'),
+      screen.queryByRole('button', { name: 'Start Next Round' }),
     ).toBeNull();
   });
 
@@ -2273,8 +2287,11 @@ describe('Stage 4B display and player room routes', () => {
     );
 
     expect(
-      await screen.findByText('Round complete — results are on the TV.'),
+      await screen.findByRole('heading', { name: 'Puzzle' }),
     ).toBeVisible();
+    expect(
+      screen.queryByText('Round complete — results are on the TV.'),
+    ).toBeNull();
     expect(
       screen.queryByRole('heading', { name: 'Silver Owl wins' }),
     ).toBeNull();
@@ -2312,6 +2329,9 @@ describe('Stage 4B display and player room routes', () => {
     expect(
       await screen.findByRole('heading', { name: 'Puzzle' }),
     ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('banner')).getByText('Disconnected'),
+    ).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Start Round' })).toBeNull();
     expect(screen.queryByRole('button', { name: '5 × 5' })).toBeNull();
   });

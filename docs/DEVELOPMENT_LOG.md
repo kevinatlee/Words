@@ -1198,6 +1198,10 @@ player are separate roles, and neither socket alone owns room lifetime.
 - Replaced phone detailed results with a concise direction to the TV and moved
   the late-join waiting notice after the puzzle.
 - Updated focused App and RoomLobby coverage for player and display behavior.
+- Applied the first physical phone-review corrections: distinct controller
+  puzzle/settings/authority bubbles, in-header phone connection state, no
+  phone Leave room action, concise active timer wording, and no redundant
+  ended-round TV message.
 
 ### Boundaries retained
 

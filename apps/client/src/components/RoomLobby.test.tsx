@@ -121,7 +121,6 @@ function renderLobby(
       sessionRole={sessionRole}
       currentPlayerId={currentPlayerId}
       connectionStatus="connected"
-      onLeave={async () => undefined}
       onTransferController={async () => null}
       onUpdateSettings={async () => null}
       onStartRound={async () => null}
@@ -175,11 +174,12 @@ describe('RoomLobby word entry', () => {
     const preview = container.querySelector('.room-dashboard__preview');
     expect(preview?.firstElementChild).toHaveClass('board-panel');
     expect(screen.getByRole('heading', { name: 'Puzzle' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Leave room' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Leave room' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Touch' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Trace' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Submit' })).toBeVisible();
     expect(screen.getByRole('timer')).toBeVisible();
+    expect(screen.getByText('Timer')).toBeVisible();
     expect(screen.getByText('0 points')).toBeVisible();
     expect(screen.getByText('0 accepted')).toBeVisible();
     expect(screen.queryByText('Live temporary room')).toBeNull();
@@ -227,6 +227,45 @@ describe('RoomLobby word entry', () => {
     expect(screen.queryByRole('heading', { name: 'Game Host' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Game Settings' })).toBeNull();
   });
+
+  it.each([
+    {
+      phase: 'LOBBY' as const,
+      room: createRoom({ phase: 'LOBBY', round: null }),
+      button: 'Start Round',
+    },
+    {
+      phase: 'ROUND_ENDED' as const,
+      room: createRoom({ phase: 'ROUND_ENDED' }),
+      button: 'Start Next Round',
+    },
+  ])(
+    'keeps the controller $phase panels as puzzle, settings, then authority',
+    ({ room, button }) => {
+      const { container } = renderLobby(undefined, { room });
+      const preview = container.querySelector('.room-dashboard__preview');
+      const puzzle = screen.getByRole('region', { name: 'Puzzle' });
+      const settings = screen.getByRole('region', { name: 'Game Settings' });
+      const authority = screen.getByRole('region', { name: 'Game Host' });
+
+      expect(
+        within(puzzle).getByRole('button', { name: button }),
+      ).toBeVisible();
+      expect(puzzle).not.toContainElement(settings);
+      expect(puzzle).not.toContainElement(authority);
+      expect(Array.from(preview?.children ?? [])).toEqual(
+        expect.arrayContaining([puzzle, settings, authority]),
+      );
+      expect(
+        puzzle.compareDocumentPosition(settings) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).not.toBe(0);
+      expect(
+        settings.compareDocumentPosition(authority) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).not.toBe(0);
+    },
+  );
 
   it('shows controller administration only to the connected controller between rounds', () => {
     const lobby = createRoom({ phase: 'LOBBY', round: null });
@@ -284,6 +323,34 @@ describe('RoomLobby word entry', () => {
     });
     expect(screen.queryByRole('heading', { name: 'Game Host' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Game Settings' })).toBeNull();
+  });
+
+  it('leaves ordinary ended phones with only the completed puzzle', () => {
+    const ordinaryPlayerId = '00000000-0000-4000-8000-000000000002';
+    const room = createRoom({
+      phase: 'ROUND_ENDED',
+      players: [
+        ...createRoom().players,
+        {
+          id: ordinaryPlayerId,
+          displayName: 'Calm Otter',
+          connected: true,
+          joinedAt: '2026-07-31T00:01:00.000Z',
+          isController: false,
+        },
+      ],
+    });
+
+    renderLobby(undefined, { room, currentPlayerId: ordinaryPlayerId });
+
+    expect(screen.getByRole('region', { name: 'Puzzle' })).toBeVisible();
+    expect(screen.getByText('Round complete')).toBeVisible();
+    expect(
+      screen.queryByText('Round complete — results are on the TV.'),
+    ).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Game Settings' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Game Host' })).toBeNull();
+    expect(screen.queryByRole('table')).toBeNull();
   });
 
   it('keeps room details and finalized results on the display', () => {

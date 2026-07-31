@@ -1489,12 +1489,6 @@ button:disabled {
     max(0.75rem, env(safe-area-inset-bottom));
 }
 
-.lobby-toolbar--phone {
-  min-height: auto;
-  margin-bottom: 0.5rem;
-  padding: 0.4rem 0;
-}
-
 .room-dashboard--phone {
   display: block;
 }
@@ -1529,13 +1523,6 @@ button:disabled {
 .personal-score__compact h3 {
   margin: 0.1rem 0 0;
   font-size: 1.1rem;
-}
-
-.phone-round-message {
-  margin: 0;
-  color: var(--paper-muted);
-  font-size: 0.9rem;
-  text-align: center;
 }
 
 @media (max-width: 430px) and (max-height: 760px) {

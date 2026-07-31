@@ -6,12 +6,14 @@ type AppShellProps = {
   children: ReactNode;
   currentPath: string;
   pageClassName?: string;
+  phoneConnectionStatus?: 'connected' | 'connecting' | 'disconnected' | null;
 };
 
 export function AppShell({
   children,
   currentPath,
   pageClassName = '',
+  phoneConnectionStatus = null,
 }: AppShellProps) {
   return (
     <div className={`app-shell ${pageClassName}`}>
@@ -23,6 +25,17 @@ export function AppShell({
           <ProductTitle compact />
         </a>
         <div className="site-header__actions">
+          {phoneConnectionStatus && (
+            <span
+              className={`connection-status connection-status--${phoneConnectionStatus}`}
+            >
+              {phoneConnectionStatus === 'connected'
+                ? 'Connected'
+                : phoneConnectionStatus === 'connecting'
+                  ? 'Reconnecting…'
+                  : 'Disconnected'}
+            </span>
+          )}
           {currentPath !== '/' && (
             <a className="text-link" href="/join">
               Join another room
