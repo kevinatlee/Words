@@ -7,11 +7,13 @@ shared-screen browser creates and presents a temporary room. Phone players join
 without accounts, and the first player becomes the initial game host
 (controller).
 
-**Stage 4D is complete and merged. Stage 4E QR joining is in draft review.**
+**Stage 4E QR joining is complete and merged. Stage 4F Touch/Trace entry is the
+current draft work.**
 The secure lobby, isolated game engine, read-only hosted CI, reproducible
 server-only game data, authoritative rounds, private submissions, and final
-round results are complete. Stage 4E adds a locally rendered, display-only QR
-join option without changing gameplay state or the network contract.
+round results and display-only QR joining are complete. Stage 4F adds local
+Touch and Trace word entry without changing gameplay state or the network
+contract.
 
 ## What works today
 
@@ -95,7 +97,7 @@ previous-round score history, streaks, profiles, progression, achievements,
 ready-up commitments, rematch voting, and penalties for leaving are
 intentional product non-goals, not unfinished MVP features.
 
-Continuous drag tracing, persistence, deployment workflow, container
+Persistence, deployment workflow, container
 packaging, image publishing, server installation, and tunnel configuration
 remain unimplemented. There is no separate results phase.
 
@@ -360,11 +362,11 @@ cannot recreate the display.
 
 ## Remaining roadmap
 
-- **Stage 4E — in draft review:** display-only QR joining and the formal
+- **Stage 4E — complete and merged:** display-only QR joining and the formal
   round-local casual-play product principle.
-- **Stage 4F:** natural continuous touch/pointer tracing while preserving
+- **Stage 4F — current draft work:** Touch and Trace word entry while preserving
   tap/click and keyboard fallbacks.
-- **Stage 4G:** real-party and narrow-screen release-candidate testing, defect
+- **Stage 4G — later:** real-party and narrow-screen release-candidate testing, defect
   correction, focused interaction polish, scoring-balance observation, and
   stabilization—not feature expansion or cumulative scoring.
 - **Stage 5:** production hardening, a one-container build, Node serving the

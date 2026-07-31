@@ -1633,7 +1633,7 @@ describe('Stage 4B display and player room routes', () => {
     expect(
       screen.getByRole('heading', { name: 'Silver Owl wins' }),
     ).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Submit Word' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Submit' })).toBeNull();
   });
 
   it('does not let old results replace a newer active round', async () => {
@@ -1787,7 +1787,7 @@ describe('Stage 4B display and player room routes', () => {
     await user.click(screen.getByRole('button', { name: 'A, tile 2' }));
     await user.click(screen.getByRole('button', { name: 'B, tile 3' }));
     expect(screen.getByRole('heading', { name: 'QUAB' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Submit Word' }));
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
 
     expect(submitWord).toHaveBeenCalledWith({
       roundId: activeRoom.round?.id,
@@ -1838,15 +1838,13 @@ describe('Stage 4B display and player room routes', () => {
     await user.click(await screen.findByRole('button', { name: 'QU, tile 1' }));
     await user.click(screen.getByRole('button', { name: 'A, tile 2' }));
     await user.click(screen.getByRole('button', { name: 'B, tile 3' }));
-    await user.click(screen.getByRole('button', { name: 'Submit Word' }));
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
 
     expect(
-      await screen.findByText(
-        'That word could not be checked. Your selection is still here.',
-      ),
+      await screen.findByText('Could not submit that word. Try again.'),
     ).toBeVisible();
     expect(screen.getByRole('heading', { name: 'QUAB' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Submit Word' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled();
   });
 
   it('does not let an older room snapshot reset newer private submission state', async () => {
@@ -1945,12 +1943,16 @@ describe('Stage 4B display and player room routes', () => {
     await user.click(await screen.findByRole('button', { name: 'QU, tile 1' }));
     await user.click(screen.getByRole('button', { name: 'F, tile 7' }));
     expect(screen.getByRole('heading', { name: 'QU' })).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    await user.click(
+      screen.getByRole('button', { name: 'QU, selection number 1' }),
+    );
     expect(
       screen.getByRole('heading', { name: 'Select adjacent tiles' }),
     ).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'A, tile 2' }));
-    await user.click(screen.getByRole('button', { name: 'Clear' }));
+    await user.click(
+      screen.getByRole('button', { name: 'A, selection number 1' }),
+    );
     expect(
       screen.getByRole('heading', { name: 'Select adjacent tiles' }),
     ).toBeVisible();
@@ -2107,7 +2109,7 @@ describe('Stage 4B display and player room routes', () => {
       />,
     );
     expect(await screen.findByText('Waiting this round.')).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Submit Word' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Submit' })).toBeNull();
     expect(screen.queryByText(/Provisional points:/)).toBeNull();
     expect(
       screen.queryByRole('region', { name: 'Join the next round' }),

@@ -1,5 +1,23 @@
 # Development log
 
+## 2026-07-31 — Stage 4F Touch and Trace entry (draft)
+
+- Added a local, accessible Touch/Trace selector for active-round player word
+  entry. It defaults to Touch and remembers only the browser preference.
+- Replaced visible Undo and Clear controls with safe path backtracking: Touch
+  and Trace both truncate an existing path when a selected tile is revisited.
+- Added Pointer Events Trace input with capture, coordinate hit testing,
+  lift-to-submit, cancellation cleanup, and the existing keyboard Submit
+  fallback. No server event, room field, phase, or scoring behavior changed.
+- Made active-round tile typography share the stronger tile scale used between
+  rounds, including `QU` and selected/focused states.
+- Recorded the locked post-playtest product decisions in
+  `PLAYTEST_DECISIONS.md`; integer scoring, TV results, and information
+  architecture work remain future scope.
+- Stage 4E is now complete and merged. The historical Stage 4E draft entry
+  below remains as an implementation record; its listed physical review checks
+  were later completed and accepted by the product owner.
+
 ## 2026-07-30 — Stage 4E QR joining (draft)
 
 - Added one display-only `JoinQrCode` component that receives the completed
@@ -65,10 +83,10 @@
   a square 281.59 CSS-pixel prominent QR, wrapped the URL safely, and kept
   results reachable. The compact active QR remained square at 153.59 CSS
   pixels and did not overlay the board or timer.
-- A physical native-iPhone Camera scan, a physical compact-QR scan, true
-  1920 × 1080 and 3840 × 2160 display runs, and a genuine browser 200% zoom
-  run remain explicitly pending for draft review; they are not claimed as
-  passed.
+- At the time of this draft record, a physical native-iPhone Camera scan,
+  compact-QR scan, true 1920 × 1080 and 3840 × 2160 display runs, and a genuine
+  browser 200% zoom run remained outstanding. Subsequent product review
+  accepted the documented display limitations before Stage 4E merged.
 - `npm run dev` reached clean client and server readiness, then shut down
   without leaving listeners on ports `5173` or `6532`.
 
@@ -184,7 +202,7 @@
 - Added participant-only accessible tile controls, Undo/Clear, private accepted
   words, provisional points, and focused privacy/deadline/race tests.
 - Deferred cross-player shared-word policy, final results, rankings,
-  persistence, and continuous drag tracing to Stage 4D.
+  persistence, and later Touch/Trace entry work to Stage 4D.
 
 Future meaningful work must add a new chronological entry. Record what changed,
 why, what remains open, and the exact verification results.
