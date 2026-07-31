@@ -73,6 +73,14 @@ compatibility aliases for the automatic root display flow. The Node server
 listens on port `6532` by default. During development Vite listens on `5173` and
 proxies API and Socket.IO traffic to the Node server.
 
+New temporary rooms begin with a 5 × 5 grid and a 120-second round. The
+controller may still choose any supported 4 × 4, 5 × 5, or 6 × 6 grid and the
+existing allowed durations before starting a round. Phone puzzle bubbles retain
+an accessible label without a visible heading; active participants receive a
+separate Tap/Trace control bubble and no phone provisional score or accepted
+word count. Any aggregate active-TV word-count presentation is deferred to the
+future TV redesign. The production UI does not show a development-stage badge.
+
 Stage 3 adds a separate framework-independent `@words/game-engine` package:
 
 - immutable validated 4 × 4, 5 × 5, and 6 × 6 boards

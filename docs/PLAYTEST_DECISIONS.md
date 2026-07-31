@@ -62,6 +62,11 @@ This is planned, not implemented by Stage 4F:
   main app header; there is no phone toolbar or Leave room control. Room codes,
   QR, player lists, display details, and phase labels stay on the shared
   display.
+- New temporary rooms default to a 5 × 5 grid and a two-minute round; all
+  existing supported sizes and durations remain available to the controller.
+- Puzzle bubbles have no visible heading on phones but retain an accessible
+  puzzle label. During active participation, the headingless Tap/Trace control
+  is a separate bubble directly below the puzzle.
 - Ordinary players see a concise waiting message between rounds and never see
   settings or controller delegation.
 - The controller sees three distinct sibling bubbles in the lobby and after
@@ -73,6 +78,10 @@ This is planned, not implemented by Stage 4F:
   bubbles) instead of rankings, scores, winner copy, detailed word review, or
   a redundant TV-results message. The shared display retains its existing
   results presentation.
+- Phones do not show provisional scores or accepted-word counts. A possible
+  active-TV word-count presentation remains deferred to the separate TV
+  redesign because it needs an aggregate-display decision.
+- The production UI does not display a development-stage identifier.
 
 ## Current boundary
 

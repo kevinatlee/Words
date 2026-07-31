@@ -124,8 +124,8 @@ describe('RoomStore display and player sessions', () => {
     );
     expect(result.session.displayReconnectToken).toHaveLength(43);
     expect(result.room.settings).toEqual({
-      gridSize: 4,
-      roundDurationSeconds: 180,
+      gridSize: 5,
+      roundDurationSeconds: 120,
       scoringMode: 'length-plus-unique',
     });
     expect(result.room).not.toHaveProperty('board');
@@ -1556,8 +1556,8 @@ describe('RoomStore authoritative settings and rounds', () => {
     const response = store.updateSettings(
       controllerSession,
       {
-        gridSize: 4,
-        roundDurationSeconds: 180,
+        gridSize: 5,
+        roundDurationSeconds: 120,
         scoringMode: 'length-plus-unique',
       },
       'socket-controller',
@@ -1746,8 +1746,8 @@ describe('RoomStore authoritative settings and rounds', () => {
         ({
           success: true,
           board: {
-            size: 5,
-            tiles: Array.from({ length: 25 }, () => 'A'),
+            size: 4,
+            tiles: Array.from({ length: 16 }, () => 'A'),
           },
           attempts: 1,
         }) as never,
@@ -1814,7 +1814,7 @@ describe('RoomStore authoritative settings and rounds', () => {
   });
 
   it('copies mutable generator output before publishing a round', () => {
-    const tiles = Array.from({ length: 16 }, () => 'A');
+    const tiles = Array.from({ length: 25 }, () => 'A');
     const { store, display, controllerSession } = createRoundRoom({
       generator: (size) => ({
         success: true,

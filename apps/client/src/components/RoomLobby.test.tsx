@@ -168,20 +168,32 @@ afterEach(() => {
 });
 
 describe('RoomLobby word entry', () => {
-  it('keeps the active phone focused on the puzzle and private play state', () => {
+  it('keeps active phone play in a headingless puzzle bubble and separate mode bubble', () => {
     const { container } = renderLobby();
 
     const preview = container.querySelector('.room-dashboard__preview');
     expect(preview?.firstElementChild).toHaveClass('board-panel');
-    expect(screen.getByRole('heading', { name: 'Puzzle' })).toBeVisible();
+    const puzzle = screen.getByRole('region', { name: 'Puzzle' });
+    const modePanel = screen.getByRole('region', { name: 'Word entry mode' });
+    expect(puzzle).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Puzzle' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Leave room' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Touch' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Trace' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Submit' })).toBeVisible();
+    expect(
+      within(modePanel).getByRole('button', { name: 'Tap' }),
+    ).toBeVisible();
+    expect(
+      within(modePanel).getByRole('button', { name: 'Trace' }),
+    ).toBeVisible();
+    expect(
+      within(puzzle).getByRole('button', { name: 'Submit' }),
+    ).toBeVisible();
+    expect(puzzle).not.toContainElement(modePanel);
+    expect(modePanel.querySelector('h1, h2, h3, .eyebrow, p')).toBeNull();
     expect(screen.getByRole('timer')).toBeVisible();
     expect(screen.getByText('Timer')).toBeVisible();
-    expect(screen.getByText('0 points')).toBeVisible();
-    expect(screen.getByText('0 accepted')).toBeVisible();
+    expect(screen.queryByText('Private progress')).toBeNull();
+    expect(screen.queryByText('0 points')).toBeNull();
+    expect(screen.queryByText('0 accepted')).toBeNull();
     expect(screen.queryByText('Live temporary room')).toBeNull();
     expect(screen.queryByLabelText('Room code ABC234')).toBeNull();
     expect(screen.queryByText('Shared screen')).toBeNull();
@@ -189,12 +201,12 @@ describe('RoomLobby word entry', () => {
     expect(screen.queryByRole('region', { name: /scan to join/i })).toBeNull();
   });
 
-  it('defaults to Touch, remembers Trace locally, and exposes an accessible selector', async () => {
+  it('defaults to Tap, remembers Trace locally, and exposes an accessible selector', async () => {
     const user = userEvent.setup();
     const first = renderLobby();
 
     const mode = screen.getByRole('group', { name: 'Word entry mode' });
-    expect(within(mode).getByRole('button', { name: 'Touch' })).toHaveAttribute(
+    expect(within(mode).getByRole('button', { name: 'Tap' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
@@ -211,6 +223,56 @@ describe('RoomLobby word entry', () => {
       'aria-pressed',
       'true',
     );
+  });
+
+  it('shows the mode bubble only to active round participants', () => {
+    const activeView = renderLobby();
+    expect(
+      screen.getByRole('region', { name: 'Word entry mode' }),
+    ).toBeVisible();
+    activeView.unmount();
+
+    const lobbyView = renderLobby(undefined, {
+      room: createRoom({ phase: 'LOBBY', round: null }),
+    });
+    expect(
+      screen.queryByRole('region', { name: 'Word entry mode' }),
+    ).toBeNull();
+    lobbyView.unmount();
+
+    const latePlayerId = '00000000-0000-4000-8000-000000000002';
+    renderLobby(undefined, {
+      room: createRoom({
+        players: [
+          ...createRoom().players,
+          {
+            id: latePlayerId,
+            displayName: 'Calm Otter',
+            connected: true,
+            joinedAt: '2026-07-31T00:01:00.000Z',
+            isController: false,
+          },
+        ],
+      }),
+      currentPlayerId: latePlayerId,
+    });
+    expect(
+      screen.queryByRole('region', { name: 'Word entry mode' }),
+    ).toBeNull();
+  });
+
+  it('keeps display timer wording separate from prominent phone timer labels', () => {
+    const phone = renderLobby();
+    expect(screen.getByText('Timer').closest('.round-clock')).toHaveClass(
+      'round-clock--phone',
+    );
+    phone.unmount();
+
+    renderLobby(undefined, { sessionRole: 'display', currentPlayerId: null });
+    expect(screen.getByText('Authoritative time remaining')).toBeVisible();
+    expect(
+      screen.getByText('Authoritative time remaining').closest('.round-clock'),
+    ).not.toHaveClass('round-clock--phone');
   });
 
   it('removes obsolete controls and keeps Submit available', () => {
@@ -346,6 +408,9 @@ describe('RoomLobby word entry', () => {
     expect(screen.getByRole('region', { name: 'Puzzle' })).toBeVisible();
     expect(screen.getByText('Round complete')).toBeVisible();
     expect(
+      screen.getByText('Round complete').closest('.round-clock'),
+    ).toHaveClass('round-clock--phone');
+    expect(
       screen.queryByText('Round complete — results are on the TV.'),
     ).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Game Settings' })).toBeNull();
@@ -398,7 +463,7 @@ describe('RoomLobby word entry', () => {
     ).toBeVisible();
   });
 
-  it('uses Touch backtracking without leaving disconnected paths', async () => {
+  it('uses Tap backtracking without leaving disconnected paths', async () => {
     const user = userEvent.setup();
     renderLobby();
     await selectFirstThree(user);
@@ -489,7 +554,7 @@ describe('RoomLobby word entry', () => {
     ).toBeVisible();
 
     fireEvent.pointerDown(tiles[0]!, { pointerId: 2, pointerType: 'mouse' });
-    await user.click(screen.getByRole('button', { name: 'Touch' }));
+    await user.click(screen.getByRole('button', { name: 'Tap' }));
     expect(
       screen.getByRole('heading', { name: 'Select adjacent tiles' }),
     ).toBeVisible();

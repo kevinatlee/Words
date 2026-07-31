@@ -1202,6 +1202,10 @@ player are separate roles, and neither socket alone owns room lifetime.
   puzzle/settings/authority bubbles, in-header phone connection state, no
   phone Leave room action, concise active timer wording, and no redundant
   ended-round TV message.
+- Applied the final phone-layout refinement: new rooms default to 5 × 5 for
+  two minutes, phone puzzle bubbles have no visible heading, active Tap/Trace
+  is a sibling bubble, private progress is not shown on phones, timer labels
+  are prominent, and the production stage badge is absent.
 
 ### Boundaries retained
 

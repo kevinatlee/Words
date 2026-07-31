@@ -97,6 +97,15 @@ function setup(options: Partial<RoomStoreOptions> = {}) {
     roomCode: display.room.code,
     playerId: second.session.playerId,
   };
+  store.updateSettings(
+    firstSession,
+    {
+      gridSize: 4,
+      roundDurationSeconds: 180,
+      scoringMode: 'length-plus-unique',
+    },
+    'player-one-socket',
+  );
   const started = store.startRound(firstSession, 'player-one-socket');
   const roundId = started.room.round?.id;
   if (!roundId) {

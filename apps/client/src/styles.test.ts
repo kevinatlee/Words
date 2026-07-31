@@ -17,4 +17,10 @@ describe('tile typography', () => {
       /\.letter-tile\s*\{[^}]*font-size: var\(--letter-tile-font-size\);[^}]*font-weight: 900;[^}]*line-height: 1;/s,
     );
   });
+
+  it('keeps phone timer labels as prominent as the countdown value', () => {
+    expect(styles).toMatch(
+      /\.room-page--phone \.round-clock--phone small\s*\{[^}]*font-size: clamp\(1\.2rem, 3vw, 1\.8rem\);[^}]*font-weight: 900;/s,
+    );
+  });
 });

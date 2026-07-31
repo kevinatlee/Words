@@ -35,7 +35,8 @@ contract.
   join-time ties by player ID.
 - Display and player presence update in real time.
 - The connected controller can atomically choose a supported grid size and
-  round duration, then start a server-owned round.
+  round duration, then start a server-owned round. New rooms begin at 5 × 5
+  for two minutes.
 - Every session receives the same immutable board, participant snapshot,
   deadline, and `LOBBY`, `ROUND_ACTIVE`, or `ROUND_ENDED` phase.
 - The server loads and verifies the 79,370-word production dictionary before
@@ -59,6 +60,10 @@ contract.
   winner, or no winner when no participant submitted a scoring word.
 - The display presents the public participant word review after submissions
   close; phones direct players to the TV rather than duplicating results.
+- Phone puzzle bubbles use semantic labels without a visible puzzle heading.
+  During active play, Tap/Trace is a separate control bubble and phones do not
+  show provisional scores or accepted-word counts. Any active-TV word-count
+  presentation remains deferred to the future TV redesign.
 - Display and player tabs use separate, temporary reconnect credentials.
 - A display or controller disconnect does not immediately close the room.
 - Rooms and credentials live only in bounded server memory.

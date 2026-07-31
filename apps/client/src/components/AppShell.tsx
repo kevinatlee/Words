@@ -41,7 +41,6 @@ export function AppShell({
               Join another room
             </a>
           )}
-          <span className="stage-badge">Stage 4E QR joining</span>
         </div>
       </header>
       <main id="main-content">{children}</main>

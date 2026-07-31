@@ -50,7 +50,6 @@ export function RoomLobby({
   onTransferController,
   onUpdateSettings,
   onStartRound,
-  submissionState,
   onSubmitWord,
 }: RoomLobbyProps) {
   const [actionPending, setActionPending] = useState(false);
@@ -371,36 +370,31 @@ export function RoomLobby({
           )}
           <section
             className="panel board-panel"
-            aria-labelledby="board-title"
+            aria-labelledby={isDisplay ? 'board-title' : undefined}
+            aria-label={isDisplay ? undefined : 'Puzzle'}
             data-round-id={room.round?.id}
             data-round-deadline-at={room.round?.deadlineAt}
           >
-            <div className="panel-heading board-panel__heading">
-              <div>
-                {isDisplay && (
+            {isDisplay && (
+              <div className="panel-heading board-panel__heading">
+                <div>
                   <span className="eyebrow">
                     {room.round
                       ? `Round ${room.round.number}`
                       : 'Layout preview'}
                   </span>
-                )}
-                <h2 id="board-title">
-                  {isDisplay
-                    ? `${boardSize} × ${boardSize} letter grid`
-                    : 'Puzzle'}
-                </h2>
-              </div>
-              {isDisplay && (
+                  <h2 id="board-title">{`${boardSize} × ${boardSize} letter grid`}</h2>
+                </div>
                 <span
                   className={`status-label${room.round ? ' status-label--display' : ''}`}
                 >
                   {room.round ? 'Official board' : 'Non-official preview'}
                 </span>
-              )}
-            </div>
+              </div>
+            )}
             {room.round && (
               <div
-                className="round-clock"
+                className={`round-clock${isDisplay ? '' : ' round-clock--phone'}`}
                 role="timer"
                 aria-live={roundIsActive ? 'off' : 'polite'}
               >
@@ -456,28 +450,6 @@ export function RoomLobby({
                     </h3>
                   </div>
                   <div className="word-entry__actions">
-                    <div
-                      className="word-entry__mode"
-                      role="group"
-                      aria-label="Word entry mode"
-                    >
-                      <button
-                        className="button button--secondary"
-                        type="button"
-                        aria-pressed={entryMode === 'touch'}
-                        onClick={() => selectEntryMode('touch')}
-                      >
-                        Touch
-                      </button>
-                      <button
-                        className="button button--secondary"
-                        type="button"
-                        aria-pressed={entryMode === 'trace'}
-                        onClick={() => selectEntryMode('trace')}
-                      >
-                        Trace
-                      </button>
-                    </div>
                     <button
                       className="button button--primary"
                       type="button"
@@ -505,24 +477,6 @@ export function RoomLobby({
                 currentPlayerId={currentPlayerId}
                 isDisplay={isDisplay}
               />
-            )}
-            {sessionRole === 'player' && roundIsActive && submissionState && (
-              <section
-                className="personal-score"
-                aria-labelledby="personal-score-title"
-              >
-                <div className="personal-score__compact">
-                  <div>
-                    <span className="eyebrow">Private progress</span>
-                    <h3 id="personal-score-title">
-                      {submissionState.provisionalScore} points
-                    </h3>
-                  </div>
-                  <strong>
-                    {submissionState.acceptedWords.length} accepted
-                  </strong>
-                </div>
-              </section>
             )}
             {!isDisplay &&
               !roundIsActive &&
@@ -560,6 +514,35 @@ export function RoomLobby({
               </div>
             )}
           </section>
+          {!isDisplay && roundIsActive && isRoundParticipant && (
+            <section
+              className="panel word-entry-mode-panel"
+              aria-label="Word entry mode"
+            >
+              <div
+                className="word-entry__mode"
+                role="group"
+                aria-label="Word entry mode"
+              >
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  aria-pressed={entryMode === 'touch'}
+                  onClick={() => selectEntryMode('touch')}
+                >
+                  Tap
+                </button>
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  aria-pressed={entryMode === 'trace'}
+                  onClick={() => selectEntryMode('trace')}
+                >
+                  Trace
+                </button>
+              </div>
+            </section>
+          )}
           {!isDisplay && showControllerAdministration && (
             <GameSettings
               settings={room.settings}
