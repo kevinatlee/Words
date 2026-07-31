@@ -70,9 +70,9 @@ This is planned, not implemented by Stage 4F:
 - Ordinary players see only the puzzle preview between rounds and never see
   settings, controller delegation, or a waiting message.
 - The controller sees three distinct sibling bubbles in the lobby and after
-  results: Puzzle (including Start Round or Start Next Round), Game Settings,
-  then Player Authority. Those administration bubbles are absent during active
-  gameplay for every phone.
+  results: Puzzle (including Start Round or Start Next Round), accessible Game
+  Settings controls, then accessible Game Host controls. Those administration
+  bubbles are absent during active gameplay for every phone.
 - Phone active timers use the concise `Timer` label. After a round, phones show
   the completed Puzzle bubble only (plus the controller's two administration
   bubbles) instead of rankings, scores, winner copy, detailed word review, or
@@ -83,10 +83,9 @@ This is planned, not implemented by Stage 4F:
   redesign because it needs an aggregate-display decision.
 - The production UI does not display a development-stage identifier.
 - Phone connection status includes safe-area-aware right-side breathing room.
-  The Game Settings bubble begins with its titled fieldset legends and compact
-  duration labels; the Game Host bubble retains its heading and transfer
-  controls without repeating the current host identity. Active word entry
-  stacks the selected word, Submit action, and feedback vertically.
+  The settings and host-control bubbles use non-visible accessible labels with
+  compact three-column controls. Active word entry stacks the selected word,
+  Submit action, and feedback vertically.
 
 ## Current boundary
 

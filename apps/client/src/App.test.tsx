@@ -608,8 +608,8 @@ describe('Stage 4B display and player room routes', () => {
       within(screen.getByRole('banner')).getByText('Connected'),
     ).toHaveClass('connection-status--phone');
     expect(
-      screen.getByRole('link', { name: 'Join Another Room' }),
-    ).toBeVisible();
+      screen.queryByRole('link', { name: 'Join Another Room' }),
+    ).toBeNull();
     expect(screen.queryByRole('contentinfo')).toBeNull();
     expect(container.querySelector('.lobby-toolbar--phone')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Leave room' })).toBeNull();
@@ -659,6 +659,9 @@ describe('Stage 4B display and player room routes', () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Start Round' })).toBeNull();
+    expect(
+      within(screen.getByRole('banner')).getByText('Connected'),
+    ).toHaveClass('connection-status--phone');
     expect(
       screen.queryByRole('link', { name: 'Join Another Room' }),
     ).toBeNull();
@@ -776,7 +779,7 @@ describe('Stage 4B display and player room routes', () => {
       />,
     );
 
-    expect(await screen.findAllByText('Game Host offline')).toHaveLength(1);
+    expect(screen.queryByText('Game Host offline')).toBeNull();
     expect(
       screen.queryByRole('button', { name: 'Make Game Host' }),
     ).not.toBeInTheDocument();

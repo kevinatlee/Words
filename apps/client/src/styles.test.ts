@@ -33,4 +33,16 @@ describe('tile typography', () => {
       /\.word-entry__actions \.button\s*\{[^}]*width: 100%;/s,
     );
   });
+
+  it('keeps duration choices in a three-column grid with compact control gaps', () => {
+    expect(styles).toMatch(
+      /\.duration-grid\s*\{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/s,
+    );
+    expect(styles).toMatch(
+      /\.choice-group \+ \.choice-group\s*\{[^}]*margin-top: 0\.8rem;/s,
+    );
+    expect(styles).toMatch(
+      /\.word-entry__actions\s*\{[^}]*margin-top: 0\.35rem;/s,
+    );
+  });
 });

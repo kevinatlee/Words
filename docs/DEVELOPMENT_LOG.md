@@ -10,6 +10,9 @@
   connected controller according to the authoritative room assignment.
 - Stacked active phone word submission content vertically and retained all
   existing submission, transfer, reconnect, and display behavior.
+- Follow-up physical review removed all in-app room navigation, visible
+  controller-panel chrome, and visible settings legends while retaining their
+  accessible names; duration choices remain a 3 × 2 grid.
 
 ## 2026-07-31 — Integer letter-count scoring (draft)
 

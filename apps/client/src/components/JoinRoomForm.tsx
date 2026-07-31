@@ -30,12 +30,7 @@ export function JoinRoomForm({
   return (
     <section className="form-page">
       <div className="form-page__intro">
-        <span className="eyebrow">Phone lobby</span>
-        <h1>Join the room.</h1>
-        <p>
-          Enter the code on the shared screen and a temporary display name. No
-          account or email is needed.
-        </p>
+        <h1>Join the Room</h1>
       </div>
 
       <form

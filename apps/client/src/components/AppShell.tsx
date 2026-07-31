@@ -4,18 +4,14 @@ import { ProductTitle } from './ProductTitle';
 
 type AppShellProps = {
   children: ReactNode;
-  currentPath: string;
   pageClassName?: string;
   phoneConnectionStatus?: 'connected' | 'connecting' | 'disconnected' | null;
-  showJoinAnotherRoom?: boolean;
 };
 
 export function AppShell({
   children,
-  currentPath,
   pageClassName = '',
   phoneConnectionStatus = null,
-  showJoinAnotherRoom = currentPath !== '/',
 }: AppShellProps) {
   return (
     <div className={`app-shell ${pageClassName}`}>
@@ -37,11 +33,6 @@ export function AppShell({
                   ? 'Reconnecting…'
                   : 'Disconnected'}
             </span>
-          )}
-          {showJoinAnotherRoom && (
-            <a className="text-link" href="/join">
-              Join Another Room
-            </a>
           )}
         </div>
       </header>

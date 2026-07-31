@@ -29,7 +29,7 @@ export function GameSettings({
       aria-busy={pending || undefined}
     >
       <fieldset className="choice-group">
-        <legend>Grid Size</legend>
+        <legend className="visually-hidden">Grid Size</legend>
         <div className="segmented-control segmented-control--three">
           {productConfig.supportedGridSizes.map((size) => (
             <button
@@ -46,7 +46,7 @@ export function GameSettings({
       </fieldset>
 
       <fieldset className="choice-group">
-        <legend>Round Duration</legend>
+        <legend className="visually-hidden">Round Duration</legend>
         <div className="duration-grid">
           {productConfig.supportedRoundDurationsSeconds.map((seconds) => (
             <button

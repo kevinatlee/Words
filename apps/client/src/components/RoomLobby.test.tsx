@@ -286,7 +286,9 @@ describe('RoomLobby word entry', () => {
   it('keeps controller administration out of active gameplay', () => {
     renderLobby();
 
-    expect(screen.queryByRole('heading', { name: 'Game Host' })).toBeNull();
+    expect(
+      screen.queryByRole('region', { name: 'Game host controls' }),
+    ).toBeNull();
     expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
   });
 
@@ -308,7 +310,9 @@ describe('RoomLobby word entry', () => {
       const preview = container.querySelector('.room-dashboard__preview');
       const puzzle = screen.getByRole('region', { name: 'Puzzle' });
       const settings = screen.getByRole('region', { name: 'Game settings' });
-      const authority = screen.getByRole('region', { name: 'Game Host' });
+      const authority = screen.getByRole('region', {
+        name: 'Game host controls',
+      });
 
       expect(
         within(puzzle).getByRole('button', { name: button }),
@@ -332,10 +336,16 @@ describe('RoomLobby word entry', () => {
   it('shows controller administration only to the connected controller between rounds', () => {
     const lobby = createRoom({ phase: 'LOBBY', round: null });
     const lobbyView = renderLobby(undefined, { room: lobby });
-    expect(screen.getByRole('heading', { name: 'Game Host' })).toBeVisible();
+    expect(
+      screen.getByRole('region', { name: 'Game host controls' }),
+    ).toBeVisible();
     expect(screen.getByRole('region', { name: 'Game settings' })).toBeVisible();
     expect(screen.queryByText('Game settings')).toBeNull();
     expect(screen.queryByText('Game Host controls')).toBeNull();
+    expect(screen.getByText('Grid Size')).toHaveClass('visually-hidden');
+    expect(screen.getByText('Round Duration')).toHaveClass('visually-hidden');
+    expect(screen.queryByRole('heading', { name: 'Game Host' })).toBeNull();
+    expect(screen.queryByText('Game Host online')).toBeNull();
     expect(screen.getByRole('group', { name: 'Grid Size' })).toBeVisible();
     expect(screen.getByRole('group', { name: 'Round Duration' })).toBeVisible();
     expect(
@@ -352,7 +362,9 @@ describe('RoomLobby word entry', () => {
     renderLobby(undefined, {
       room: createRoom({ phase: 'ROUND_ENDED' }),
     });
-    expect(screen.getByRole('heading', { name: 'Game Host' })).toBeVisible();
+    expect(
+      screen.getByRole('region', { name: 'Game host controls' }),
+    ).toBeVisible();
     expect(screen.getByRole('region', { name: 'Game settings' })).toBeVisible();
   });
 
@@ -412,7 +424,9 @@ describe('RoomLobby word entry', () => {
         },
         currentPlayerId: ordinaryPlayerId,
       });
-      expect(screen.queryByRole('heading', { name: 'Game Host' })).toBeNull();
+      expect(
+        screen.queryByRole('region', { name: 'Game host controls' }),
+      ).toBeNull();
       expect(
         screen.queryByRole('region', { name: 'Game settings' }),
       ).toBeNull();
@@ -424,7 +438,9 @@ describe('RoomLobby word entry', () => {
       sessionRole: 'display',
       currentPlayerId: null,
     });
-    expect(screen.queryByRole('heading', { name: 'Game Host' })).toBeNull();
+    expect(
+      screen.queryByRole('region', { name: 'Game host controls' }),
+    ).toBeNull();
     expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
   });
 
@@ -455,7 +471,9 @@ describe('RoomLobby word entry', () => {
       screen.queryByText('Round complete — results are on the TV.'),
     ).toBeNull();
     expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
-    expect(screen.queryByRole('heading', { name: 'Game Host' })).toBeNull();
+    expect(
+      screen.queryByRole('region', { name: 'Game host controls' }),
+    ).toBeNull();
     expect(screen.queryByRole('table')).toBeNull();
   });
 
