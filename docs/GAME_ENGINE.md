@@ -17,7 +17,7 @@ verified dictionary, derived default weights, and a bounded quality predicate.
 Stage 4B connects the server—not the browser—to default board generation and
 retains each official board and deadline. The client imports neither package.
 Stage 4C calls path validation and dictionary lookup from the authoritative
-server and adds pure traditional scoring. Stage 4D adds pure bounded
+server and adds pure word-length scoring. Stage 4D adds pure bounded
 cross-participant reconciliation while the server retains ranking and room
 lifecycle ownership.
 
@@ -138,16 +138,16 @@ normalization code. Core lookup performs no filesystem or network work.
 
 `reconcileRoundWords()` accepts one to eight unique participant IDs with at
 most 256 ordered canonical accepted records each. It verifies every stored
-point value through `scoreTraditionalWord()`, rejects duplicate participant IDs
+point value through `scoreWordByLength()`, rejects duplicate participant IDs
 and duplicate words within one participant, and counts a word once per distinct
 participant ID.
 
 A word accepted by at least two participants is shared. Every accepted word
-retains its traditional base points; a unique word adds exactly 25% of that
-base and a shared word adds no bonus. The result preserves participant and word
-order, contains exact base, uniqueness-bonus, and final totals, and is deeply
-detached and frozen. All values are exact quarter points, so no rounding or
-tolerance comparison is needed. The engine does not receive display names,
+retains its length-based base points; a unique three- or four-letter word adds
+one point, a unique longer word adds two, and a shared word adds no bonus. The
+result preserves participant and word order, contains integer base,
+uniqueness-bonus, and final totals, and is deeply detached and frozen. The
+engine does not receive display names,
 accepted timestamps, paths, room state, clocks, Socket.IO, Zod, controller
 authority, or winner presentation policy.
 
@@ -169,9 +169,9 @@ path and dictionary validation APIs. It must enforce current-round
 participation and deadline on the server, keep the display passive, and avoid
 making the engine depend on rooms or sockets.
 
-`scoreTraditionalWord()` safely rejects malformed or shorter-than-three-letter
-input. Valid canonical lengths score 3–4 as 1 point, 5 as 2, 6 as 3, 7 as 5,
-and 8–64 as 11. It counts letters rather than tiles, so `QU` contributes two.
+`scoreWordByLength()` safely rejects malformed or shorter-than-three-letter
+input. Valid canonical words score their exact length. It counts letters rather
+than tiles, so `QU` contributes two.
 Stage 4D calls pure reconciliation only after the server deadline. The server
 maps the engine output to snapshotted names, deterministic ranks, winners, and
 the strict public result state.

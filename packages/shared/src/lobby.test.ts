@@ -48,7 +48,7 @@ function roomStateFixture() {
     settings: {
       gridSize: 4,
       roundDurationSeconds: 180,
-      scoringMode: 'traditional',
+      scoringMode: 'length-plus-unique',
     },
     round: null,
   } as const;
@@ -61,7 +61,7 @@ function roundStateFixture() {
     settings: {
       gridSize: 4,
       roundDurationSeconds: 30,
-      scoringMode: 'traditional',
+      scoringMode: 'length-plus-unique',
     },
     board: {
       size: 4,

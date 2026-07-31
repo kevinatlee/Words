@@ -42,9 +42,9 @@ export {
   type PathValidationResult,
 } from './path.js';
 export {
-  scoreTraditionalWord,
-  type TraditionalPoints,
-  type TraditionalScoringResult,
+  scoreWordByLength,
+  type WordPoints,
+  type WordScoringResult,
 } from './scoring.js';
 export {
   MAX_RECONCILIATION_PARTICIPANTS,

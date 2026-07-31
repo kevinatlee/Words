@@ -1,17 +1,16 @@
-import { scoreTraditionalWord, type TraditionalPoints } from './scoring.js';
+import { scoreWordByLength, type WordPoints } from './scoring.js';
 
 export const MAX_RECONCILIATION_PARTICIPANTS = 8;
 export const MAX_RECONCILIATION_WORDS_PER_PARTICIPANT = 256;
 
 export type ReconciliationAcceptedWord = {
   readonly word: string;
-  readonly points: TraditionalPoints;
+  readonly points: WordPoints;
 };
 
-export type UniqueBonusPoints = 0 | 0.25 | 0.5 | 0.75 | 1.25 | 2.75;
+export type UniqueBonusPoints = 0 | 1 | 2;
 
-export type FinalWordPoints =
-  1 | 1.25 | 2 | 2.5 | 3 | 3.75 | 5 | 6.25 | 11 | 13.75;
+export type FinalWordPoints = number;
 
 export type ReconciliationParticipant = {
   readonly playerId: string;
@@ -20,7 +19,7 @@ export type ReconciliationParticipant = {
 
 export type ReconciledWord = {
   readonly word: string;
-  readonly basePoints: TraditionalPoints;
+  readonly basePoints: WordPoints;
   readonly shared: boolean;
   readonly uniqueBonusPoints: UniqueBonusPoints;
   readonly finalPoints: FinalWordPoints;
@@ -70,42 +69,12 @@ function failure(
   });
 }
 
-function uniqueBonusFor(
-  points: TraditionalPoints,
-): Exclude<UniqueBonusPoints, 0> {
-  switch (points) {
-    case 1:
-      return 0.25;
-    case 2:
-      return 0.5;
-    case 3:
-      return 0.75;
-    case 5:
-      return 1.25;
-    case 11:
-      return 2.75;
-  }
+function uniqueBonusFor(points: WordPoints): Exclude<UniqueBonusPoints, 0> {
+  return points <= 4 ? 1 : 2;
 }
 
-function finalPointsFor(
-  points: TraditionalPoints,
-  shared: boolean,
-): FinalWordPoints {
-  if (shared) {
-    return points;
-  }
-  switch (points) {
-    case 1:
-      return 1.25;
-    case 2:
-      return 2.5;
-    case 3:
-      return 3.75;
-    case 5:
-      return 6.25;
-    case 11:
-      return 13.75;
-  }
+function finalPointsFor(points: WordPoints, shared: boolean): FinalWordPoints {
+  return points + (shared ? 0 : uniqueBonusFor(points));
 }
 
 function reconcileRoundWordsChecked(
@@ -159,7 +128,7 @@ function reconcileRoundWordsChecked(
       const acceptedWord = acceptedWords[wordIndex];
       const word = acceptedWord?.word;
       const points = acceptedWord?.points;
-      const scored = scoreTraditionalWord(word);
+      const scored = scoreWordByLength(word);
       if (!acceptedWord || !scored.valid || scored.word !== word) {
         return failure('INVALID_WORD', participantIndex, wordIndex);
       }

@@ -25,7 +25,7 @@ Socket.IO event maps. Both client and server import the same contract.
 **Game-engine package (`packages/game-engine`):** Pure TypeScript for immutable
 board validation, injected-random weighted generation, bounded rejection,
 row-major paths, adjacency, word normalization, exact path-word matching, an
-injected dictionary, traditional scoring, and pure cross-participant word
+injected dictionary, length-plus-unique scoring, and pure cross-participant word
 reconciliation. It has no runtime dependencies and does not import the lobby,
 browser, Socket.IO, clocks, or Node runtime APIs.
 
@@ -382,7 +382,7 @@ stabilizer, assigns competition ranks and tied positive winners, validates the
 complete ended-round candidate, and only then commits one public transition.
 
 The public result contains words, traditional base values, shared/unique
-status, exact 25% unique bonuses, final values, base/bonus/final player totals,
+status, integer unique bonuses, final values, base/bonus/final player totals,
 ranks, and winner IDs. Shared words retain base points without a bonus. It
 excludes accepted timestamps, paths, private sequence/version data, sockets,
 credentials, dictionary internals, rejected attempts, and limiter state. The

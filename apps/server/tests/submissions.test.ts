@@ -151,8 +151,8 @@ describe('RoomStore private submissions', () => {
 
     expect(result.response).toMatchObject({
       ok: true,
-      acceptedWord: { sequence: 1, word: 'CAT', points: 1 },
-      state: { submissionVersion: 1, provisionalScore: 1 },
+      acceptedWord: { sequence: 1, word: 'CAT', points: 3 },
+      state: { submissionVersion: 1, provisionalScore: 3 },
     });
     expect(game.store.getRoomState(game.display.room.code)).toEqual(before);
   });
@@ -196,7 +196,7 @@ describe('RoomStore private submissions', () => {
     expect(duplicate).toMatchObject({
       ok: false,
       error: { code: 'ALREADY_SUBMITTED' },
-      state: { submissionVersion: 1, provisionalScore: 1 },
+      state: { submissionVersion: 1, provisionalScore: 3 },
     });
   });
 
@@ -216,7 +216,7 @@ describe('RoomStore private submissions', () => {
         ).response,
       ).toMatchObject({
         ok: true,
-        state: { submissionVersion: 1, provisionalScore: 1 },
+        state: { submissionVersion: 1, provisionalScore: 3 },
       });
     }
   });
@@ -560,23 +560,23 @@ describe('RoomStore private submissions', () => {
               playerId: game.first.session.playerId,
               displayName: 'Silver Owl',
               rank: 1,
-              baseScore: 2,
-              uniqueBonusScore: 0.25,
-              finalScore: 2.25,
+              baseScore: 7,
+              uniqueBonusScore: 1,
+              finalScore: 8,
               words: [
                 {
                   word: 'DOG',
-                  basePoints: 1,
+                  basePoints: 3,
                   shared: false,
-                  uniqueBonusPoints: 0.25,
-                  finalPoints: 1.25,
+                  uniqueBonusPoints: 1,
+                  finalPoints: 4,
                 },
                 {
                   word: 'CATS',
-                  basePoints: 1,
+                  basePoints: 4,
                   shared: true,
                   uniqueBonusPoints: 0,
-                  finalPoints: 1,
+                  finalPoints: 4,
                 },
               ],
             },
@@ -584,16 +584,16 @@ describe('RoomStore private submissions', () => {
               playerId: game.second.session.playerId,
               displayName: 'Copper Fox',
               rank: 2,
-              baseScore: 1,
+              baseScore: 4,
               uniqueBonusScore: 0,
-              finalScore: 1,
+              finalScore: 4,
               words: [
                 {
                   word: 'CATS',
-                  basePoints: 1,
+                  basePoints: 4,
                   shared: true,
                   uniqueBonusPoints: 0,
-                  finalPoints: 1,
+                  finalPoints: 4,
                 },
               ],
             },
@@ -725,7 +725,7 @@ describe('RoomStore private submissions', () => {
         expect.objectContaining({
           playerId: game.second.session.playerId,
           displayName: 'Copper Fox',
-          finalScore: 1.25,
+          finalScore: 4,
         }),
       ]),
     );
@@ -755,11 +755,11 @@ describe('RoomStore private submissions', () => {
       game.second.session.playerId,
     ]);
     expect(results?.players.map((player) => player.rank)).toEqual([1, 1]);
-    expect(results?.players.map((player) => player.baseScore)).toEqual([1, 1]);
+    expect(results?.players.map((player) => player.baseScore)).toEqual([3, 3]);
     expect(results?.players.map((player) => player.uniqueBonusScore)).toEqual([
       0, 0,
     ]);
-    expect(results?.players.map((player) => player.finalScore)).toEqual([1, 1]);
+    expect(results?.players.map((player) => player.finalScore)).toEqual([3, 3]);
   });
 
   it('finalizes idempotently without rewriting private state or room lifetime', () => {
@@ -791,8 +791,8 @@ describe('RoomStore private submissions', () => {
     );
     expect(reconnected.submissionState).toMatchObject({
       submissionVersion: 1,
-      provisionalScore: 1,
-      acceptedWords: [{ word: 'CAT', points: 1 }],
+      provisionalScore: 3,
+      acceptedWords: [{ word: 'CAT', points: 3 }],
     });
 
     const callerResult = first?.round?.results;
@@ -839,7 +839,7 @@ describe('RoomStore private submissions', () => {
       {
         gridSize: 5,
         roundDurationSeconds: 60,
-        scoringMode: 'traditional',
+        scoringMode: 'length-plus-unique',
       },
       'player-one-socket',
     ).room;

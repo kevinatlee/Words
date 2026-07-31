@@ -28,30 +28,29 @@ The pure game engine receives the immutable round participant IDs and each
 participant's ordered canonical accepted records. A word is shared when at
 least two distinct participant IDs accepted the same canonical word.
 
-- Every accepted word retains its traditional base points.
+- Every accepted word receives its normalized word length as base points.
 - A shared word receives no uniqueness bonus and loses no points.
-- A unique word receives exactly 25% of its base points as a bonus.
+- A unique three- or four-letter word receives +1; a unique word of five or
+  more letters receives +2.
 - `finalPoints = basePoints + uniqueBonusPoints`.
 - One player's personal duplicate cannot count twice because Stage 4C already
   rejects it and reconciliation independently requires unique words.
 
 The exact word outcomes are:
 
-| Base points | Shared bonus | Shared final | Unique bonus | Unique final |
-| ----------: | -----------: | -----------: | -----------: | -----------: |
-|           1 |            0 |            1 |         0.25 |         1.25 |
-|           2 |            0 |            2 |         0.50 |         2.50 |
-|           3 |            0 |            3 |         0.75 |         3.75 |
-|           5 |            0 |            5 |         1.25 |         6.25 |
-|          11 |            0 |           11 |         2.75 |        13.75 |
+| Word length | Shared final | Unique final |
+| ----------: | -----------: | -----------: |
+|           3 |            3 |            4 |
+|           4 |            4 |            5 |
+|           5 |            5 |            7 |
+|           6 |            6 |            8 |
+|           8 |            8 |           10 |
 
-Quarter-point values are exact binary fractions. Result calculation and schema
-validation use exact equality and never round word values or player totals to
-whole numbers. The strict runtime schemas also reject negative zero rather than
-silently accepting a differently encoded zero.
+Result calculation and schema validation use exact safe integers. The strict
+runtime schemas reject decimal values and negative zero.
 
 The engine validates participant uniqueness, canonical words, stored
-traditional point values, and the existing eight-participant and 256-word
+length-based point values, and the existing eight-participant and 256-word
 bounds. It preserves participant and accepted-word input order and returns a
 detached immutable result. It has no room, display-name, Socket.IO, clock,
 dictionary, React, or persistence dependency.
@@ -64,7 +63,7 @@ a bounded engine error with no accepted word text or thrown caller message.
 Each public result word contains only:
 
 - canonical uppercase `word`
-- traditional `basePoints`
+- length-based `basePoints`
 - `shared`
 - `uniqueBonusPoints`
 - `finalPoints`
@@ -73,7 +72,7 @@ Each player result contains:
 
 - immutable round `playerId` and snapshotted `displayName`
 - competition `rank`
-- exact `baseScore`, `uniqueBonusScore`, and `finalScore`
+- integer `baseScore`, `uniqueBonusScore`, and `finalScore`
 - ordered public result words
 
 The round result contains the deterministically ordered player results and
@@ -122,7 +121,7 @@ and shared status remain private. The display and other players cannot observe
 submission activity.
 
 Only after submissions close does the detached public result projection reveal
-participant words, base values, shared/unique status, exact uniqueness bonuses,
+participant words, base values, shared/unique status, integer uniqueness bonuses,
 final word values, base/bonus/final totals, ranks, and winners to that room.
 
 These values remain private and absent from public results:
@@ -210,11 +209,10 @@ During an active round, verify that the display and other players still cannot
 see a participant's accepted words, provisional base total, or eventual
 shared/unique status. After the deadline, verify on every role that:
 
-- a shared word shows its traditional base value, zero uniqueness bonus, and
+- a shared word shows its length-based base value, zero uniqueness bonus, and
   the same positive final value;
-- a unique word shows its base value, exact 25% bonus, and exact quarter-point
-  final value;
-- player base, bonus, and final totals equal their word rows without rounding;
+- a unique word shows its base value, +1 or +2 bonus, and integer final value;
+- player base, bonus, and final totals equal their word rows;
 - rankings use `finalScore`, and an all-shared positive tie names every tied
   leader;
 - an empty-scoring round has no winner;
@@ -233,8 +231,7 @@ Stage 4E adds the display-only QR presentation without modifying results,
 scoring, phases, publication, state versions, TTL, participants, or next-round
 replacement.
 
-Stage 4F will address continuous touch/pointer tracing while preserving
-tap/click and keyboard fallbacks. Stage 4G will perform focused casual-play
+Stage 4F is complete and merged. Stage 4G will perform focused casual-play
 release-candidate testing and polish without adding match state or cumulative
 scoring. Stage 5 will address production hardening, a one-container production
 build, serving the built client from Node, production image publishing,

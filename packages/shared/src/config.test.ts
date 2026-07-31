@@ -12,7 +12,7 @@ describe('product configuration', () => {
       productionPort: 6532,
       defaultGridSize: 4,
       defaultRoundDurationSeconds: 180,
-      defaultScoringMode: 'traditional',
+      defaultScoringMode: 'length-plus-unique',
       maxPlayers: 8,
       reconnectGraceSeconds: 60,
       roomTtlMinutes: 120,

@@ -20,7 +20,7 @@ timestamps, bounded generation attempts, and nullable finalized results.
 validation checks participant identity, score order, competition ranks,
 shared-word status, exact quarter-point totals, and every tied positive winner.
 Every public word retains traditional `basePoints`; a unique word carries a
-25% `uniqueBonusPoints` value, while a shared word has zero bonus and keeps its
+integer `uniqueBonusPoints` value (+1 or +2), while a shared word has zero bonus and keeps its
 base as `finalPoints`. Player entries expose exact base, bonus, and final
 totals. Runtime parsing rejects non-quarter values, non-finite values, negative
 values, and negative zero.

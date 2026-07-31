@@ -15,7 +15,7 @@ import {
 const roundId = '00000000-0000-4000-8000-000000000100';
 const playerId = '00000000-0000-4000-8000-000000000001';
 
-function accepted(sequence = 1, word = 'CAT', points = 1) {
+function accepted(sequence = 1, word = 'CAT', points = 3) {
   return {
     sequence,
     word,
@@ -99,7 +99,7 @@ describe('private submission contracts', () => {
         accepted(
           index + 1,
           `${String.fromCharCode(65 + Math.floor(index / 26))}${String.fromCharCode(65 + (index % 26))}A`,
-          1,
+          3,
         ),
     );
     expect(
@@ -172,7 +172,7 @@ describe('private submission contracts', () => {
       settings: {
         gridSize: 4,
         roundDurationSeconds: 180,
-        scoringMode: 'traditional',
+        scoringMode: 'length-plus-unique',
       },
       round: null,
     };
@@ -234,7 +234,7 @@ describe('private submission contracts', () => {
       settings: {
         gridSize: 4,
         roundDurationSeconds: 180,
-        scoringMode: 'traditional',
+        scoringMode: 'length-plus-unique',
       },
       round: null,
     };

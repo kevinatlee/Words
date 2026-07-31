@@ -126,7 +126,7 @@ describe('RoomStore display and player sessions', () => {
     expect(result.room.settings).toEqual({
       gridSize: 4,
       roundDurationSeconds: 180,
-      scoringMode: 'traditional',
+      scoringMode: 'length-plus-unique',
     });
     expect(result.room).not.toHaveProperty('board');
     expect(result.room).not.toHaveProperty('scores');
@@ -1495,7 +1495,7 @@ describe('RoomStore authoritative settings and rounds', () => {
     const settings = {
       gridSize: 6 as const,
       roundDurationSeconds: 60 as const,
-      scoringMode: 'traditional' as const,
+      scoringMode: 'length-plus-unique' as const,
     };
 
     expect(
@@ -1558,7 +1558,7 @@ describe('RoomStore authoritative settings and rounds', () => {
       {
         gridSize: 4,
         roundDurationSeconds: 180,
-        scoringMode: 'traditional',
+        scoringMode: 'length-plus-unique',
       },
       'socket-controller',
     ).room;
@@ -1577,7 +1577,7 @@ describe('RoomStore authoritative settings and rounds', () => {
       {
         gridSize: 5,
         roundDurationSeconds: 90,
-        scoringMode: 'traditional',
+        scoringMode: 'length-plus-unique',
       },
       'socket-controller',
     );
@@ -1592,7 +1592,7 @@ describe('RoomStore authoritative settings and rounds', () => {
       settings: {
         gridSize: 5,
         roundDurationSeconds: 90,
-        scoringMode: 'traditional',
+        scoringMode: 'length-plus-unique',
       },
       board: { size: 5 },
       startedAt: '2026-07-29T20:00:00.000Z',
@@ -1678,7 +1678,7 @@ describe('RoomStore authoritative settings and rounds', () => {
           {
             gridSize: 6,
             roundDurationSeconds: 30,
-            scoringMode: 'traditional',
+            scoringMode: 'length-plus-unique',
           },
           'socket-controller',
         ),
@@ -1990,7 +1990,7 @@ describe('RoomStore authoritative settings and rounds', () => {
       {
         gridSize: 4,
         roundDurationSeconds: 30,
-        scoringMode: 'traditional',
+        scoringMode: 'length-plus-unique',
       },
       'socket-controller',
     );
@@ -2017,7 +2017,7 @@ describe('RoomStore authoritative settings and rounds', () => {
       {
         gridSize: 4,
         roundDurationSeconds: 30,
-        scoringMode: 'traditional',
+        scoringMode: 'length-plus-unique',
       },
       'socket-controller',
     );
@@ -2067,7 +2067,7 @@ describe('RoomStore authoritative settings and rounds', () => {
         {
           gridSize: 4,
           roundDurationSeconds: 30,
-          scoringMode: 'traditional',
+          scoringMode: 'length-plus-unique',
         },
         socketId,
       );
@@ -2103,7 +2103,7 @@ describe('RoomStore authoritative settings and rounds', () => {
       {
         gridSize: 4,
         roundDurationSeconds: 30,
-        scoringMode: 'traditional',
+        scoringMode: 'length-plus-unique',
       },
       'socket-controller',
     );
@@ -2125,7 +2125,7 @@ describe('RoomStore authoritative settings and rounds', () => {
       {
         gridSize: 4,
         roundDurationSeconds: 30,
-        scoringMode: 'traditional',
+        scoringMode: 'length-plus-unique',
       },
       'socket-controller',
     );
@@ -2137,7 +2137,7 @@ describe('RoomStore authoritative settings and rounds', () => {
       {
         gridSize: 6,
         roundDurationSeconds: 60,
-        scoringMode: 'traditional',
+        scoringMode: 'length-plus-unique',
       },
       'socket-controller',
     ).room;
@@ -2154,7 +2154,7 @@ describe('RoomStore authoritative settings and rounds', () => {
       {
         gridSize: 4,
         roundDurationSeconds: 30,
-        scoringMode: 'traditional',
+        scoringMode: 'length-plus-unique',
       },
       'socket-controller',
     );
@@ -2243,7 +2243,7 @@ describe('RoomStore authoritative settings and rounds', () => {
         {
           gridSize: size,
           roundDurationSeconds: 30,
-          scoringMode: 'traditional',
+          scoringMode: 'length-plus-unique',
         },
         'socket-controller',
       );

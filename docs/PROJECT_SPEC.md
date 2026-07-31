@@ -46,7 +46,7 @@ Creating the room does not grant the display player membership or controller
 authority. The display never selects or approves a controller. Changing the
 controller must never change the display session.
 
-## Current scope: Stage 4E complete, Stage 4F Touch/Trace in draft
+## Current scope: Stage 4F complete, integer scoring in draft
 
 Stage 2.5 is complete. It extends the secure, server-backed lobby with explicit
 game-host delegation and deterministic automatic succession:
@@ -114,12 +114,12 @@ The server owns the generated board, connected-participant snapshot, start,
 deadline, phase, and automatic ending. Every session reconnects to the same
 current round.
 
-Stage 4C adds private current-participant word/path validation and traditional
+Stage 4C adds private current-participant word/path validation and length-based
 provisional scoring.
 
 Stage 4D automatically reconciles every immutable participant at the deadline,
-retains traditional base points for every accepted word, adds an exact 25%
-bonus to words found by only one distinct player, and publishes one strict
+uses normalized word length as every accepted word's base points, adds +1 to
+unique three- or four-letter words and +2 to longer unique words, and publishes one strict
 result projection in `ROUND_ENDED`. It adds competition ranks, tied positive
 winners, no-winner handling when nobody scored, display/player result
 presentation, reconnect-safe results, and the controller-driven next round.
@@ -149,7 +149,7 @@ A room contains:
 - authoritative settings and at most one current round snapshot
 - nullable finalized results inside the current round
 - a server state version and serialization-time clock snapshot
-- controller-configured grid and duration plus traditional scoring mode
+- controller-configured grid and duration plus `length-plus-unique` scoring mode
 - creation, last-activity, and expiration timestamps
 
 Room state lives in one Node.js process. The server bounds active rooms,
@@ -238,9 +238,10 @@ Planned rules remain:
 
 - Board sizes: 4 × 4, 5 × 5, and 6 × 6; default 4 × 4
 - Durations: 30, 60, 90, 120, 150, and 180 seconds; default 180 seconds
-- Default scoring: Traditional
-- Default shared-word handling: every accepted word keeps its base points; a
-  unique word receives an exact 25% bonus and a shared word receives no bonus
+- Default scoring: length-plus-unique
+- Default shared-word handling: every accepted word keeps its length-based
+  points; unique 3–4 letter words receive +1, unique 5+ letter words receive
+  +2, and shared words receive no bonus
 - Default minimum word length: 3 letters
 - Adjacency: horizontal, vertical, and diagonal; no tile reuse within a word
 
@@ -313,8 +314,10 @@ details are future deployment work, not a claim about Stage 2.
    public ended-round results, and controller-driven next rounds.
 10. **Stage 4E — complete and merged:** display-only local SVG QR joining,
     accessible manual fallbacks, and formal round-local casual play.
-11. **Stage 4F — current draft work:** Touch and Trace word entry while preserving
+11. **Stage 4F — complete and merged:** Touch and Trace word entry while preserving
     tap/click and keyboard fallbacks.
+    Integer scoring is current focused draft work: length-based base points and
+    fixed integer unique-word bonuses.
 12. **Stage 4G — later:** structured real-party, narrow-phone, display, and
     release-candidate testing with focused defect correction and interaction
     polish—not feature expansion or cumulative scoring.

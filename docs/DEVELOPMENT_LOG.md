@@ -1,5 +1,17 @@
 # Development log
 
+## 2026-07-31 — Integer letter-count scoring (draft)
+
+- Replaced the former tiered and fractional scoring rule with integer
+  `length-plus-unique` scoring: accepted words score their normalized length;
+  unique three- or four-letter words receive +1 and longer unique words +2.
+- Updated authoritative provisional and finalized scores, strict shared result
+  contracts, rankings, reconnect-restored private state, and client result
+  presentation without changing phases, events, or lifecycle behavior.
+- Stage 4F is complete and merged. This scoring-only draft remains pending a
+  small physical multiplayer scoring check; Stage 4G and Stage 5 have not
+  started.
+
 ## 2026-07-31 — Stage 4F Touch and Trace entry (draft)
 
 - Corrected first physical iPhone findings: Trace now resolves travelled pointer

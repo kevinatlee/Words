@@ -16,7 +16,7 @@ can still be found.
 
 Each participant instead has one bounded `PlayerRoundSubmissionState` held
 privately beside the current round. It contains only canonical accepted words,
-traditional points, acceptance time, deterministic sequence, and the exact
+length-based points, acceptance time, deterministic sequence, and the exact
 provisional total. Paths are discarded after validation. Rejected attempts are
 not retained. Stage 4D derives a detached public result projection from this
 map only after the deadline. Starting the next round replaces every private
@@ -40,7 +40,7 @@ socket submission limit before payload parsing, checks the current
 player-bound newest socket, reconciles the deadline, requires the active
 matching round and immutable participant membership, and then applies the
 10-per-1,000-ms stable room/player limiter before `validateWordPath()`.
-Personal duplicates, the 256-word bound, traditional points, and the complete
+Personal duplicates, the 256-word bound, length-based points, and the complete
 next private state are validated before one atomic private commit.
 
 At `now >= deadlineAt`, the room first transitions to `ROUND_ENDED` with
@@ -81,6 +81,6 @@ final totals, ranks, and winners. `acceptedAt`, private sequence and version,
 paths, rejected attempts, and rate-limit state remain private. The owner can
 still recover their unchanged private state on reconnect until the next round.
 
-See [`RESULTS.md`](RESULTS.md) for the timed visibility transition, exact 25%
+See [`RESULTS.md`](RESULTS.md) for the timed visibility transition, integer
 unique-word bonus, rankings, and next-round lifecycle. Touch and Trace entry
 remain client-only interaction work with the same server-owned validation.

@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { scoreTraditionalWord } from '../src/index.js';
+import { scoreWordByLength } from '../src/index.js';
 
-describe('traditional scoring', () => {
+describe('word-length scoring', () => {
   it.each([
-    ['CAT', 1],
-    ['WORD', 1],
-    ['FIVES', 2],
-    ['SIXLET', 3],
-    ['SEVENUP', 5],
-    ['EIGHTERS', 11],
-    ['A'.repeat(64), 11],
+    ['CAT', 3],
+    ['WORD', 4],
+    ['FIVES', 5],
+    ['SIXLET', 6],
+    ['SEVENUP', 7],
+    ['EIGHTERS', 8],
+    ['A'.repeat(64), 64],
   ] as const)('scores %s as %s points', (word, points) => {
-    expect(scoreTraditionalWord(word)).toEqual({
+    expect(scoreWordByLength(word)).toEqual({
       valid: true,
       word,
       points,
@@ -20,18 +20,18 @@ describe('traditional scoring', () => {
   });
 
   it('counts every canonical letter in a QU word', () => {
-    expect(scoreTraditionalWord('QUIZ')).toEqual({
+    expect(scoreWordByLength('QUIZ')).toEqual({
       valid: true,
       word: 'QUIZ',
-      points: 1,
+      points: 4,
     });
   });
 
   it.each([
-    [' cat ', 'CAT', 1],
-    ['quiz', 'QUIZ', 1],
+    [' cat ', 'CAT', 3],
+    ['quiz', 'QUIZ', 4],
   ] as const)('normalizes %j before scoring', (candidate, word, points) => {
-    expect(scoreTraditionalWord(candidate)).toEqual({
+    expect(scoreWordByLength(candidate)).toEqual({
       valid: true,
       word,
       points,
@@ -39,7 +39,7 @@ describe('traditional scoring', () => {
   });
 
   it('returns a safe structured failure for a two-letter word', () => {
-    expect(scoreTraditionalWord('AT')).toEqual({
+    expect(scoreWordByLength('AT')).toEqual({
       valid: false,
       code: 'WORD_TOO_SHORT',
     });
@@ -48,7 +48,7 @@ describe('traditional scoring', () => {
   it.each(['', '   ', "CAN'T", 'TWO WORDS', 'CAFÉ', 'A'.repeat(65), 42, null])(
     'returns a safe structured failure for malformed input %j',
     (candidate) => {
-      expect(scoreTraditionalWord(candidate)).toEqual({
+      expect(scoreWordByLength(candidate)).toEqual({
         valid: false,
         code: 'INVALID_WORD_FORMAT',
       });
