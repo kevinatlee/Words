@@ -7,11 +7,11 @@ shared-screen browser creates and presents a temporary room. Phone players join
 without accounts, and the first player becomes the initial game host
 (controller).
 
-**Stage 4C is complete. Stage 4D final round results are in draft review.** The
-secure lobby, isolated game engine, read-only hosted CI, reproducible
-server-only game data, authoritative rounds, and private submissions are
-complete. Stage 4D reconciles accepted participant words automatically at the
-deadline without adding another phase or network event.
+**Stage 4D is complete and merged. Stage 4E QR joining is in draft review.**
+The secure lobby, isolated game engine, read-only hosted CI, reproducible
+server-only game data, authoritative rounds, private submissions, and final
+round results are complete. Stage 4E adds a locally rendered, display-only QR
+join option without changing gameplay state or the network contract.
 
 ## What works today
 
@@ -21,6 +21,9 @@ deadline without adding another phase or network event.
   player.
 - Zero to eight phone players can join through the room-specific
   `/join/:roomCode` link or enter a six-character code manually at `/join`.
+- The shared display renders that exact public join link as a high-contrast
+  local SVG QR code: prominent between rounds and compact while a round is
+  active.
 - The first player becomes the server-assigned controller; later players join
   without gaining controller authority.
 - The connected game host can explicitly transfer authority to another
@@ -80,13 +83,21 @@ deadline without adding another phase or network event.
   pushes to `main`, and manual runs. Hosted CI supplements local review rather
   than replacing it.
 
-## What is not implemented
+## Round-local casual play
 
-There is no cumulative score, match series, previous-round history, saved
-result, custom shared-word rule, continuous drag tracing, or separate results
-phase. Scannable QR codes, persistence, deployment workflow, container
+Each round stands alone. Words is designed for casual drop-in play rather than
+a committed match or campaign. Players can join, play a round, see that
+round's result, continue, or leave. Starting the next round replaces the
+previous result.
+
+Cumulative scores, session totals, match series, persistent standings,
+previous-round score history, streaks, profiles, progression, achievements,
+ready-up commitments, rematch voting, and penalties for leaving are
+intentional product non-goals, not unfinished MVP features.
+
+Continuous drag tracing, persistence, deployment workflow, container
 packaging, image publishing, server installation, and tunnel configuration
-also remain unimplemented.
+remain unimplemented. There is no separate results phase.
 
 ## Roles and authority
 
@@ -155,8 +166,10 @@ Try the lobby:
 
 1. Open `http://localhost:5173/` on the shared-screen browser. The room appears
    automatically without a role-selection or creation step.
-2. Open the displayed `/join/:roomCode` link in a phone-sized tab or another
-   device. `/join` remains available for manually entering a code.
+2. Scan the displayed QR from another device, open the visible
+   `/join/:roomCode` link, or enter the code manually at `/join`. For a real
+   phone scan during development, open the display through the computer's
+   LAN-reachable origin rather than `localhost`.
 3. Enter a temporary display name. This first player becomes the controller.
 4. Join from another phone tab and watch the shared display update.
 5. On the controller phone, choose a supported grid and duration, then start a
@@ -301,6 +314,7 @@ centrally in `packages/shared/src/lobby.ts`. See
 [`docs/SUBMISSIONS.md`](docs/SUBMISSIONS.md) for the Stage 4C private
 submission contract, [`docs/RESULTS.md`](docs/RESULTS.md) for Stage 4D
 deadline reconciliation and public results,
+[`docs/QR_JOINING.md`](docs/QR_JOINING.md) for Stage 4E display-only joining,
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the complete system flow,
 and [`docs/GAME_DATA.md`](docs/GAME_DATA.md) for Stage 4A provenance and
 derivation.
@@ -344,13 +358,18 @@ again as a new player if room capacity and controller state allow it. A display
 whose credential expired cannot impersonate a player, and a player credential
 cannot recreate the display.
 
-## Next stage
+## Remaining roadmap
 
-Stage 5 will address production hardening, a one-container build, serving the
-built client from Node, production image publishing and configuration, health
-and graceful shutdown, Unraid-oriented installation guidance, and
-reverse-proxy/tunnel documentation. QR rendering, persistence, continuous
-tracing, and additional UX polish remain separately reviewed scope.
+- **Stage 4E — in draft review:** display-only QR joining and the formal
+  round-local casual-play product principle.
+- **Stage 4F:** natural continuous touch/pointer tracing while preserving
+  tap/click and keyboard fallbacks.
+- **Stage 4G:** real-party and narrow-screen release-candidate testing, defect
+  correction, focused interaction polish, scoring-balance observation, and
+  stabilization—not feature expansion or cumulative scoring.
+- **Stage 5:** production hardening, a one-container build, Node serving the
+  client, health and graceful shutdown, image publishing, Unraid guidance, and
+  reverse-proxy/tunnel documentation.
 
 ## License
 
@@ -359,4 +378,6 @@ packages retain their own licenses. The generated production dictionary has a
 separate preserved permission notice in
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and beside the data.
 Provenance, filtering, checksum, licence scope, and audits are recorded in
-[`docs/GAME_DATA.md`](docs/GAME_DATA.md).
+[`docs/GAME_DATA.md`](docs/GAME_DATA.md). The exact ISC notice for
+`qrcode.react` 4.2.0 is also preserved in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

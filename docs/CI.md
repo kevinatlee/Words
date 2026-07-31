@@ -160,5 +160,6 @@ that GitHub has never observed.
   containers, or change repository settings.
 - Stage 4A data verification does not rebuild ESDB in CI. The pinned source
   reproduction command remains an explicit reviewed maintenance operation.
-- Browser end-to-end gameplay, QR rendering, and production deployment remain
-  deferred.
+- Browser end-to-end gameplay, physical QR scanning, and production deployment
+  remain outside hosted CI. Component tests and the production build cover the
+  local SVG renderer.

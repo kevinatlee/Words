@@ -1,9 +1,9 @@
 # Authoritative round lifecycle
 
 Stage 4A production game data, Stage 4B rounds, and Stage 4C private
-submissions are complete. Stage 4D is in draft review. It keeps the same
-authoritative settings, boards, participant snapshots, deadlines, and three
-phases while making `ROUND_ENDED` the finalized-results state.
+submissions are complete. Stage 4D final results are complete and merged. Stage
+4E display QR joining keeps the same authoritative settings, boards,
+participant snapshots, deadlines, and three phases.
 
 ## Roles and settings ownership
 

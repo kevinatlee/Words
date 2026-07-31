@@ -1,7 +1,8 @@
 # Final round reconciliation and results
 
-Stage 4C is merged. Stage 4D is in draft review and completes one temporary
-round without adding persistence, match history, or a new network event.
+Stage 4D is complete and merged. It completes one temporary round without
+adding persistence, match history, or a new network event. Stage 4E display QR
+joining does not change this contract.
 
 ## Three-phase lifecycle
 
@@ -199,7 +200,9 @@ the only retained round slot. A generation failure leaves the ended round and
 results unchanged.
 
 There is no cumulative score, prior-round history, saved result, leaderboard,
-series, ready-up flow, rematch vote, or automatic next round.
+series, ready-up flow, rematch vote, or automatic next round. This is a
+deliberate round-local casual-play product principle, not an unfinished match
+feature. Players may continue or leave without commitment or penalty.
 
 ## Manual verification focus
 
@@ -226,13 +229,14 @@ The maximum public projection is eight participants with 256 words each: 2,048
 result-word entries. Validation, reconciliation, serialization, and rendering
 remain bounded for the existing single Node process.
 
-Stage 4D adds no continuous drag tracing, QR image, custom shared-word mode,
-alternative scoring, persistence, database, Redis, analytics, moderation,
-container, deployment, or repository-setting work.
+Stage 4E adds the display-only QR presentation without modifying results,
+scoring, phases, publication, state versions, TTL, participants, or next-round
+replacement.
 
-Stage 5 will address production hardening, a one-container production build,
-serving the built client from Node, production image publishing, production
-server configuration, health and graceful shutdown, Unraid-oriented
-installation documentation, and reverse-proxy/tunnel documentation. QR image
-rendering, persistence, continuous tracing, and additional UX polish still
-require separately reviewed scope.
+Stage 4F will address continuous touch/pointer tracing while preserving
+tap/click and keyboard fallbacks. Stage 4G will perform focused casual-play
+release-candidate testing and polish without adding match state or cumulative
+scoring. Stage 5 will address production hardening, a one-container production
+build, serving the built client from Node, production image publishing,
+production server configuration, health and graceful shutdown, Unraid-oriented
+installation documentation, and reverse-proxy/tunnel documentation.

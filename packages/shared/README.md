@@ -5,6 +5,12 @@ payloads, Socket.IO event maps, acknowledgements, errors, room state, the Stage
 4B round lifecycle, Stage 4C private submissions, and Stage 4D public result
 contracts.
 
+Stage 4E reuses the shared `buildJoinUrl()` helper for both the visible display
+link and its local QR encoding. The helper normalizes the room code, replaces
+the path, removes query parameters, fragments, and URL userinfo, and preserves
+the current origin and optional development port. Stage 4E adds no shared
+network event or room-state field.
+
 The room phase is exactly `LOBBY`, `ROUND_ACTIVE`, or `ROUND_ENDED`. A serialized
 room includes a server-owned state version and clock snapshot, authoritative
 settings, and at most one current round. Round state contains an immutable

@@ -3,9 +3,10 @@
 Stage 2.5 established the network and controller boundary. Stage 3 adds an
 isolated defensive engine, Stage 3.1 adds read-only hosted verification, and
 Stage 4A adds verified server-only production data, Stage 4B adds authoritative
-rounds, and Stage 4C adds merged player-private submissions. Stage 4D final
-round results are in draft review. This document separates implemented
-controls from protections still required before public deployment.
+rounds, Stage 4C adds player-private submissions, and Stage 4D adds merged final
+round results. Stage 4E display-only QR joining is in draft review. This
+document separates implemented controls from protections still required before
+public deployment.
 
 ## Implemented authority controls
 
@@ -251,6 +252,44 @@ payload in Stage 4B.
   private state remains reconnectable until the next round replaces both the
   old public result and private submission map.
 
+## Stage 4E QR joining
+
+- The display derives one public join URL from `window.location.origin` and the
+  room's validated public code through the existing shared `buildJoinUrl`
+  helper.
+- The helper replaces stale paths, removes query parameters, fragments, and
+  URL userinfo, and emits only the current scheme, host, optional port, and
+  `/join/<NORMALIZED_CODE>` path.
+- The exact same completed string is passed to the QR renderer and rendered as
+  the textual link. The QR component does not rebuild or append to it.
+- QR markup contains no session ID, reconnect token, player or controller ID,
+  socket ID, room snapshot, settings, board, result, accepted word, state
+  version, dictionary value, analytics identifier, or authentication value.
+- `qrcode.react` 4.2.0 runs synchronously in the client, renders SVG, and has no
+  runtime dependencies, network request, install script, native binary,
+  filesystem access, telemetry, or remote code.
+- The published ISC licence notice is preserved in
+  `THIRD_PARTY_NOTICES.md`. Package files and bundled code were inspected
+  before installation.
+- Rendering uses black modules on an opaque white background, error-correction
+  level M with boosting disabled, and a four-module quiet zone. There is no
+  image, logo, overlay, gradient, transparency, animation, or decorative
+  module style.
+- The SVG and wrapper are hidden from the accessibility tree. A semantic
+  region supplies the heading, instructions, visible room code, and exact
+  keyboard-focusable URL instead.
+- A renderer exception is contained around only the visual QR. It cannot
+  remove the textual join information, break gameplay or reconnect, delete a
+  room, or start a retry loop.
+- QR presentation is display-only. It grants no role, bypasses no name,
+  capacity, expiration, or rate-limit check, and does not auto-join.
+- Stage 4E adds no server endpoint, network event, state field, QR credential,
+  external service, untrusted HTML, or `dangerouslySetInnerHTML`.
+
+The public room code and QR are intentionally visible to people near the
+shared display. They are invitations to attempt an ordinary temporary-room
+join, not secrets or proof of authorization.
+
 ## Known current limits
 
 - Throttling is per socket, not per IP, subnet, device, or room code.
@@ -264,6 +303,9 @@ payload in Stage 4B.
 - The in-memory process is a single availability boundary; restarting it closes
   every room.
 - The room/player submission limiter is not an IP-aware public edge limit.
+- Physical QR scanning depends on display size, glare, focus, viewing distance,
+  and the scanning device; the visible URL and room code remain required
+  fallbacks.
 
 Before public deployment, add layered IP-aware limits at a trusted boundary,
 review enumeration behavior, verify proxy IP handling, add safe operational

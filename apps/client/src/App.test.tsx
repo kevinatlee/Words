@@ -337,6 +337,7 @@ describe('Stage 4B display and player room routes', () => {
 
   it('automatically creates one passive display room at the root', async () => {
     const client = createFakeClient();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
     render(
       <App
@@ -368,7 +369,17 @@ describe('Stage 4B display and player room routes', () => {
         name: 'http://localhost:3000/join/ABC234',
       }),
     ).toHaveAttribute('href', 'http://localhost:3000/join/ABC234');
-    expect(screen.getByLabelText('QR code placeholder')).toBeInTheDocument();
+    const qrRegion = screen.getByRole('region', { name: 'Scan to join' });
+    expect(qrRegion).toHaveClass('join-qr--prominent');
+    const qrSvg = qrRegion.querySelector('svg');
+    expect(qrSvg).toHaveAttribute('aria-hidden', 'true');
+    expect(qrSvg).toHaveAttribute('focusable', 'false');
+    expect(qrSvg).toHaveAttribute('viewBox');
+    expect(qrSvg?.querySelector('image')).toBeNull();
+    expect(qrSvg?.querySelector('path[fill="#FFFFFF"]')).not.toBeNull();
+    expect(qrSvg?.querySelector('path[fill="#000000"]')).not.toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
     expect(
       screen
         .getAllByRole('button', { name: /×|minute|seconds/i })
@@ -417,19 +428,25 @@ describe('Stage 4B display and player room routes', () => {
     const firstView = render(
       <App routePath="/" client={firstClient} sessionStore={firstStore} />,
     );
-    expect(await screen.findByText('ABC234')).toBeInTheDocument();
+    expect(
+      await screen.findByLabelText('Room code ABC234'),
+    ).toBeInTheDocument();
     firstView.unmount();
 
     const secondView = render(
       <App routePath="/" client={secondClient} sessionStore={secondStore} />,
     );
-    expect(await screen.findByText('XYZ789')).toBeInTheDocument();
+    expect(
+      await screen.findByLabelText('Room code XYZ789'),
+    ).toBeInTheDocument();
     secondView.unmount();
 
     const refreshedFirst = render(
       <App routePath="/" client={firstClient} sessionStore={firstStore} />,
     );
-    expect(await screen.findByText('ABC234')).toBeInTheDocument();
+    expect(
+      await screen.findByLabelText('Room code ABC234'),
+    ).toBeInTheDocument();
     expect(firstClient.reconnectDisplay).toHaveBeenCalledWith({
       roomCode: 'ABC234',
       displayReconnectToken: displaySuccess.session.displayReconnectToken,
@@ -440,7 +457,9 @@ describe('Stage 4B display and player room routes', () => {
     render(
       <App routePath="/" client={secondClient} sessionStore={secondStore} />,
     );
-    expect(await screen.findByText('XYZ789')).toBeInTheDocument();
+    expect(
+      await screen.findByLabelText('Room code XYZ789'),
+    ).toBeInTheDocument();
     expect(secondClient.reconnectDisplay).toHaveBeenCalledWith({
       roomCode: 'XYZ789',
       displayReconnectToken: secondSuccess.session.displayReconnectToken,
@@ -522,6 +541,11 @@ describe('Stage 4B display and player room routes', () => {
     const roomCodeInput = screen.getByRole('textbox', { name: 'Room code' });
     expect(roomCodeInput).toHaveValue('ABC234');
     expect(roomCodeInput).toHaveAttribute('readonly');
+    expect(
+      screen.queryByRole('region', {
+        name: /scan to join|join the next round/i,
+      }),
+    ).toBeNull();
 
     await user.type(
       screen.getByRole('textbox', { name: 'Display name' }),
@@ -573,6 +597,11 @@ describe('Stage 4B display and player room routes', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Silver Owl (you)')).toBeInTheDocument();
     expect(screen.getAllByText('Game Host').length).toBeGreaterThan(0);
+    expect(
+      screen.queryByRole('region', {
+        name: /scan to join|join the next round/i,
+      }),
+    ).toBeNull();
   });
 
   it('shows later phone players without granting controller authority', async () => {
@@ -605,6 +634,11 @@ describe('Stage 4B display and player room routes', () => {
     expect(
       screen.queryByRole('button', { name: 'Make Game Host' }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('region', {
+        name: /scan to join|join the next round/i,
+      }),
+    ).toBeNull();
   });
 
   it('lets the current game host transfer control to a connected player', async () => {
@@ -729,6 +763,55 @@ describe('Stage 4B display and player room routes', () => {
     expect(
       screen.queryByRole('button', { name: 'Assign Game Host' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('keeps the display QR unchanged when controller authority moves', async () => {
+    let reportRoomState: ((room: RoomState) => void) | undefined;
+    const initialRoom = createRoom([controllerPlayer, ordinaryPlayer]);
+    const client = createFakeClient({
+      createDisplay: vi.fn(async (): Promise<DisplayActionResponse> => ({
+        ...displaySuccess,
+        room: initialRoom,
+      })),
+      onRoomState: (listener) => {
+        reportRoomState = listener;
+        return () => undefined;
+      },
+    });
+
+    render(
+      <App
+        routePath="/"
+        client={client}
+        sessionStore={createFakeSessionStore()}
+      />,
+    );
+
+    const qrRegion = await screen.findByRole('region', {
+      name: 'Scan to join',
+    });
+    const initialSvg = qrRegion.querySelector('svg')?.outerHTML;
+    const initialLink = screen.getByRole('link', {
+      name: 'http://localhost:3000/join/ABC234',
+    });
+
+    act(() => {
+      reportRoomState?.({
+        ...transferredRoom,
+        stateVersion: 2,
+        serverTime: '2026-07-27T20:02:01.000Z',
+      });
+    });
+
+    expect(await screen.findByText('<Bright Fox>')).toBeInTheDocument();
+    expect(initialLink).toHaveAttribute(
+      'href',
+      'http://localhost:3000/join/ABC234',
+    );
+    expect(
+      screen.getByRole('region', { name: 'Scan to join' }).querySelector('svg')
+        ?.outerHTML,
+    ).toBe(initialSvg);
   });
 
   it('shows automatic succession waiting without display controls', async () => {
@@ -885,6 +968,9 @@ describe('Stage 4B display and player room routes', () => {
         name: 'Shared display is ready.',
       }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('region', { name: 'Scan to join' }),
+    ).toBeInTheDocument();
     expect(client.reconnectPlayer).not.toHaveBeenCalled();
     expect(client.createDisplay).not.toHaveBeenCalled();
   });
@@ -986,6 +1072,11 @@ describe('Stage 4B display and player room routes', () => {
     expect(
       await screen.findByRole('heading', { name: 'You’re in the room.' }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('region', {
+        name: /scan to join|join the next round/i,
+      }),
+    ).toBeNull();
     expect(client.reconnectDisplay).not.toHaveBeenCalled();
   });
 
@@ -2018,6 +2109,39 @@ describe('Stage 4B display and player room routes', () => {
     expect(await screen.findByText('Waiting this round.')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Submit Word' })).toBeNull();
     expect(screen.queryByText(/Provisional points:/)).toBeNull();
+    expect(
+      screen.queryByRole('region', { name: 'Join the next round' }),
+    ).toBeNull();
+  });
+
+  it('shows a compact next-round QR only on the active shared display', async () => {
+    const activeRoom = createRoundRoom();
+
+    render(
+      <App
+        routePath="/"
+        client={createFakeClient({
+          createDisplay: vi.fn(async (): Promise<DisplayActionResponse> => ({
+            ...displaySuccess,
+            room: activeRoom,
+          })),
+        })}
+        sessionStore={createFakeSessionStore()}
+      />,
+    );
+
+    const qrRegion = await screen.findByRole('region', {
+      name: 'Join the next round',
+    });
+    expect(qrRegion).toHaveClass('join-qr--compact');
+    expect(qrRegion).toHaveClass('join-qr--active-round');
+    expect(
+      screen.getByText(/join now and wait for the next round/i),
+    ).toBeVisible();
+    expect(screen.getByRole('timer')).toBeVisible();
+    expect(
+      screen.getByRole('grid', { name: '4 by 4 official letter grid' }),
+    ).toBeVisible();
   });
 
   it('keeps the ended board visible and offers the controller the next round', async () => {
@@ -2093,6 +2217,11 @@ describe('Stage 4B display and player room routes', () => {
     expect(
       await screen.findByRole('heading', { name: 'Silver Owl wins' }),
     ).toBeVisible();
+    const endedQr = screen.getByRole('region', {
+      name: 'Join the next round',
+    });
+    expect(endedQr).toHaveClass('join-qr--prominent');
+    expect(endedQr).toHaveClass('join-qr--ended-round');
     expect(
       screen.queryByRole('button', { name: 'Start Next Round' }),
     ).toBeNull();
@@ -2128,6 +2257,9 @@ describe('Stage 4B display and player room routes', () => {
     expect(screen.getByText('<Bright Fox> (You)')).toBeVisible();
     expect(
       screen.queryByRole('button', { name: 'Start Next Round' }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('region', { name: 'Join the next round' }),
     ).toBeNull();
   });
 
@@ -2245,5 +2377,26 @@ describe('Stage 4B display and player room routes', () => {
         name: 'That word isn’t on this board.',
       }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('region', {
+        name: /scan to join|join the next round/i,
+      }),
+    ).toBeNull();
+  });
+
+  it('does not render the display QR on the retained demo route', () => {
+    render(
+      <App
+        routePath="/play/demo"
+        client={createFakeClient()}
+        sessionStore={createFakeSessionStore()}
+      />,
+    );
+
+    expect(
+      screen.queryByRole('region', {
+        name: /scan to join|join the next round/i,
+      }),
+    ).toBeNull();
   });
 });

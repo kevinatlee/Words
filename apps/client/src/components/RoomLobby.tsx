@@ -16,19 +16,12 @@ import { useRoundCountdown } from '../useRoundCountdown';
 import { createDemoBoard } from '../utils/demoBoard';
 import { ControllerPanel } from './ControllerPanel';
 import { GameSettings } from './GameSettings';
+import { JoinQrCode } from './JoinQrCode';
 import { LetterGrid } from './LetterGrid';
 import { PlayerList } from './PlayerList';
 import { PrototypeNotice } from './PrototypeNotice';
 import { RoomCode } from './RoomCode';
 import { RoundResults } from './RoundResults';
-
-const placeholderCells = Array.from(
-  { length: 49 },
-  (_, index) =>
-    index % 3 === 0 ||
-    index % 7 === 0 ||
-    (index > 8 && index < 20 && index % 2 === 0),
-);
 
 type RoomLobbyProps = {
   room: RoomState;
@@ -80,6 +73,11 @@ export function RoomLobby({
   const canChangeSettings = isConnectedController && !roundIsActive;
   const canStartRound = isConnectedController && !roundIsActive;
   const joinUrl = buildJoinUrl(window.location.origin, room.code);
+  const joinQrContext = roundIsActive
+    ? 'active-round'
+    : roundIsEnded
+      ? 'ended-round'
+      : 'lobby';
   const countdownMs = useRoundCountdown(room);
   const letters = room.round
     ? [...room.round.board.tiles]
@@ -291,35 +289,28 @@ export function RoomLobby({
                   : 'Display offline'}
               </span>
             </div>
-            <p>
-              Players can open{' '}
-              <a className="join-url" href={joinUrl}>
-                {joinUrl}
-              </a>{' '}
-              to join this room.
-            </p>
+            {isDisplay ? (
+              <p>
+                This shared screen presents the room while phone players join
+                and play.
+              </p>
+            ) : (
+              <p>
+                Players can open{' '}
+                <a className="join-url" href={joinUrl}>
+                  {joinUrl}
+                </a>{' '}
+                to join this room.
+              </p>
+            )}
           </section>
           {isDisplay && (
-            <section
-              className="qr-placeholder"
-              aria-label="QR code placeholder"
-            >
-              <span className="qr-placeholder__pattern" aria-hidden="true">
-                {placeholderCells.map((filled, index) => (
-                  <span
-                    className={
-                      filled ? 'qr-placeholder__cell--filled' : undefined
-                    }
-                    key={index}
-                  />
-                ))}
-              </span>
-              <strong>Scan-to-join area</strong>
-              <small>
-                The exact join link is ready. A scannable QR image remains
-                outside this stage.
-              </small>
-            </section>
+            <JoinQrCode
+              joinUrl={joinUrl}
+              roomCode={room.code}
+              presentation={roundIsActive ? 'compact' : 'prominent'}
+              context={joinQrContext}
+            />
           )}
           <PlayerList
             players={room.players}
