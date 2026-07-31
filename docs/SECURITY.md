@@ -4,7 +4,8 @@ Stage 2.5 established the network and controller boundary. Stage 3 adds an
 isolated defensive engine, Stage 3.1 adds read-only hosted verification, and
 Stage 4A adds verified server-only production data, Stage 4B adds authoritative
 rounds, Stage 4C adds player-private submissions, and Stage 4D adds merged final
-round results. Stage 4E display-only QR joining is in draft review. This
+round results. Stage 4E display-only QR joining is complete and merged; Stage
+4F Touch/Trace entry is the current draft work. This
 document separates implemented controls from protections still required before
 public deployment.
 

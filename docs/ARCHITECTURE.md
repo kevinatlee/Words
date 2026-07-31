@@ -1,8 +1,9 @@
 # Architecture
 
 This document describes the completed lobby, engine, CI, production game data,
-authoritative rounds, private submissions, and Stage 4D final results, plus the
-Stage 4E display-only QR joining change now in draft review.
+authoritative rounds, private submissions, Stage 4D final results, and the
+merged Stage 4E display-only QR joining change. Stage 4F Touch/Trace entry is
+the current draft work.
 
 ## Runtime pieces
 
@@ -511,8 +512,8 @@ The eventual production topology is one public HTTPS origin forwarding to one
 Words process on port `6532`. That process will serve the built client, health
 API, Socket.IO, game engine, and an openly licensed dictionary.
 
-Stage 4F will add natural continuous touch/pointer tracing while retaining
-tap/click and keyboard fallbacks. Stage 4G will perform focused real-party and
+Stage 4F adds Touch and Trace word entry while retaining tap/click and keyboard
+fallbacks. Stage 4G remains later focused real-party and
 release-candidate testing without feature expansion. Stage 5 will add
 production hardening, static-client serving from the Node process,
 one-container packaging, production image publishing, server configuration,

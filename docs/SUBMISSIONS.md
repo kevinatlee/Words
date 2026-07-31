@@ -82,5 +82,5 @@ paths, rejected attempts, and rate-limit state remain private. The owner can
 still recover their unchanged private state on reconnect until the next round.
 
 See [`RESULTS.md`](RESULTS.md) for the timed visibility transition, exact 25%
-unique-word bonus, rankings, and next-round lifecycle. Continuous drag tracing
-remains separately reviewed future scope.
+unique-word bonus, rankings, and next-round lifecycle. Touch and Trace entry
+remain client-only interaction work with the same server-owned validation.

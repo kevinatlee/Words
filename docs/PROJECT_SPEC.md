@@ -46,7 +46,7 @@ Creating the room does not grant the display player membership or controller
 authority. The display never selects or approves a controller. Changing the
 controller must never change the display session.
 
-## Current scope: Stage 4D complete, Stage 4E QR joining in draft review
+## Current scope: Stage 4E complete, Stage 4F Touch/Trace in draft
 
 Stage 2.5 is complete. It extends the secure, server-backed lobby with explicit
 game-host delegation and deterministic automatic succession:
@@ -260,7 +260,7 @@ reverses this principle.
 
 ## Current technical non-goals
 
-Stage 4E does not include continuous touch tracing, QR scanning, camera
+Stage 4F does not include QR scanning, camera
 permissions, native or installable applications, persistence, deployment
 automation, production container packaging, image publishing, server
 installation, or tunnel configuration.
@@ -311,11 +311,11 @@ details are future deployment work, not a claim about Stage 2.
 9. **Stage 4D — complete:** automatic shared-word reconciliation, final
    per-player scores, deterministic competition ranking, tied/no-winner state,
    public ended-round results, and controller-driven next rounds.
-10. **Stage 4E — in draft review:** display-only local SVG QR joining,
+10. **Stage 4E — complete and merged:** display-only local SVG QR joining,
     accessible manual fallbacks, and formal round-local casual play.
-11. **Stage 4F:** natural continuous touch/pointer tracing while preserving
+11. **Stage 4F — current draft work:** Touch and Trace word entry while preserving
     tap/click and keyboard fallbacks.
-12. **Stage 4G:** structured real-party, narrow-phone, display, and
+12. **Stage 4G — later:** structured real-party, narrow-phone, display, and
     release-candidate testing with focused defect correction and interaction
     polish—not feature expansion or cumulative scoring.
 13. **Stage 5:** production hardening, one-container build, Node serving the

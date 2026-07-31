@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   buildJoinUrl,
@@ -14,6 +14,13 @@ import {
 
 import { useRoundCountdown } from '../useRoundCountdown';
 import { createDemoBoard } from '../utils/demoBoard';
+import {
+  isExpectedSubmissionRejection,
+  loadWordEntryMode,
+  saveWordEntryMode,
+  updateWordPath,
+  type WordEntryMode,
+} from '../utils/word-entry';
 import { ControllerPanel } from './ControllerPanel';
 import { GameSettings } from './GameSettings';
 import { JoinQrCode } from './JoinQrCode';
@@ -56,6 +63,9 @@ export function RoomLobby({
     null,
   );
   const activeRoundIdRef = useRef(room.round?.id);
+  const selectedPathRef = useRef<number[]>([]);
+  const submissionPendingRef = useRef(false);
+  const [entryMode, setEntryMode] = useState<WordEntryMode>(loadWordEntryMode);
   const currentPlayer = room.players.find(
     (player) => player.id === currentPlayerId,
   );
@@ -72,6 +82,7 @@ export function RoomLobby({
   const roundIsEnded = room.phase === 'ROUND_ENDED';
   const canChangeSettings = isConnectedController && !roundIsActive;
   const canStartRound = isConnectedController && !roundIsActive;
+  const showControllerAdministration = isConnectedController && !roundIsActive;
   const joinUrl = buildJoinUrl(window.location.origin, room.code);
   const joinQrContext = roundIsActive
     ? 'active-round'
@@ -79,9 +90,13 @@ export function RoomLobby({
       ? 'ended-round'
       : 'lobby';
   const countdownMs = useRoundCountdown(room);
-  const letters = room.round
-    ? [...room.round.board.tiles]
-    : createDemoBoard(room.settings.gridSize);
+  const letters = useMemo(
+    () =>
+      room.round
+        ? [...room.round.board.tiles]
+        : createDemoBoard(room.settings.gridSize),
+    [room.round, room.settings.gridSize],
+  );
   const boardSize = room.round?.board.size ?? room.settings.gridSize;
   const isRoundParticipant =
     currentPlayerId !== null &&
@@ -99,82 +114,112 @@ export function RoomLobby({
     .map((tileIndex) => letters[tileIndex] ?? '')
     .join('');
 
-  const selectTile = (tileIndex: number) => {
-    if (!canBuildWord || submissionPending) {
-      return;
-    }
+  const clearSelectedPath = useCallback(() => {
+    selectedPathRef.current = [];
+    setSelectedPath([]);
+  }, []);
+
+  useEffect(() => {
+    activeRoundIdRef.current = room.round?.id;
+    submissionPendingRef.current = false;
+    // The server changed the input scope, so its client-only pending state is obsolete.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSubmissionPending(false);
+    clearSelectedPath();
     setSubmissionMessage(null);
-    if (
-      candidateWord.length + (letters[tileIndex]?.length ?? 0) >
-      productConfig.maximumSubmittedWordLength
-    ) {
-      setSubmissionMessage(
-        `Words can contain at most ${productConfig.maximumSubmittedWordLength} letters.`,
+  }, [clearSelectedPath, room.phase, room.round?.id]);
+
+  const selectTile = useCallback(
+    (tileIndex: number) => {
+      if (!canBuildWord || submissionPendingRef.current) {
+        return selectedPathRef.current;
+      }
+      setSubmissionMessage(null);
+      const update = updateWordPath(
+        selectedPathRef.current,
+        tileIndex,
+        letters,
+        boardSize,
+        productConfig.maximumSubmittedWordLength,
       );
+      if (update.exceededMaximumLength) {
+        setSubmissionMessage(
+          `Words can contain at most ${productConfig.maximumSubmittedWordLength} letters.`,
+        );
+        return selectedPathRef.current;
+      }
+      selectedPathRef.current = update.path;
+      setSelectedPath(update.path);
+      return update.path;
+    },
+    [boardSize, canBuildWord, letters],
+  );
+
+  const selectEntryMode = (mode: WordEntryMode) => {
+    if (mode === entryMode) {
       return;
     }
-    setSelectedPath((current) => {
-      if (current.includes(tileIndex)) {
-        return current;
-      }
-      const previous = current.at(-1);
-      if (previous !== undefined) {
-        const previousRow = Math.floor(previous / boardSize);
-        const previousColumn = previous % boardSize;
-        const nextRow = Math.floor(tileIndex / boardSize);
-        const nextColumn = tileIndex % boardSize;
-        if (
-          Math.abs(previousRow - nextRow) > 1 ||
-          Math.abs(previousColumn - nextColumn) > 1
-        ) {
-          return current;
-        }
-      }
-      return [...current, tileIndex];
-    });
+    saveWordEntryMode(mode);
+    setEntryMode(mode);
+    clearSelectedPath();
+    setSubmissionMessage(null);
   };
 
-  const submitSelection = async () => {
+  const submitSelection = useCallback(async () => {
     const roundId = room.round?.id;
+    const path = selectedPathRef.current;
+    const word = path.map((tileIndex) => letters[tileIndex] ?? '').join('');
     if (
       !canBuildWord ||
-      submissionPending ||
+      submissionPendingRef.current ||
       !roundId ||
-      selectedPath.length === 0
+      path.length === 0
     ) {
       return;
     }
+    submissionPendingRef.current = true;
     setSubmissionPending(true);
     setSubmissionMessage(null);
     try {
       const response = await onSubmitWord({
         roundId,
-        word: candidateWord,
-        path: [...selectedPath],
+        word,
+        path: [...path],
       });
       if (activeRoundIdRef.current !== roundId) {
         return;
       }
       if (response.ok) {
-        setSelectedPath([]);
+        clearSelectedPath();
         setSubmissionMessage(
           `${response.acceptedWord.word} accepted for ${response.acceptedWord.points} ${response.acceptedWord.points === 1 ? 'point' : 'points'}.`,
         );
-      } else {
+      } else if (isExpectedSubmissionRejection(response.error.code)) {
+        clearSelectedPath();
         setSubmissionMessage(response.error.message);
+      } else {
+        setSubmissionMessage('Could not submit that word. Try again.');
       }
     } catch {
       if (activeRoundIdRef.current === roundId) {
-        setSubmissionMessage(
-          'That word could not be checked. Your selection is still here.',
-        );
+        setSubmissionMessage('Could not submit that word. Try again.');
       }
     } finally {
       if (activeRoundIdRef.current === roundId) {
+        submissionPendingRef.current = false;
         setSubmissionPending(false);
       }
     }
-  };
+  }, [canBuildWord, clearSelectedPath, letters, onSubmitWord, room.round?.id]);
+
+  const cancelTrace = useCallback(() => {
+    clearSelectedPath();
+    setSubmissionMessage(null);
+  }, [clearSelectedPath]);
+
+  const submitTrace = useCallback(() => {
+    void submitSelection();
+  }, [submitSelection]);
 
   const heading = isDisplay
     ? roundIsActive
@@ -317,21 +362,25 @@ export function RoomLobby({
             maxPlayers={room.maxPlayers}
             currentPlayerId={currentPlayerId}
           />
-          <ControllerPanel
-            room={room}
-            currentPlayerId={currentPlayerId}
-            onTransfer={onTransferController}
-          />
+          {showControllerAdministration && (
+            <ControllerPanel
+              room={room}
+              currentPlayerId={currentPlayerId}
+              onTransfer={onTransferController}
+            />
+          )}
         </div>
 
         <div className="room-dashboard__preview">
-          <GameSettings
-            settings={room.settings}
-            disabled={!canChangeSettings || actionPending}
-            pending={actionPending}
-            canEdit={canChangeSettings}
-            onChange={(settings) => void runSettingsUpdate(settings)}
-          />
+          {showControllerAdministration && (
+            <GameSettings
+              settings={room.settings}
+              disabled={!canChangeSettings || actionPending}
+              pending={actionPending}
+              canEdit={canChangeSettings}
+              onChange={(settings) => void runSettingsUpdate(settings)}
+            />
+          )}
           <section
             className="panel board-panel"
             aria-labelledby="board-title"
@@ -379,6 +428,12 @@ export function RoomLobby({
               }
               disabled={!canBuildWord || submissionPending}
               onSelect={selectTile}
+              entryMode={entryMode}
+              traceResetKey={`${room.round?.id ?? 'no-round'}:${room.phase}:${entryMode}`}
+              onTraceStart={selectTile}
+              onTraceMove={selectTile}
+              onTraceEnd={submitTrace}
+              onTraceCancel={cancelTrace}
             />
             {sessionRole === 'player' &&
               roundIsActive &&
@@ -394,32 +449,28 @@ export function RoomLobby({
                     </h3>
                   </div>
                   <div className="word-entry__actions">
-                    <button
-                      className="button button--secondary"
-                      type="button"
-                      disabled={
-                        !canBuildWord ||
-                        submissionPending ||
-                        selectedPath.length === 0
-                      }
-                      onClick={() =>
-                        setSelectedPath((current) => current.slice(0, -1))
-                      }
+                    <div
+                      className="word-entry__mode"
+                      role="group"
+                      aria-label="Word entry mode"
                     >
-                      Undo
-                    </button>
-                    <button
-                      className="button button--secondary"
-                      type="button"
-                      disabled={
-                        !canBuildWord ||
-                        submissionPending ||
-                        selectedPath.length === 0
-                      }
-                      onClick={() => setSelectedPath([])}
-                    >
-                      Clear
-                    </button>
+                      <button
+                        className="button button--secondary"
+                        type="button"
+                        aria-pressed={entryMode === 'touch'}
+                        onClick={() => selectEntryMode('touch')}
+                      >
+                        Touch
+                      </button>
+                      <button
+                        className="button button--secondary"
+                        type="button"
+                        aria-pressed={entryMode === 'trace'}
+                        onClick={() => selectEntryMode('trace')}
+                      >
+                        Trace
+                      </button>
+                    </div>
                     <button
                       className="button button--primary"
                       type="button"
@@ -430,7 +481,7 @@ export function RoomLobby({
                       }
                       onClick={() => void submitSelection()}
                     >
-                      {submissionPending ? 'Checking…' : 'Submit Word'}
+                      {submissionPending ? 'Checking…' : 'Submit'}
                     </button>
                   </div>
                   {submissionMessage && (

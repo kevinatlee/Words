@@ -1,8 +1,8 @@
 # QR joining
 
 Stage 4D is complete and merged on the trusted
-`c8bbc33f2b150c9c04c047b0bb2f64091cecb0b2` main baseline. Stage 4E is in
-draft review. It adds a display-only QR presentation without changing the
+`c8bbc33f2b150c9c04c047b0bb2f64091cecb0b2` main baseline. Stage 4E is
+complete and merged. It adds a display-only QR presentation without changing the
 server, room contract, gameplay lifecycle, scoring, or ordinary player join
 flow.
 
@@ -165,9 +165,10 @@ Automated coverage verifies:
 - unchanged active-round waiting and next-round behavior.
 
 Manual verification uses a LAN-reachable Vite origin rather than `localhost`,
-because `localhost` on a phone refers to that phone. The final draft review
-record must distinguish automated barcode decoding from a real native-camera
-scan; it must not claim a production deployment.
+because `localhost` on a phone refers to that phone. The original review record
+distinguished automated barcode decoding from a real native-camera scan and did
+not claim a production deployment. Physical review later accepted the remaining
+display limitations.
 
 The implemented browser run used a private LAN-reachable Vite origin. It
 verified the exact credential-free payload, all three phase presentations,
@@ -181,11 +182,11 @@ was square at 153.59 CSS pixels. Browser consoles were clean, and the page
 asset inventory showed the QR as a local inline SVG with no external image or
 QR service request.
 
-A physical native-iPhone Camera scan, a physical scan of the compact
-active-round presentation, true 1920 × 1080 and 3840 × 2160 display runs, and
-a genuine browser 200% zoom run were not available in the implementation
-environment. They remain explicit draft-review checks and are not reported as
-passed. No production deployment was tested.
+At the time of this implementation record, a physical native-iPhone Camera
+scan, a physical scan of the compact active-round presentation, true 1920 ×
+1080 and 3840 × 2160 display runs, and a genuine browser 200% zoom run were
+not available. Subsequent product review accepted the documented display
+limitations before Stage 4E merged. No production deployment was tested.
 
 ## Known limitations and Stage 4F boundary
 
@@ -197,8 +198,7 @@ passed. No production deployment was tested.
 - Rooms remain temporary and are lost on a server restart.
 - There is no result history or cumulative score by deliberate product design.
 
-Stage 4F should add natural continuous touch and pointer tracing over the
+Stage 4F is the current draft work. It adds Touch and Trace word entry over the
 existing board while preserving tap/click and keyboard fallbacks, server-owned
-path validation, explicit submission behavior unless separately reviewed, and
-all current privacy and authority boundaries. It must not expand QR behavior,
-add cumulative scoring, or begin release packaging.
+path validation, and all current privacy and authority boundaries. It does not
+expand QR behavior, add cumulative scoring, or begin release packaging.

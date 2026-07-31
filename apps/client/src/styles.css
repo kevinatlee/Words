@@ -873,6 +873,8 @@ button:disabled {
 }
 
 .letter-grid {
+  --letter-tile-font-size: clamp(1.8rem, 8vw, 2.75rem);
+
   display: grid;
   width: min(100%, 40rem);
   margin-inline: auto;
@@ -882,6 +884,11 @@ button:disabled {
 
 .letter-grid__cell {
   min-width: 0;
+}
+
+.letter-grid--trace {
+  touch-action: none;
+  user-select: none;
 }
 
 .letter-tile {
@@ -895,7 +902,7 @@ button:disabled {
   background: var(--paper);
   box-shadow: inset 0 -0.32rem 0 rgba(6, 16, 27, 0.1);
   color: var(--ink-950);
-  font-size: clamp(1.25rem, 3.4vw, 3rem);
+  font-size: var(--letter-tile-font-size);
   font-weight: 900;
   line-height: 1;
 }
@@ -934,7 +941,7 @@ button:disabled {
   width: 100%;
   padding: 0;
   cursor: pointer;
-  font: inherit;
+  font-family: inherit;
 }
 
 .letter-tile--button:focus-visible {
@@ -1096,7 +1103,6 @@ button:disabled {
 
 .letter-grid--compact .letter-tile {
   border-radius: clamp(0.65rem, 3vw, 1rem);
-  font-size: clamp(1.8rem, 8vw, 2.75rem);
 }
 
 .word-entry {
@@ -1122,6 +1128,28 @@ button:disabled {
 .word-entry__actions .button {
   min-height: 2.75rem;
   padding: 0.65rem 0.9rem;
+}
+
+.word-entry__mode {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+
+.word-entry__mode .button {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.word-entry__mode .button + .button {
+  border-left: 1px solid var(--line-strong);
+}
+
+.word-entry__mode .button[aria-pressed='true'] {
+  background: var(--mint);
+  color: var(--ink-950);
 }
 
 .word-entry__message {
