@@ -105,12 +105,21 @@ function renderLobby(
       state: createSubmissionState(),
     }),
   ),
+  {
+    room = createRoom(),
+    sessionRole = 'player',
+    currentPlayerId = playerId,
+  }: {
+    room?: RoomState;
+    sessionRole?: 'display' | 'player';
+    currentPlayerId?: string | null;
+  } = {},
 ) {
   return render(
     <RoomLobby
-      room={createRoom()}
-      sessionRole="player"
-      currentPlayerId={playerId}
+      room={room}
+      sessionRole={sessionRole}
+      currentPlayerId={currentPlayerId}
       connectionStatus="connected"
       onLeave={async () => undefined}
       onTransferController={async () => null}
@@ -124,6 +133,27 @@ function renderLobby(
 
 function tileButtons() {
   return within(screen.getByRole('grid')).getAllByRole('button');
+}
+
+function mockTileGeometry() {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+    function getBoundingClientRect(this: HTMLElement) {
+      const index = Number.parseInt(this.dataset.tileIndex ?? '-1', 10);
+      const left = (index % 4) * 100;
+      const top = Math.floor(index / 4) * 100;
+      return {
+        bottom: top + 100,
+        height: 100,
+        left,
+        right: left + 100,
+        toJSON: () => ({}),
+        top,
+        width: 100,
+        x: left,
+        y: top,
+      } as DOMRect;
+    },
+  );
 }
 
 async function selectFirstThree(user: ReturnType<typeof userEvent.setup>) {
@@ -171,6 +201,65 @@ describe('RoomLobby word entry', () => {
     expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled();
   });
 
+  it('keeps controller administration out of active gameplay', () => {
+    renderLobby();
+
+    expect(screen.queryByRole('heading', { name: 'Game Host' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Round setup' })).toBeNull();
+  });
+
+  it('shows controller administration only to the connected controller between rounds', () => {
+    const lobby = createRoom({ phase: 'LOBBY', round: null });
+    const lobbyView = renderLobby(undefined, { room: lobby });
+    expect(screen.getByRole('heading', { name: 'Game Host' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Round setup' })).toBeVisible();
+    lobbyView.unmount();
+
+    renderLobby(undefined, {
+      room: createRoom({ phase: 'ROUND_ENDED' }),
+    });
+    expect(screen.getByRole('heading', { name: 'Game Host' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Round setup' })).toBeVisible();
+  });
+
+  it('never shows controller administration to ordinary players or the display', () => {
+    const ordinaryPlayerId = '00000000-0000-4000-8000-000000000002';
+    const ordinaryRoom = createRoom({
+      players: [
+        ...createRoom().players,
+        {
+          id: ordinaryPlayerId,
+          displayName: 'Calm Otter',
+          connected: true,
+          joinedAt: '2026-07-31T00:01:00.000Z',
+          isController: false,
+        },
+      ],
+    });
+
+    for (const phase of ['LOBBY', 'ROUND_ACTIVE', 'ROUND_ENDED'] as const) {
+      const view = renderLobby(undefined, {
+        room: {
+          ...ordinaryRoom,
+          phase,
+          round: phase === 'LOBBY' ? null : ordinaryRoom.round,
+        },
+        currentPlayerId: ordinaryPlayerId,
+      });
+      expect(screen.queryByRole('heading', { name: 'Game Host' })).toBeNull();
+      expect(screen.queryByRole('heading', { name: 'Round setup' })).toBeNull();
+      view.unmount();
+    }
+
+    renderLobby(undefined, {
+      room: createRoom({ phase: 'LOBBY', round: null }),
+      sessionRole: 'display',
+      currentPlayerId: null,
+    });
+    expect(screen.queryByRole('heading', { name: 'Game Host' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Round setup' })).toBeNull();
+  });
+
   it('uses Touch backtracking without leaving disconnected paths', async () => {
     const user = userEvent.setup();
     renderLobby();
@@ -201,20 +290,37 @@ describe('RoomLobby word entry', () => {
     await user.click(screen.getByRole('button', { name: 'Trace' }));
     const grid = screen.getByRole('grid');
     const tiles = tileButtons();
-    const elementFromPoint = vi
-      .fn()
-      .mockReturnValueOnce(tiles[0]!)
-      .mockReturnValueOnce(tiles[1]!)
-      .mockReturnValueOnce(tiles[10]!);
+    mockTileGeometry();
+    const elementFromPoint = vi.fn().mockReturnValue(tiles[0]!);
     Object.defineProperty(document, 'elementFromPoint', {
       configurable: true,
       value: elementFromPoint,
     });
 
-    fireEvent.pointerDown(tiles[0]!, { pointerId: 1, pointerType: 'mouse' });
-    fireEvent.pointerMove(grid, { pointerId: 1, pointerType: 'mouse' });
-    fireEvent.pointerMove(grid, { pointerId: 1, pointerType: 'mouse' });
-    fireEvent.pointerUp(grid, { pointerId: 1, pointerType: 'mouse' });
+    fireEvent.pointerDown(tiles[0]!, {
+      clientX: 50,
+      clientY: 50,
+      pointerId: 1,
+      pointerType: 'mouse',
+    });
+    fireEvent.pointerMove(grid, {
+      clientX: 150,
+      clientY: 50,
+      pointerId: 1,
+      pointerType: 'mouse',
+    });
+    fireEvent.pointerMove(grid, {
+      clientX: 250,
+      clientY: 250,
+      pointerId: 1,
+      pointerType: 'mouse',
+    });
+    fireEvent.pointerUp(grid, {
+      clientX: 250,
+      clientY: 250,
+      pointerId: 1,
+      pointerType: 'mouse',
+    });
 
     expect(onSubmitWord).toHaveBeenCalledTimes(1);
     expect(onSubmitWord).toHaveBeenCalledWith({
@@ -235,6 +341,7 @@ describe('RoomLobby word entry', () => {
     await user.click(screen.getByRole('button', { name: 'Trace' }));
     const grid = screen.getByRole('grid');
     const tiles = tileButtons();
+    mockTileGeometry();
 
     fireEvent.pointerDown(tiles[0]!, { pointerId: 1, pointerType: 'mouse' });
     fireEvent.pointerCancel(grid, { pointerId: 1, pointerType: 'mouse' });
@@ -264,21 +371,42 @@ describe('RoomLobby word entry', () => {
     await user.click(screen.getByRole('button', { name: 'Trace' }));
     const grid = screen.getByRole('grid');
     const tiles = tileButtons();
+    mockTileGeometry();
     Object.defineProperty(document, 'elementFromPoint', {
       configurable: true,
-      value: vi
-        .fn()
-        .mockReturnValueOnce(tiles[0]!)
-        .mockReturnValueOnce(tiles[1]!)
-        .mockReturnValueOnce(tiles[2]!)
-        .mockReturnValueOnce(tiles[1]!),
+      value: vi.fn().mockReturnValue(tiles[0]!),
     });
 
-    fireEvent.pointerDown(tiles[0]!, { pointerId: 3, pointerType: 'mouse' });
-    fireEvent.pointerMove(grid, { pointerId: 3, pointerType: 'mouse' });
-    fireEvent.pointerMove(grid, { pointerId: 3, pointerType: 'mouse' });
-    fireEvent.pointerMove(grid, { pointerId: 3, pointerType: 'mouse' });
-    fireEvent.pointerUp(grid, { pointerId: 3, pointerType: 'mouse' });
+    fireEvent.pointerDown(tiles[0]!, {
+      clientX: 50,
+      clientY: 50,
+      pointerId: 3,
+      pointerType: 'mouse',
+    });
+    fireEvent.pointerMove(grid, {
+      clientX: 150,
+      clientY: 50,
+      pointerId: 3,
+      pointerType: 'mouse',
+    });
+    fireEvent.pointerMove(grid, {
+      clientX: 250,
+      clientY: 50,
+      pointerId: 3,
+      pointerType: 'mouse',
+    });
+    fireEvent.pointerMove(grid, {
+      clientX: 150,
+      clientY: 50,
+      pointerId: 3,
+      pointerType: 'mouse',
+    });
+    fireEvent.pointerUp(grid, {
+      clientX: 150,
+      clientY: 50,
+      pointerId: 3,
+      pointerType: 'mouse',
+    });
 
     expect(onSubmitWord).toHaveBeenCalledWith({
       roundId,

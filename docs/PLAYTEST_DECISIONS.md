@@ -50,6 +50,9 @@ This is planned, not implemented by Stage 4F:
   hidden words are represented as “+N more”.
 - The TV will not scroll. Phones remain on a simple puzzle/lobby-style waiting
   view, with detailed results focused on the TV.
+- During this planned 20-second `ROUND_ENDED` presentation, phones will not
+  show game-host controls. After the authoritative return to `LOBBY`, Game
+  Settings and game-host delegation reappear for the current controller only.
 - After 20 seconds, the server will authoritatively return to `LOBBY`, using
   the existing `ROUND_ENDED` lifecycle rather than adding a fourth phase.
 

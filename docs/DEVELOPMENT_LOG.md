@@ -2,6 +2,14 @@
 
 ## 2026-07-31 — Stage 4F Touch and Trace entry (draft)
 
+- Corrected first physical iPhone findings: Trace now resolves travelled pointer
+  segments through centre-biased inset tile regions with directional hysteresis,
+  and interactive tiles no longer reset their shared typography with a `font`
+  shorthand.
+- During `ROUND_ACTIVE`, every phone now omits Game Settings and game-host
+  delegation controls. Between rounds, those controls remain available only to
+  the connected controller; the display and ordinary players never receive
+  them.
 - Added a local, accessible Touch/Trace selector for active-round player word
   entry. It defaults to Touch and remembers only the browser preference.
 - Replaced visible Undo and Clear controls with safe path backtracking: Touch

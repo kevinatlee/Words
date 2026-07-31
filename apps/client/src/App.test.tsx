@@ -381,10 +381,8 @@ describe('Stage 4B display and player room routes', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
     expect(
-      screen
-        .getAllByRole('button', { name: /×|minute|seconds/i })
-        .every((button) => button.hasAttribute('disabled')),
-    ).toBe(true);
+      screen.queryByRole('button', { name: /×|minute|seconds/i }),
+    ).toBeNull();
   });
 
   it('does not create duplicate rooms when StrictMode repeats effects', async () => {
@@ -674,10 +672,7 @@ describe('Stage 4B display and player room routes', () => {
       targetPlayerId: ordinaryPlayer.id,
     });
     expect(
-      await screen.findByText('Game Host control moved to <Bright Fox>.'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'You’re in the room.' }),
+      await screen.findByRole('heading', { name: 'You’re in the room.' }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Make Game Host' }),
@@ -753,10 +748,7 @@ describe('Stage 4B display and player room routes', () => {
       />,
     );
 
-    expect(await screen.findAllByText('Game Host offline')).toHaveLength(2);
-    expect(
-      screen.getByText(/If grace expires, the server will select/i),
-    ).toBeInTheDocument();
+    expect(await screen.findAllByText('Game Host offline')).toHaveLength(1);
     expect(
       screen.queryByRole('button', { name: 'Make Game Host' }),
     ).not.toBeInTheDocument();
@@ -836,10 +828,7 @@ describe('Stage 4B display and player room routes', () => {
     );
 
     expect(
-      await screen.findByText('Selecting automatically'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/next player to join or reconnect/i),
+      await screen.findByRole('heading', { name: 'Shared display is ready.' }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Assign Game Host' }),
@@ -1197,7 +1186,7 @@ describe('Stage 4B display and player room routes', () => {
     );
 
     expect(await screen.findByText('Display offline')).toBeInTheDocument();
-    expect(screen.getAllByText('Game Host offline')).toHaveLength(2);
+    expect(screen.getAllByText('Game Host offline')).toHaveLength(1);
     expect(
       screen.getByRole('heading', { name: 'You’re in the room.' }),
     ).toBeInTheDocument();
@@ -1722,7 +1711,7 @@ describe('Stage 4B display and player room routes', () => {
     expect(
       screen.getByRole('button', { name: 'QU, tile 1' }),
     ).toBeInTheDocument();
-    expect(screen.getAllByText('30 seconds')).toHaveLength(2);
+    expect(screen.getAllByText('30 seconds')).toHaveLength(1);
     expect(screen.getByRole('timer')).toHaveAttribute('aria-live', 'off');
     expect(screen.queryByRole('textbox', { name: /word/i })).toBeNull();
   });
@@ -2290,7 +2279,7 @@ describe('Stage 4B display and player room routes', () => {
     expect(
       await screen.findByRole('button', { name: 'Start Round' }),
     ).toBeDisabled();
-    expect(screen.getByRole('button', { name: '5 × 5' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: '5 × 5' })).toBeNull();
   });
 
   it('prevents duplicate controller actions while one is pending', async () => {

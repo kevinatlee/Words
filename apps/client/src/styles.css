@@ -941,7 +941,7 @@ button:disabled {
   width: 100%;
   padding: 0;
   cursor: pointer;
-  font: inherit;
+  font-family: inherit;
 }
 
 .letter-tile--button:focus-visible {

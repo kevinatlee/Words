@@ -6,6 +6,7 @@ import {
 } from 'react';
 
 import type { WordEntryMode } from '../utils/word-entry';
+import { resolveTraceSegment, type TracePoint } from '../utils/trace-resolver';
 
 type LetterGridProps = {
   letters: string[];
@@ -18,8 +19,8 @@ type LetterGridProps = {
   onSelect?: (index: number) => void;
   entryMode?: WordEntryMode;
   traceResetKey?: string;
-  onTraceStart?: (index: number) => void;
-  onTraceMove?: (index: number) => void;
+  onTraceStart?: (index: number) => readonly number[] | void;
+  onTraceMove?: (index: number) => readonly number[] | void;
   onTraceEnd?: () => void;
   onTraceCancel?: () => void;
 };
@@ -43,6 +44,8 @@ export function LetterGrid({
   const gridRef = useRef<HTMLDivElement>(null);
   const activePointerIdRef = useRef<number | null>(null);
   const lastTraceTileIndexRef = useRef<number | null>(null);
+  const previousTracePointRef = useRef<TracePoint | null>(null);
+  const tracePathRef = useRef<number[]>([]);
   const selectedOrder = new Map(
     selectedIndices.map((tileIndex, order) => [tileIndex, order + 1]),
   );
@@ -74,6 +77,8 @@ export function LetterGrid({
     }
     activePointerIdRef.current = null;
     lastTraceTileIndexRef.current = null;
+    previousTracePointRef.current = null;
+    tracePathRef.current = [];
     if (gridRef.current?.hasPointerCapture?.(pointerId)) {
       gridRef.current.releasePointerCapture(pointerId);
     }
@@ -109,8 +114,69 @@ export function LetterGrid({
     event.preventDefault();
     activePointerIdRef.current = event.pointerId;
     lastTraceTileIndexRef.current = tileIndex;
+    previousTracePointRef.current = { x: event.clientX, y: event.clientY };
     event.currentTarget.setPointerCapture?.(event.pointerId);
-    onTraceStart?.(tileIndex);
+    tracePathRef.current = [...(onTraceStart?.(tileIndex) ?? [])];
+  };
+
+  const processTraceSegment = (event: PointerEvent<HTMLDivElement>) => {
+    const currentPoint = { x: event.clientX, y: event.clientY };
+    const previousPoint = previousTracePointRef.current;
+    previousTracePointRef.current = currentPoint;
+    if (!previousPoint || tracePathRef.current.length === 0) {
+      return;
+    }
+    const resolvedPath = resolveTraceSegment(
+      tracePathRef.current,
+      previousPoint,
+      currentPoint,
+      size,
+      (index) => {
+        const tile = gridRef.current?.querySelector<HTMLElement>(
+          `[data-tile-index="${index}"]`,
+        );
+        if (!tile) {
+          return null;
+        }
+        const rect = tile.getBoundingClientRect();
+        return {
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+        };
+      },
+    );
+    if (
+      resolvedPath.length === tracePathRef.current.length &&
+      resolvedPath.every(
+        (index, order) => index === tracePathRef.current[order],
+      )
+    ) {
+      return;
+    }
+    const previousPath = tracePathRef.current;
+    const sharedPrefixLength = previousPath.findIndex(
+      (index, order) => index !== resolvedPath[order],
+    );
+    const firstChangedIndex =
+      sharedPrefixLength === -1
+        ? Math.min(previousPath.length, resolvedPath.length)
+        : sharedPrefixLength;
+    const nextIndexes =
+      firstChangedIndex === previousPath.length
+        ? resolvedPath.slice(firstChangedIndex)
+        : [
+            resolvedPath[firstChangedIndex - 1],
+            ...resolvedPath.slice(firstChangedIndex),
+          ];
+    for (const index of nextIndexes) {
+      if (index === undefined) {
+        continue;
+      }
+      tracePathRef.current = [...(onTraceMove?.(index) ?? resolvedPath)];
+    }
+    lastTraceTileIndexRef.current = tracePathRef.current.at(-1) ?? null;
   };
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -118,11 +184,7 @@ export function LetterGrid({
       return;
     }
     event.preventDefault();
-    const tileIndex = indexFromPointer(event);
-    if (tileIndex !== null && tileIndex !== lastTraceTileIndexRef.current) {
-      lastTraceTileIndexRef.current = tileIndex;
-      onTraceMove?.(tileIndex);
-    }
+    processTraceSegment(event);
   };
 
   const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
@@ -130,13 +192,11 @@ export function LetterGrid({
       return;
     }
     event.preventDefault();
-    const tileIndex = indexFromPointer(event);
-    if (tileIndex !== null && tileIndex !== lastTraceTileIndexRef.current) {
-      lastTraceTileIndexRef.current = tileIndex;
-      onTraceMove?.(tileIndex);
-    }
+    processTraceSegment(event);
     activePointerIdRef.current = null;
     lastTraceTileIndexRef.current = null;
+    previousTracePointRef.current = null;
+    tracePathRef.current = [];
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }

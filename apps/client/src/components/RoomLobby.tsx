@@ -82,6 +82,7 @@ export function RoomLobby({
   const roundIsEnded = room.phase === 'ROUND_ENDED';
   const canChangeSettings = isConnectedController && !roundIsActive;
   const canStartRound = isConnectedController && !roundIsActive;
+  const showControllerAdministration = isConnectedController && !roundIsActive;
   const joinUrl = buildJoinUrl(window.location.origin, room.code);
   const joinQrContext = roundIsActive
     ? 'active-round'
@@ -361,21 +362,25 @@ export function RoomLobby({
             maxPlayers={room.maxPlayers}
             currentPlayerId={currentPlayerId}
           />
-          <ControllerPanel
-            room={room}
-            currentPlayerId={currentPlayerId}
-            onTransfer={onTransferController}
-          />
+          {showControllerAdministration && (
+            <ControllerPanel
+              room={room}
+              currentPlayerId={currentPlayerId}
+              onTransfer={onTransferController}
+            />
+          )}
         </div>
 
         <div className="room-dashboard__preview">
-          <GameSettings
-            settings={room.settings}
-            disabled={!canChangeSettings || actionPending}
-            pending={actionPending}
-            canEdit={canChangeSettings}
-            onChange={(settings) => void runSettingsUpdate(settings)}
-          />
+          {showControllerAdministration && (
+            <GameSettings
+              settings={room.settings}
+              disabled={!canChangeSettings || actionPending}
+              pending={actionPending}
+              canEdit={canChangeSettings}
+              onChange={(settings) => void runSettingsUpdate(settings)}
+            />
+          )}
           <section
             className="panel board-panel"
             aria-labelledby="board-title"
