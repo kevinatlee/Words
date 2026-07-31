@@ -1,8 +1,8 @@
 # Playtest decisions
 
-This document records the product decisions locked after Stage 4E playtesting.
-It distinguishes the current Stage 4F scope from later work so that a small
-interaction improvement does not quietly broaden the product.
+This document records the product decisions locked through Stage 4F playtesting
+and the phone-interface cleanup. It distinguishes that focused work from later
+product changes.
 
 ## General layout
 
@@ -56,22 +56,38 @@ This is planned, not implemented by Stage 4F:
 - After 20 seconds, the server will authoritatively return to `LOBBY`, using
   the existing `ROUND_ENDED` lifecycle rather than adding a fourth phase.
 
-## Planned information architecture
+## Implemented phone information architecture
 
-This cleanup is agreed future work and is not implemented by Stage 4F:
+- Phone rooms lead with the puzzle. Their compact connection state sits in the
+  main app header; there is no phone toolbar or Leave room control. Room codes,
+  QR, player lists, display details, and phase labels stay on the shared
+  display.
+- New temporary rooms default to a 5 × 5 grid and a two-minute round; all
+  existing supported sizes and durations remain available to the controller.
+- Puzzle bubbles have no visible heading on phones but retain an accessible
+  puzzle label. During active participation, the headingless Tap/Trace control
+  is a separate bubble directly below the puzzle.
+- Ordinary players see only the puzzle preview between rounds and never see
+  settings, controller delegation, or a waiting message.
+- The controller sees three distinct sibling bubbles in the lobby and after
+  results: Puzzle (including Start Round or Start Next Round), accessible Game
+  Settings controls, then accessible Game Host controls. Those administration
+  bubbles are absent during active gameplay for every phone.
+- Phone active timers use the concise `Timer` label. After a round, phones show
+  the completed Puzzle bubble only (plus the controller's two administration
+  bubbles) instead of rankings, scores, winner copy, detailed word review, or
+  a redundant TV-results message. The shared display retains its existing
+  results presentation.
+- Phones do not show provisional scores or accepted-word counts. A possible
+  active-TV word-count presentation remains deferred to the separate TV
+  redesign because it needs an aggregate-display decision.
+- The production UI does not display a development-stage identifier.
+- Phone connection status includes safe-area-aware right-side breathing room.
+  The settings and host-control bubbles use non-visible accessible labels with
+  an accessible seconds slider. Active word entry keeps a reserved feedback
+  area between the selected word and Submit action to prevent layout movement.
 
-- The game-host phone will remove temporary-room detail from its primary view,
-  lead with the puzzle, and group controls in the order: puzzle, settings,
-  controls, then game-host authority.
-- Ordinary players will remove nonessential room sections, lead with the
-  puzzle, and keep the active task in focus.
-- The shared display will keep a compact header with the title at left and
-  player count plus game-host crown at right. Its QR and puzzle presentation
-  will remain concise, with selected settings visible without becoming a
-  separate control surface.
+## Current boundary
 
-## Current scoring migration boundary
-
-This draft implements integer scoring only. It does not implement the TV result
-lifecycle, phone or display information architecture cleanup, a new phase, or a
-new network event.
+The phone cleanup does not implement the TV results lifecycle, a display
+redesign, a new phase, or a new network event.

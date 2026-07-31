@@ -7,8 +7,8 @@ shared-screen browser creates and presents a temporary room. Phone players join
 without accounts, and the first player becomes the initial game host
 (controller).
 
-**Stage 4F Touch/Trace entry is complete and merged. Integer letter-count
-scoring is the current draft work.**
+**Stage 4F Touch/Trace entry and integer letter-count scoring are complete and
+merged. The phone room-interface cleanup is the current draft work.**
 The secure lobby, isolated game engine, read-only hosted CI, reproducible
 server-only game data, authoritative rounds, private submissions, and final
 round results and display-only QR joining are complete. Stage 4F adds local
@@ -35,7 +35,8 @@ contract.
   join-time ties by player ID.
 - Display and player presence update in real time.
 - The connected controller can atomically choose a supported grid size and
-  round duration, then start a server-owned round.
+  round duration, then start a server-owned round. New rooms begin at 5 × 5
+  for two minutes.
 - Every session receives the same immutable board, participant snapshot,
   deadline, and `LOBBY`, `ROUND_ACTIVE`, or `ROUND_ENDED` phase.
 - The server loads and verifies the 79,370-word production dictionary before
@@ -57,9 +58,16 @@ contract.
   snapshot in the existing `ROUND_ENDED` state.
 - Final results show deterministic competition ranks, every tied positive
   winner, or no winner when no participant submitted a scoring word.
-- Displays and phones receive the same public participant word review only
-  after submissions close; accepted timestamps, paths, and private versions
-  remain private.
+- The display presents the public participant word review after submissions
+  close; phones direct players to the TV rather than duplicating results.
+- Phone puzzle bubbles use semantic labels without a visible puzzle heading.
+  The compact Tap/Trace control stays centred in the phone header throughout
+  lobby, active, and ended phases; phones do not show provisional scores or
+  accepted-word counts. Any active-TV word-count presentation remains deferred
+  to the future TV redesign.
+- Between rounds, controller settings use an accessible local-draft
+  30–180-second slider with a compact seconds readout and distinct settings and
+  host-control bubbles; ordinary player phones retain only the puzzle preview.
 - Display and player tabs use separate, temporary reconnect credentials.
 - A display or controller disconnect does not immediately close the room.
 - Rooms and credentials live only in bounded server memory.
@@ -178,9 +186,9 @@ Try the lobby:
    round. Confirm every session shows the same official board and deadline.
 6. Submit words from both phones. Confirm each phone sees only its own words
    while the round is active.
-7. At the deadline, confirm every role receives the same shared/unique word
-   review, integer base points, +1/+2 unique bonuses, final scores, ranks, and
-   winner state.
+7. At the deadline, confirm the display shows the shared/unique word review,
+   integer scores, ranks, and winner state while phones direct players to the
+   TV for results.
 8. After results appear, transfer Game Host authority to the second player;
    the display and completed result remain unchanged.
 9. Disconnect the new controller and confirm the room remains visible during

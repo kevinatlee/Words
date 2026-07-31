@@ -1265,7 +1265,7 @@ describe('Words Stage 4B server', () => {
     expect(onDisplay.round).toEqual(response.room.round);
     expect(onOrdinary.round).toEqual(response.room.round);
     expect(response.room.round?.participants).toHaveLength(2);
-    expect(response.room.round?.board.tiles).toHaveLength(16);
+    expect(response.room.round?.board.tiles).toHaveLength(25);
   });
 
   it('rejects round starts from non-controllers and unexpected payloads', async () => {

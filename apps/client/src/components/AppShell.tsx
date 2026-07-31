@@ -4,14 +4,14 @@ import { ProductTitle } from './ProductTitle';
 
 type AppShellProps = {
   children: ReactNode;
-  currentPath: string;
   pageClassName?: string;
+  phoneConnectionStatus?: 'connected' | 'connecting' | 'disconnected' | null;
 };
 
 export function AppShell({
   children,
-  currentPath,
   pageClassName = '',
+  phoneConnectionStatus = null,
 }: AppShellProps) {
   return (
     <div className={`app-shell ${pageClassName}`}>
@@ -23,20 +23,21 @@ export function AppShell({
           <ProductTitle compact />
         </a>
         <div className="site-header__actions">
-          {currentPath !== '/' && (
-            <a className="text-link" href="/join">
-              Join another room
-            </a>
+          <div id="phone-entry-mode-slot" />
+          {phoneConnectionStatus && (
+            <span
+              className={`connection-status connection-status--phone connection-status--${phoneConnectionStatus}`}
+            >
+              {phoneConnectionStatus === 'connected'
+                ? 'Connected'
+                : phoneConnectionStatus === 'connecting'
+                  ? 'Reconnecting…'
+                  : 'Disconnected'}
+            </span>
           )}
-          <span className="stage-badge">Stage 4E QR joining</span>
         </div>
       </header>
       <main id="main-content">{children}</main>
-      <footer className="site-footer">
-        <span>Temporary real-time lobbies</span>
-        <span aria-hidden="true">•</span>
-        <span>No account. No progress grind. Just a temporary room.</span>
-      </footer>
     </div>
   );
 }

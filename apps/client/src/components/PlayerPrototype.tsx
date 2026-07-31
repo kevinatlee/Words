@@ -72,7 +72,7 @@ export function PlayerPrototype() {
             aria-labelledby="submitted-words-title"
           >
             <div className="submitted-words__heading">
-              <h2 id="submitted-words-title">Your words</h2>
+              <h2 id="submitted-words-title">Your Words</h2>
               <strong>3 pts</strong>
             </div>
             <ul>

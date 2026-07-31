@@ -17,4 +17,29 @@ describe('tile typography', () => {
       /\.letter-tile\s*\{[^}]*font-size: var\(--letter-tile-font-size\);[^}]*font-weight: 900;[^}]*line-height: 1;/s,
     );
   });
+
+  it('keeps phone timer labels as prominent as the countdown value', () => {
+    expect(styles).toMatch(
+      /\.room-page--phone \.round-clock--phone small\s*\{[^}]*font-size: clamp\(1\.2rem, 3vw, 1\.8rem\);[^}]*font-weight: 900;/s,
+    );
+  });
+
+  it('insets phone connection status and stacks phone word submission controls', () => {
+    expect(styles).toMatch(
+      /\.connection-status--phone\s*\{[^}]*margin-right: calc\(env\(safe-area-inset-right\) \+ 0\.5rem\);/s,
+    );
+    expect(styles).toMatch(/\.word-entry\s*\{[^}]*flex-direction: column;/s);
+    expect(styles).toMatch(
+      /\.word-entry__actions \.button\s*\{[^}]*width: 100%;/s,
+    );
+  });
+
+  it('keeps the compact slider and word-entry gaps', () => {
+    expect(styles).toMatch(/\.duration-slider\s*\{[^}]*display: flex;/s);
+    expect(styles).not.toContain('.duration-slider__ticks');
+    expect(styles).toMatch(
+      /\.choice-group \+ \.choice-group\s*\{[^}]*margin-top: 0\.8rem;/s,
+    );
+    expect(styles).toMatch(/\.word-entry__actions\s*\{[^}]*margin-top: 0;/s);
+  });
 });

@@ -1,14 +1,10 @@
-import {
-  formatRoundDuration,
-  productConfig,
-  type RoomSettings,
-} from '@words/shared';
+import { productConfig, type RoomSettings } from '@words/shared';
+import { useEffect, useRef, useState } from 'react';
 
 type GameSettingsProps = {
   settings: RoomSettings;
   disabled: boolean;
   pending: boolean;
-  canEdit: boolean;
   onChange: (settings: RoomSettings) => void;
 };
 
@@ -16,23 +12,37 @@ export function GameSettings({
   settings,
   disabled,
   pending,
-  canEdit,
   onChange,
 }: GameSettingsProps) {
+  const [draftDuration, setDraftDuration] = useState(
+    settings.roundDurationSeconds,
+  );
+  const dragging = useRef(false);
+  const lastRequestedDuration = useRef(settings.roundDurationSeconds);
+  useEffect(() => {
+    if (!dragging.current) {
+      lastRequestedDuration.current = settings.roundDurationSeconds;
+      setDraftDuration(settings.roundDurationSeconds);
+    }
+  }, [settings.roundDurationSeconds]);
+  const commitDuration = () => {
+    dragging.current = false;
+    if (
+      draftDuration !== settings.roundDurationSeconds &&
+      draftDuration !== lastRequestedDuration.current
+    ) {
+      lastRequestedDuration.current = draftDuration;
+      onChange({ ...settings, roundDurationSeconds: draftDuration });
+    }
+  };
   return (
-    <section className="panel settings-panel" aria-labelledby="settings-title">
-      <div className="panel-heading">
-        <div>
-          <span className="eyebrow">Authoritative room settings</span>
-          <h2 id="settings-title">Round setup</h2>
-        </div>
-        <span className="status-label">
-          {pending ? 'Saving…' : canEdit ? 'Game Host controls' : 'Read only'}
-        </span>
-      </div>
-
+    <section
+      className="panel settings-panel"
+      aria-label="Game settings"
+      aria-busy={pending || undefined}
+    >
       <fieldset className="choice-group">
-        <legend>Grid size</legend>
+        <legend className="visually-hidden">Grid Size</legend>
         <div className="segmented-control segmented-control--three">
           {productConfig.supportedGridSizes.map((size) => (
             <button
@@ -49,21 +59,60 @@ export function GameSettings({
       </fieldset>
 
       <fieldset className="choice-group">
-        <legend>Round duration</legend>
-        <div className="duration-grid">
-          {productConfig.supportedRoundDurationsSeconds.map((seconds) => (
-            <button
-              type="button"
-              aria-pressed={settings.roundDurationSeconds === seconds}
-              disabled={disabled}
-              onClick={() =>
-                onChange({ ...settings, roundDurationSeconds: seconds })
+        <legend className="visually-hidden">Round Duration</legend>
+        <div className="duration-slider">
+          <input
+            id="round-duration"
+            type="range"
+            min="30"
+            max="180"
+            step="30"
+            value={draftDuration}
+            aria-label="Round Duration"
+            aria-valuetext={`${draftDuration} seconds`}
+            disabled={disabled}
+            onPointerDown={() => {
+              dragging.current = true;
+            }}
+            onPointerUp={commitDuration}
+            onPointerCancel={commitDuration}
+            onTouchEnd={commitDuration}
+            onBlur={commitDuration}
+            onInput={(event) =>
+              setDraftDuration(
+                Number(
+                  event.currentTarget.value,
+                ) as RoomSettings['roundDurationSeconds'],
+              )
+            }
+            onChange={(event) => {
+              setDraftDuration(
+                Number(
+                  event.currentTarget.value,
+                ) as RoomSettings['roundDurationSeconds'],
+              );
+              if (
+                !dragging.current &&
+                Number(event.currentTarget.value) !==
+                  settings.roundDurationSeconds &&
+                Number(event.currentTarget.value) !==
+                  lastRequestedDuration.current
+              ) {
+                lastRequestedDuration.current = Number(
+                  event.currentTarget.value,
+                ) as RoomSettings['roundDurationSeconds'];
+                onChange({
+                  ...settings,
+                  roundDurationSeconds: Number(
+                    event.currentTarget.value,
+                  ) as RoomSettings['roundDurationSeconds'],
+                });
               }
-              key={seconds}
-            >
-              {formatRoundDuration(seconds)}
-            </button>
-          ))}
+            }}
+          />
+          <output className="duration-slider__value" htmlFor="round-duration">
+            {draftDuration}s
+          </output>
         </div>
       </fieldset>
     </section>

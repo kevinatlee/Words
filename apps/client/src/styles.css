@@ -118,18 +118,16 @@ button:disabled {
 }
 
 .site-header,
-.site-footer,
 #main-content {
   width: min(100% - 2rem, 90rem);
   margin-inline: auto;
 }
 
 .site-header {
-  display: flex;
+  display: grid;
   min-height: 5.5rem;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   border-bottom: 1px solid var(--line);
 }
 
@@ -139,21 +137,12 @@ button:disabled {
 }
 
 .site-header__actions {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
+  display: contents;
 }
 
-.site-footer {
-  display: flex;
-  margin-top: auto;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
-  padding-block: 2.25rem;
-  color: var(--paper-muted);
-  font-size: 0.82rem;
-  text-align: center;
+.connection-status--phone {
+  grid-column: 3;
+  justify-self: end;
 }
 
 .skip-link {
@@ -173,19 +162,6 @@ button:disabled {
   transform: translateY(0);
 }
 
-.text-link {
-  color: var(--paper-muted);
-  font-size: 0.9rem;
-  font-weight: 700;
-  text-decoration-color: var(--line-strong);
-  text-underline-offset: 0.3rem;
-}
-
-.text-link:hover {
-  color: var(--paper);
-}
-
-.stage-badge,
 .count-badge,
 .status-label {
   display: inline-flex;
@@ -771,7 +747,16 @@ button:disabled {
 }
 
 .controller-actions {
-  margin-top: 1.25rem;
+  margin: 0;
+}
+
+.controller-actions__empty {
+  display: flex;
+  min-height: 3rem;
+  align-items: center;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 750;
 }
 
 .controller-actions label {
@@ -800,7 +785,7 @@ button:disabled {
 }
 
 .choice-group + .choice-group {
-  margin-top: 1.4rem;
+  margin-top: 0.8rem;
 }
 
 .choice-group legend {
@@ -820,12 +805,7 @@ button:disabled {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.duration-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.segmented-control button,
-.duration-grid button {
+.segmented-control button {
   min-height: 3rem;
   padding: 0.6rem;
   border: 1px solid var(--line-strong);
@@ -838,12 +818,12 @@ button:disabled {
 }
 
 .segmented-control button:hover,
-.duration-grid button:hover {
+.segmented-control button:hover {
   border-color: var(--paper-muted);
 }
 
 .segmented-control button[aria-pressed='true'],
-.duration-grid button[aria-pressed='true'] {
+.segmented-control button[aria-pressed='true'] {
   border-color: var(--mint-strong);
   background: var(--mint-strong);
   color: var(--ink-950);
@@ -993,6 +973,19 @@ button:disabled {
   font-size: clamp(1.2rem, 3vw, 1.8rem);
 }
 
+.room-page--phone .round-clock--phone small {
+  color: var(--paper);
+  font-size: clamp(1.2rem, 3vw, 1.8rem);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.word-entry-mode-panel {
+  display: flex;
+  justify-content: center;
+  padding: 0.65rem;
+}
+
 /* Player view */
 
 .player-page__intro {
@@ -1107,9 +1100,8 @@ button:disabled {
 
 .word-entry {
   display: flex;
-  min-height: 5rem;
-  align-items: center;
-  justify-content: space-between;
+  align-items: stretch;
+  flex-direction: column;
   gap: 1rem;
   margin-block: 1rem;
   padding: 0.75rem 0.9rem;
@@ -1119,13 +1111,11 @@ button:disabled {
 }
 
 .word-entry__actions {
-  flex-flow: row wrap !important;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.55rem;
+  margin-top: 0;
 }
 
 .word-entry__actions .button {
+  width: 100%;
   min-height: 2.75rem;
   padding: 0.65rem 0.9rem;
 }
@@ -1153,25 +1143,46 @@ button:disabled {
 }
 
 .word-entry__message {
-  flex-basis: 100%;
   margin: 0;
   color: var(--sun);
+  font-size: 0.86rem;
+  line-height: 1.2;
+  min-height: 1.2em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.personal-score {
-  margin-top: 1rem;
-  padding: 1rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: rgba(6, 16, 27, 0.28);
+.word-entry__content h3 {
+  margin-bottom: 0;
+}
+#phone-entry-mode-slot {
+  grid-column: 2;
+}
+.site-header .word-entry__mode {
+  flex: 0 0 auto;
+}
+.site-header .word-entry__mode .button {
+  min-height: 1.9rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.72rem;
 }
 
-.personal-score h3 {
-  margin: 0;
+.duration-slider {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
 }
 
-.personal-score > small {
-  color: var(--paper-muted);
+.duration-slider__value {
+  color: var(--paper);
+  font-size: 1rem;
+  font-weight: 850;
+}
+
+.duration-slider input {
+  flex: 1;
+  accent-color: var(--mint-strong);
 }
 
 .accepted-word-list {
@@ -1482,6 +1493,48 @@ button:disabled {
   margin-bottom: 1rem;
 }
 
+.room-page--phone {
+  width: min(100% - 1rem, 34rem);
+  margin-inline: auto;
+  padding-block: max(0.5rem, env(safe-area-inset-top))
+    max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.room-dashboard--phone {
+  display: block;
+}
+
+.room-dashboard--phone .room-dashboard__preview {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.room-dashboard--phone .board-panel {
+  padding: 0.75rem;
+}
+
+.room-dashboard--phone .board-panel__heading {
+  margin-bottom: 0.5rem;
+}
+
+.room-dashboard--phone .letter-grid {
+  --letter-tile-font-size: clamp(1.35rem, 8.5vw, 2.3rem);
+
+  width: min(100%, 26rem);
+  gap: clamp(0.22rem, 1vw, 0.45rem);
+}
+
+@media (max-width: 430px) and (max-height: 760px) {
+  .room-page--phone .letter-grid {
+    --letter-tile-font-size: clamp(1.15rem, 7.8vw, 1.8rem);
+  }
+
+  .room-page--phone .round-clock {
+    margin-bottom: 0.55rem;
+    padding: 0.45rem 0.65rem;
+  }
+}
+
 .connection-status {
   display: inline-flex;
   align-items: center;
@@ -1569,7 +1622,6 @@ button:disabled {
 
 @media (max-width: 44rem) {
   .site-header,
-  .site-footer,
   #main-content {
     width: min(100% - 1.25rem, 90rem);
   }
@@ -1578,17 +1630,8 @@ button:disabled {
     min-height: 4.5rem;
   }
 
-  .site-header__actions .text-link {
-    display: none;
-  }
-
-  .stage-badge {
-    font-size: 0.62rem;
-  }
-
-  .site-footer {
-    flex-wrap: wrap;
-    padding-block: 1.5rem;
+  .connection-status--phone {
+    margin-right: calc(env(safe-area-inset-right) + 0.5rem);
   }
 
   .role-hero {
@@ -1639,10 +1682,6 @@ button:disabled {
   .join-qr__visual,
   .join-qr--compact .join-qr__visual {
     justify-self: center;
-  }
-
-  .duration-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .setting-summary {

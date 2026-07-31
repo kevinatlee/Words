@@ -1,5 +1,26 @@
 # Development log
 
+## 2026-07-31 — Phone information architecture refinement (draft)
+
+- Reduced phone visual density while preserving the authoritative lobby and
+  gameplay behavior: the connection status has safe-area-aware spacing, the
+  footer is removed, and ordinary player lobbies contain only the puzzle.
+- Simplified controller-only Game Settings and Game Host bubbles, added compact
+  accessible duration labels, and limited Join Another Room to the currently
+  connected controller according to the authoritative room assignment.
+- Stacked active phone word submission content vertically and retained all
+  existing submission, transfer, reconnect, and display behavior.
+- Follow-up physical review removed all in-app room navigation, visible
+  controller-panel chrome, and visible settings legends while retaining their
+  accessible names; duration choices initially used a 3 × 2 grid.
+- Final physical review replaced duration choices with an accessible native
+  30–180-second slider, removed former host-header spacing, and reserved
+  word-entry feedback space above Submit to prevent puzzle-height movement.
+- The approved finishing pass centres the persistent Tap/Trace control in the
+  symmetric phone header, keeps the compact `120s` slider readout, and gives
+  the no-alternative-host fallback a balanced, dedicated presentation. It does
+  not change display behavior, server contracts, scoring, or lifecycle state.
+
 ## 2026-07-31 — Integer letter-count scoring (draft)
 
 - Replaced the former tiered and fractional scoring rule with integer
@@ -1184,3 +1205,30 @@ player are separate roles, and neither socket alone owns room lifetime.
   and `/play/demo`.
 - Responsive checks passed at desktop and phone sizes without horizontal
   overflow.
+
+## 2026-07-31 — Phone room-interface cleanup (draft)
+
+### Work completed
+
+- Made the phone room view puzzle-first, with compact connection state and a
+  Leave room action instead of duplicate display-room administration.
+- Kept room codes, QR joining, player lists, phase labels, and detailed results
+  on the shared display.
+- Kept controller settings, start controls, and delegation between rounds only;
+  active gameplay hides them for every phone.
+- Replaced phone detailed results with a concise direction to the TV and moved
+  the late-join waiting notice after the puzzle.
+- Updated focused App and RoomLobby coverage for player and display behavior.
+- Applied the first physical phone-review corrections: distinct controller
+  puzzle/settings/authority bubbles, in-header phone connection state, no
+  phone Leave room action, concise active timer wording, and no redundant
+  ended-round TV message.
+- Applied the final phone-layout refinement: new rooms default to 5 × 5 for
+  two minutes, phone puzzle bubbles have no visible heading, active Tap/Trace
+  is a sibling bubble, private progress is not shown on phones, timer labels
+  are prominent, and the production stage badge is absent.
+
+### Boundaries retained
+
+- No TV redesign, results timeout, lifecycle transition, server contract,
+  scoring, persistence, or later-stage work was added.
