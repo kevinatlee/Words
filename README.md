@@ -7,8 +7,8 @@ shared-screen browser creates and presents a temporary room. Phone players join
 without accounts, and the first player becomes the initial game host
 (controller).
 
-**Stage 4E QR joining is complete and merged. Stage 4F Touch/Trace entry is the
-current draft work.**
+**Stage 4F Touch/Trace entry is complete and merged. Integer letter-count
+scoring is the current draft work.**
 The secure lobby, isolated game engine, read-only hosted CI, reproducible
 server-only game data, authoritative rounds, private submissions, and final
 round results and display-only QR joining are complete. Stage 4F adds local
@@ -48,13 +48,13 @@ contract.
 - Current participants can tap/click adjacent unused tiles and privately submit
   the derived word and path before the server deadline.
 - The server validates against the official board and private dictionary,
-  rejects personal duplicates, and calculates traditional provisional points.
+  rejects personal duplicates, and calculates length-based provisional points.
 - Accepted words recover only for that player and never enter `RoomState` or a
   display broadcast while the round is active.
 - At the deadline, the server marks words shared across distinct participants,
-  retains traditional base points for every accepted word, adds an exact 25%
-  bonus to each unique word, and publishes one immutable result snapshot in the
-  existing `ROUND_ENDED` state.
+  awards one point per word letter, adds +1 to unique three- or four-letter
+  words and +2 to longer unique words, and publishes one immutable result
+  snapshot in the existing `ROUND_ENDED` state.
 - Final results show deterministic competition ranks, every tied positive
   winner, or no winner when no participant submitted a scoring word.
 - Displays and phones receive the same public participant word review only
@@ -179,7 +179,7 @@ Try the lobby:
 6. Submit words from both phones. Confirm each phone sees only its own words
    while the round is active.
 7. At the deadline, confirm every role receives the same shared/unique word
-   review, base points, exact 25% unique bonuses, final scores, ranks, and
+   review, integer base points, +1/+2 unique bonuses, final scores, ranks, and
    winner state.
 8. After results appear, transfer Game Host authority to the second player;
    the display and completed result remain unchanged.

@@ -88,7 +88,7 @@ function createRoom(
     settings: {
       gridSize: 4,
       roundDurationSeconds: 180,
-      scoringMode: 'traditional',
+      scoringMode: 'length-plus-unique',
     },
     round: null,
   };
@@ -106,7 +106,7 @@ function createRoundRoom(
     settings: {
       gridSize: 4,
       roundDurationSeconds: 30,
-      scoringMode: 'traditional',
+      scoringMode: 'length-plus-unique',
     },
     round: {
       id: '00000000-0000-4000-8000-000000000200',
@@ -114,7 +114,7 @@ function createRoundRoom(
       settings: {
         gridSize: 4,
         roundDurationSeconds: 30,
-        scoringMode: 'traditional',
+        scoringMode: 'length-plus-unique',
       },
       board: {
         size: 4,
@@ -169,18 +169,18 @@ function createEndedRoom(
         players: activeRoom.round.participants.map((participant, index) => ({
           ...participant,
           rank: index === 0 ? 1 : 2,
-          baseScore: index === 0 ? 1 : 0,
-          uniqueBonusScore: index === 0 ? 0.25 : 0,
-          finalScore: index === 0 ? 1.25 : 0,
+          baseScore: index === 0 ? 3 : 0,
+          uniqueBonusScore: index === 0 ? 1 : 0,
+          finalScore: index === 0 ? 4 : 0,
           words:
             index === 0
               ? [
                   {
                     word: 'CAT',
-                    basePoints: 1,
+                    basePoints: 3,
                     shared: false,
-                    uniqueBonusPoints: 0.25,
-                    finalPoints: 1.25,
+                    uniqueBonusPoints: 1,
+                    finalPoints: 4,
                   },
                 ]
               : [],
@@ -492,7 +492,7 @@ describe('Stage 4B display and player room routes', () => {
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start Round' })).toBeDisabled();
     expect(screen.queryByText('Scoring mode')).not.toBeInTheDocument();
-    expect(screen.queryByText(/traditional scoring/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/scoring selector/i)).not.toBeInTheDocument();
   });
 
   it.each(['/display', '/host'])(
@@ -1240,7 +1240,7 @@ describe('Stage 4B display and player room routes', () => {
       settings: {
         gridSize: 5 as const,
         roundDurationSeconds: 180 as const,
-        scoringMode: 'traditional' as const,
+        scoringMode: 'length-plus-unique' as const,
       },
     };
     const client = createFakeClient({
@@ -1274,7 +1274,7 @@ describe('Stage 4B display and player room routes', () => {
     expect(client.updateSettings).toHaveBeenCalledWith({
       gridSize: 5,
       roundDurationSeconds: 180,
-      scoringMode: 'traditional',
+      scoringMode: 'length-plus-unique',
     });
     await waitFor(() =>
       expect(fiveByFive).toHaveAttribute('aria-pressed', 'true'),
@@ -1329,7 +1329,7 @@ describe('Stage 4B display and player room routes', () => {
       settings: {
         gridSize: 5 as const,
         roundDurationSeconds: 180 as const,
-        scoringMode: 'traditional' as const,
+        scoringMode: 'length-plus-unique' as const,
       },
     };
     const newerRoom = {
@@ -1338,7 +1338,7 @@ describe('Stage 4B display and player room routes', () => {
       settings: {
         gridSize: 6 as const,
         roundDurationSeconds: 180 as const,
-        scoringMode: 'traditional' as const,
+        scoringMode: 'length-plus-unique' as const,
       },
     };
     const client = createFakeClient({
@@ -1401,7 +1401,7 @@ describe('Stage 4B display and player room routes', () => {
         settings: {
           gridSize: 5 as const,
           roundDurationSeconds: 180 as const,
-          scoringMode: 'traditional' as const,
+          scoringMode: 'length-plus-unique' as const,
         },
       },
     },
@@ -1476,7 +1476,7 @@ describe('Stage 4B display and player room routes', () => {
       settings: {
         gridSize: 6,
         roundDurationSeconds: 180,
-        scoringMode: 'traditional',
+        scoringMode: 'length-plus-unique',
       },
     };
     const olderRoom: RoomState = {

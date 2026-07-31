@@ -1146,7 +1146,7 @@ describe('Words Stage 4B server', () => {
     const settings = {
       gridSize: 6 as const,
       roundDurationSeconds: 60 as const,
-      scoringMode: 'traditional' as const,
+      scoringMode: 'length-plus-unique' as const,
     };
     const displayed = nextRoomState(
       display,
@@ -1177,7 +1177,7 @@ describe('Words Stage 4B server', () => {
     const settings = {
       gridSize: 5 as const,
       roundDurationSeconds: 90 as const,
-      scoringMode: 'traditional' as const,
+      scoringMode: 'length-plus-unique' as const,
     };
 
     expect(await emitUpdateSettings(display, settings)).toMatchObject({
@@ -1207,7 +1207,7 @@ describe('Words Stage 4B server', () => {
       {
         gridSize: 5,
         roundDurationSeconds: 60,
-        scoringMode: 'traditional',
+        scoringMode: 'length-plus-unique',
         controllerPlayerId: created.session.displaySessionId,
       },
     ]) {
@@ -1327,7 +1327,7 @@ describe('Words Stage 4B server', () => {
       await emitUpdateSettings(controller, {
         gridSize: 5,
         roundDurationSeconds: 60,
-        scoringMode: 'traditional',
+        scoringMode: 'length-plus-unique',
       }),
     ).toMatchObject({
       ok: false,
@@ -1374,7 +1374,7 @@ describe('Words Stage 4B server', () => {
     await emitUpdateSettings(controller, {
       gridSize: 4,
       roundDurationSeconds: 30,
-      scoringMode: 'traditional',
+      scoringMode: 'length-plus-unique',
     });
     const started = await emitStartRound(controller);
     if (!started.ok || !started.room.round) {
@@ -1585,10 +1585,10 @@ describe('Words Stage 4B server', () => {
       players: participantPlayerIds.map((playerId) => ({
         playerId,
         rank: 1,
-        baseScore: 1,
+        baseScore: 3,
         uniqueBonusScore: 0,
-        finalScore: 1,
-        words: [{ word: 'ABC', shared: true, finalPoints: 1 }],
+        finalScore: 3,
+        words: [{ word: 'ABC', shared: true, finalPoints: 3 }],
       })),
     });
     expect(observedEvents).toEqual(new Set(['room:state']));
@@ -1800,11 +1800,11 @@ describe('Words Stage 4B server', () => {
     });
     expect(response).toMatchObject({
       ok: true,
-      acceptedWord: { word: 'ABC', points: 1 },
+      acceptedWord: { word: 'ABC', points: 3 },
       state: {
         playerId: firstJoin.session.playerId,
         submissionVersion: 1,
-        provisionalScore: 1,
+        provisionalScore: 3,
       },
     });
     expect(response).not.toHaveProperty('room');

@@ -2,10 +2,10 @@ import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 
 import {
   reconcileRoundWords,
-  scoreTraditionalWord,
+  scoreWordByLength,
   validateWordPath,
   type RoundReconciliationResult,
-  type TraditionalScoringResult,
+  type WordScoringResult,
   type WordDictionary,
 } from '@words/game-engine';
 import {
@@ -206,7 +206,7 @@ export type RoomStoreOptions = {
   roundIdGenerator?: () => string;
   reconnectTokenGenerator?: () => string;
   roundBoardGenerator?: (size: GridSize) => RoundBoardGenerationResult;
-  scoreWord?: (word: unknown) => TraditionalScoringResult;
+  scoreWord?: (word: unknown) => WordScoringResult;
   reconcileWords?: (
     participants: Parameters<typeof reconcileRoundWords>[0],
   ) => RoundReconciliationResult;
@@ -292,7 +292,7 @@ export class RoomStore {
   private readonly reconnectTokenGenerator: () => string;
   private readonly roundBoardGenerator:
     ((size: GridSize) => RoundBoardGenerationResult) | undefined;
-  private readonly scoreWord: (word: unknown) => TraditionalScoringResult;
+  private readonly scoreWord: (word: unknown) => WordScoringResult;
   private readonly reconcileWords: typeof reconcileRoundWords;
 
   constructor(private readonly options: RoomStoreOptions) {
@@ -311,7 +311,7 @@ export class RoomStore {
     this.reconnectTokenGenerator =
       options.reconnectTokenGenerator ?? defaultReconnectTokenGenerator;
     this.roundBoardGenerator = options.roundBoardGenerator;
-    this.scoreWord = options.scoreWord ?? scoreTraditionalWord;
+    this.scoreWord = options.scoreWord ?? scoreWordByLength;
     this.reconcileWords = options.reconcileWords ?? reconcileRoundWords;
   }
 
@@ -811,7 +811,7 @@ export class RoomStore {
       );
     }
 
-    let scored: TraditionalScoringResult;
+    let scored: WordScoringResult;
     try {
       scored = this.scoreWord(validated.word);
     } catch {

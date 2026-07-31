@@ -22,14 +22,14 @@ interaction improvement does not quietly broaden the product.
 - Touch backtracking truncates the selected path.
 - Trace submits when the pointer is lifted.
 
-## Future integer scoring
+## Implemented integer scoring
 
-This is a locked future policy, not a Stage 4F implementation. Base score will
-be one point per letter, with `QU` counting as two letters. A unique three- or
-four-letter word will receive one bonus point; a unique word of five or more
-letters will receive two bonus points. Provisional scores, finalized scores,
-ranks, winners, schemas, and visible values will use integers only: no hidden
-fractional score or display-only rounding.
+Integer scoring is implemented by the current draft work. Base score is one
+point per letter, with `QU` counting as two letters. A unique three- or
+four-letter word receives one bonus point; a unique word of five or more letters
+receives two bonus points. Provisional scores, finalized scores, ranks, winners,
+schemas, and visible values use integers only: no hidden fractional score or
+display-only rounding.
 
 | Word      | Shared | Unique |
 | --------- | -----: | -----: |
@@ -70,8 +70,8 @@ This cleanup is agreed future work and is not implemented by Stage 4F:
   will remain concise, with selected settings visible without becoming a
   separate control surface.
 
-## Stage 4F boundary
+## Current scoring migration boundary
 
-Stage 4F implements only the input decisions above. It does not implement the
-integer scoring migration, TV result lifecycle, phone or display information
-architecture cleanup, a new phase, or a new network event.
+This draft implements integer scoring only. It does not implement the TV result
+lifecycle, phone or display information architecture cleanup, a new phase, or a
+new network event.

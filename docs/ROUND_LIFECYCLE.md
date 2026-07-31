@@ -15,7 +15,7 @@ one connected phone player identified by `controllerPlayerId`.
 
 - `gridSize`: 4, 5, or 6
 - `roundDurationSeconds`: 30, 60, 90, 120, 150, or 180
-- `scoringMode`: `traditional`
+- `scoringMode`: `length-plus-unique`
 
 Only the currently connected controller socket may update settings. The server
 rejects partial objects, unknown fields, unsupported values, display sessions,
@@ -71,7 +71,7 @@ keys are rejected at every new schema level.
 Final results contain every immutable participant exactly once, ordered by
 final score descending and participant snapshot order for ties. Each entry
 contains canonical accepted words, traditional base values, shared/unique
-state, exact 25% unique bonuses, final values, exact base/bonus/final totals,
+state, integer unique bonuses, final values, exact base/bonus/final totals,
 and competition rank. Positive tied leaders all appear in `winnerPlayerIds`;
 when nobody submitted a scoring word the all-zero round has no winner. An
 all-shared positive round can have tied winners. Accepted timestamps, paths,

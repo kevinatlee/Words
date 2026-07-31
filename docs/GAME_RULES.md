@@ -10,19 +10,18 @@ interaction boundary.
 - The player prototype shows a static touch-sized 4 × 4 layout.
 - Allowed duration labels and defaults are represented in shared configuration.
 - Temporary room state includes the planned grid-size, duration, and
-  traditional-scoring defaults.
+  `length-plus-unique` scoring default.
 - The isolated game engine validates 4 × 4, 5 × 5, and 6 × 6 immutable boards.
 - Canonical paths use row-major tile indexes and enforce horizontal, vertical,
   or diagonal adjacency without tile reuse.
 - Complete tile tokens are concatenated, so `QU` is one tile and two letters.
 - Current participants can submit one adjacent path before the server deadline.
-- Personal duplicates are rejected. Traditional provisional scoring awards
-  1 point for 3–4 letters, 2 for 5, 3 for 6, 5 for 7, and 11 for 8 or more.
+- Personal duplicates are rejected. Provisional scoring awards one integer
+  point per normalized letter.
 - Personal words and points remain private while the round is active.
-- At the deadline, every word retains its traditional base points. A word
-  accepted by exactly one participant receives an exact 25% uniqueness bonus;
-  a word accepted by at least two distinct participants receives no bonus and
-  loses no points.
+- At the deadline, every word retains its length-based base points. A unique
+  three- or four-letter word receives a +1 bonus, a unique word of five or
+  more letters receives +2, and a shared word receives no bonus.
 - `ROUND_ENDED` exposes final participant words, totals, competition ranks, and
   tied positive winners through the existing room snapshot.
 - When no participant submitted a scoring word, every final score is zero and
@@ -83,40 +82,19 @@ The default is 180 seconds (3 minutes). The Stage 4B server validates a complete
 controller settings object, rejects arbitrary durations, and owns the official
 deadline.
 
-## Planned default scoring
+## Current scoring
 
-Traditional scoring is the initial default:
-
-| Word length          |  Points |
-| -------------------- | ------: |
-| Fewer than 3 letters | Invalid |
-| 3 letters            |       1 |
-| 4 letters            |       1 |
-| 5 letters            |       2 |
-| 6 letters            |       3 |
-| 7 letters            |       5 |
-| 8 or more letters    |      11 |
-
-Stage 4D uses those values as `basePoints`. A unique word adds exactly one
-quarter of its base value:
-
-| Base | Shared final | Unique bonus | Unique final |
-| ---: | -----------: | -----------: | -----------: |
-|    1 |            1 |         0.25 |         1.25 |
-|    2 |            2 |         0.50 |         2.50 |
-|    3 |            3 |         0.75 |         3.75 |
-|    5 |            5 |         1.25 |         6.25 |
-|   11 |           11 |         2.75 |        13.75 |
-
-No word or player total is rounded to a whole number.
-
-Traditional scoring is implemented in pure server-used engine code, not UI
-components. No alternative scoring mode is implemented.
+`length-plus-unique` is the sole scoring mode. Every accepted word receives
+one integer point per normalized letter; fewer than three letters are invalid.
+`QU` contributes two letters. A shared word receives no bonus. A unique
+three- or four-letter word receives +1; a unique word of five or more letters
+receives +2. `finalPoints = basePoints + uniqueBonusPoints`, and all word and
+player totals are safe integers. No alternative scoring mode is implemented.
 
 ## Shared-word behavior
 
 A canonical word accepted by at least two distinct round participant IDs is
-shared. Every submitter retains that word's traditional base points but
+shared. Every submitter retains that word's length-based base points but
 receives no uniqueness bonus. One player's personal duplicate cannot make a
 word shared. Disconnected, departed, and grace-expired participants remain part
 of reconciliation because identity comes from the immutable participant

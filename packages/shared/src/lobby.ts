@@ -117,7 +117,7 @@ export const roomSettingsSchema = z
       z.literal(150),
       z.literal(180),
     ]),
-    scoringMode: z.literal('traditional'),
+    scoringMode: z.literal('length-plus-unique'),
   })
   .strict();
 
@@ -157,51 +157,39 @@ export const roundBoardSchema = z
 
 const roundSettingsSchema = roomSettingsSchema.readonly();
 
-export const traditionalPointsSchema = z.union([
-  z.literal(1),
-  z.literal(2),
-  z.literal(3),
-  z.literal(5),
-  z.literal(11),
-]);
+export const wordPointsSchema = z
+  .number()
+  .int()
+  .positive()
+  .safe()
+  .max(productConfig.maximumSubmittedWordLength);
 
 export const uniqueBonusPointsSchema = z
-  .union([
-    z.literal(0),
-    z.literal(0.25),
-    z.literal(0.5),
-    z.literal(0.75),
-    z.literal(1.25),
-    z.literal(2.75),
-  ])
+  .union([z.literal(0), z.literal(1), z.literal(2)])
   .refine((points) => !Object.is(points, -0), {
     message: 'A uniqueness bonus cannot be negative zero.',
   });
 
-export const finalWordPointsSchema = z.union([
-  z.literal(1),
-  z.literal(1.25),
-  z.literal(2),
-  z.literal(2.5),
-  z.literal(3),
-  z.literal(3.75),
-  z.literal(5),
-  z.literal(6.25),
-  z.literal(11),
-  z.literal(13.75),
-]);
+export const finalWordPointsSchema = z
+  .number()
+  .int()
+  .positive()
+  .safe()
+  .max(productConfig.maximumSubmittedWordLength + 2);
 
 const maximumBaseScore =
-  productConfig.maximumAcceptedWordsPerPlayerPerRound * 11;
+  productConfig.maximumAcceptedWordsPerPlayerPerRound *
+  productConfig.maximumSubmittedWordLength;
 const maximumUniqueBonusScore =
-  productConfig.maximumAcceptedWordsPerPlayerPerRound * 2.75;
+  productConfig.maximumAcceptedWordsPerPlayerPerRound * 2;
 const maximumFinalScore = maximumBaseScore + maximumUniqueBonusScore;
-const quarterPointScoreSchema = (maximum: number) =>
+const integerScoreSchema = (maximum: number) =>
   z
     .number()
     .finite()
     .nonnegative()
-    .multipleOf(0.25)
+    .int()
+    .safe()
     .max(maximum)
     .refine((score) => !Object.is(score, -0), {
       message: 'A score cannot be negative zero.',
@@ -214,37 +202,28 @@ export const roundResultWordSchema = z
       .min(3)
       .max(productConfig.maximumSubmittedWordLength)
       .regex(/^[A-Z]+$/),
-    basePoints: traditionalPointsSchema,
+    basePoints: wordPointsSchema,
     shared: z.boolean(),
     uniqueBonusPoints: uniqueBonusPointsSchema,
     finalPoints: finalWordPointsSchema,
   })
   .strict()
   .superRefine((word, context) => {
-    const expectedBasePoints =
-      word.word.length <= 4
-        ? 1
-        : word.word.length === 5
-          ? 2
-          : word.word.length === 6
-            ? 3
-            : word.word.length === 7
-              ? 5
-              : 11;
+    const expectedBasePoints = word.word.length;
     if (word.basePoints !== expectedBasePoints) {
       context.addIssue({
         code: 'custom',
-        message: 'Base points must match traditional scoring for the word.',
+        message: 'Base points must equal the word length.',
         path: ['basePoints'],
       });
     }
-    const expectedBonus = word.shared ? 0 : word.basePoints * 0.25;
+    const expectedBonus = word.shared ? 0 : word.basePoints <= 4 ? 1 : 2;
     const expectedFinal = word.basePoints + expectedBonus;
     if (word.uniqueBonusPoints !== expectedBonus) {
       context.addIssue({
         code: 'custom',
         message:
-          'The uniqueness bonus must be zero for shared words and 25% for unique words.',
+          'The uniqueness bonus must be zero for shared words, one point for unique three- or four-letter words, and two points for longer unique words.',
         path: ['uniqueBonusPoints'],
       });
     }
@@ -264,9 +243,9 @@ export const roundPlayerResultSchema = z
     playerId: playerIdSchema,
     displayName: serializedDisplayNameSchema,
     rank: z.number().int().positive().safe(),
-    baseScore: quarterPointScoreSchema(maximumBaseScore),
-    uniqueBonusScore: quarterPointScoreSchema(maximumUniqueBonusScore),
-    finalScore: quarterPointScoreSchema(maximumFinalScore),
+    baseScore: integerScoreSchema(maximumBaseScore),
+    uniqueBonusScore: integerScoreSchema(maximumUniqueBonusScore),
+    finalScore: integerScoreSchema(maximumFinalScore),
     words: z
       .array(roundResultWordSchema)
       .max(productConfig.maximumAcceptedWordsPerPlayerPerRound)
@@ -668,10 +647,19 @@ export const acceptedWordSchema = z
       .min(3)
       .max(64)
       .regex(/^[A-Z]+$/),
-    points: traditionalPointsSchema,
+    points: wordPointsSchema,
     acceptedAt: z.string().datetime(),
   })
   .strict()
+  .superRefine((acceptedWord, context) => {
+    if (acceptedWord.points !== acceptedWord.word.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Accepted-word points must equal the normalized word length.',
+        path: ['points'],
+      });
+    }
+  })
   .readonly();
 
 export const playerRoundSubmissionStateSchema = z
@@ -693,7 +681,10 @@ export const playerRoundSubmissionStateSchema = z
       .int()
       .nonnegative()
       .safe()
-      .max(maximumAcceptedWordsPerPlayerPerRound * 11),
+      .max(
+        maximumAcceptedWordsPerPlayerPerRound *
+          productConfig.maximumSubmittedWordLength,
+      ),
   })
   .strict()
   .superRefine((state, context) => {

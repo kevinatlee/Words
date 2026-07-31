@@ -7,7 +7,7 @@ and does not import React, Express, Socket.IO, the DOM, Node runtime APIs, or
 the room store.
 
 The authoritative server calls the package for board generation, submission
-validation, and traditional scoring. Browsers never decide the official board,
+validation, and length-based scoring. Browsers never decide the official board,
 dictionary result, or points.
 
 ## Public model
@@ -42,7 +42,7 @@ path copy.
 - Paths: `validatePath` and `readPath`
 - Words: `normalizeWord`, `validateWordPath`,
   `DEFAULT_MINIMUM_WORD_LENGTH`, and `MAX_CANDIDATE_WORD_LENGTH`
-- Scoring: `scoreTraditionalWord`
+- Scoring: `scoreWordByLength`
 - Results: `reconcileRoundWords`, with bounded participant and word constants
 - Dictionaries: `WordDictionary` and `createWordDictionary`
 
@@ -137,7 +137,7 @@ pinned Stage 4 dictionary recommendation and licence conditions, and
 Stage 4C calls validation and scoring only on the authoritative server. Stage
 4D calls pure `reconcileRoundWords()` at the deadline. The engine identifies
 shared canonical words across distinct participant IDs, retains traditional
-base points for all accepted words, adds an exact 25% bonus to unique words,
+base points from normalized word length, adds +1 or +2 to unique words,
 and returns detached immutable participant results. Display names, rankings,
 winners, rooms, clocks, and publication stay server-owned.
 

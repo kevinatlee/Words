@@ -8,7 +8,7 @@ export const productConfig = {
   supportedRoundDurationsSeconds: [30, 60, 90, 120, 150, 180],
   defaultGridSize: 4,
   defaultRoundDurationSeconds: 180,
-  defaultScoringMode: 'traditional',
+  defaultScoringMode: 'length-plus-unique',
   maxPlayers: 8,
   maximumSubmittedWordLength: 64,
   maximumAcceptedWordsPerPlayerPerRound: 256,

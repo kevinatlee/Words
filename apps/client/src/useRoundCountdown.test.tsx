@@ -28,7 +28,7 @@ function createRoom(overrides: Partial<RoomState> = {}): RoomState {
     settings: {
       gridSize: 4,
       roundDurationSeconds: 30,
-      scoringMode: 'traditional',
+      scoringMode: 'length-plus-unique',
     },
     round: {
       id: '00000000-0000-4000-8000-000000000100',
@@ -36,7 +36,7 @@ function createRoom(overrides: Partial<RoomState> = {}): RoomState {
       settings: {
         gridSize: 4,
         roundDurationSeconds: 30,
-        scoringMode: 'traditional',
+        scoringMode: 'length-plus-unique',
       },
       board: {
         size: 4,

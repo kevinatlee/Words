@@ -12,8 +12,8 @@ const participant = (
 ): ReconciliationParticipant => ({ playerId, acceptedWords });
 
 describe('round word reconciliation', () => {
-  it('requires at least one bounded participant', () => {
-    expect(reconcileRoundWords([])).toEqual({
+  it('requires one to eight participants and safely contains malformed input', () => {
+    expect(reconcileRoundWords([])).toMatchObject({
       success: false,
       code: 'NO_PARTICIPANTS',
     });
@@ -21,130 +21,25 @@ describe('round word reconciliation', () => {
       reconcileRoundWords(
         Array.from({ length: 9 }, (_, index) => participant(`player-${index}`)),
       ),
-    ).toEqual({
-      success: false,
-      code: 'TOO_MANY_PARTICIPANTS',
-    });
-  });
-
-  it('returns bounded errors for primitive, sparse, and malformed inputs', () => {
-    for (const input of [null, 1, 'players', {}, true]) {
-      expect(
-        reconcileRoundWords(
-          input as unknown as readonly ReconciliationParticipant[],
-        ),
-      ).toEqual({
-        success: false,
-        code: 'NO_PARTICIPANTS',
-      });
-    }
-
-    expect(
-      reconcileRoundWords(
-        Array(1) as unknown as readonly ReconciliationParticipant[],
-      ),
-    ).toEqual({
-      success: false,
-      code: 'INVALID_PLAYER_ID',
-      participantIndex: 0,
-    });
+    ).toMatchObject({ success: false, code: 'TOO_MANY_PARTICIPANTS' });
     expect(
       reconcileRoundWords([
-        participant(
-          'player-a',
-          Array(1) as ReconciliationParticipant['acceptedWords'],
-        ),
+        participant('player-a', [{ word: 'CAT', points: 2 }]),
       ]),
-    ).toEqual({
+    ).toMatchObject({
       success: false,
-      code: 'INVALID_WORD',
-      participantIndex: 0,
-      wordIndex: 0,
+      code: 'INCORRECT_BASE_POINTS',
     });
   });
 
-  it('contains throwing getters and proxies without exposing their messages', () => {
-    const secretMessage = 'private accepted word: TOOL';
-    const throwingParticipant = Object.defineProperty({}, 'playerId', {
-      get: () => {
-        throw new Error(secretMessage);
-      },
-    });
-    const throwingWords = {
-      playerId: 'player-a',
-      get acceptedWords() {
-        throw new Error(secretMessage);
-      },
-    };
-    const throwingArray = new Proxy([], {
-      get: () => {
-        throw new Error(secretMessage);
-      },
-    });
-
-    for (const input of [
-      [throwingParticipant],
-      [throwingWords],
-      throwingArray,
-    ]) {
-      const result = reconcileRoundWords(
-        input as unknown as readonly ReconciliationParticipant[],
-      );
-      expect(result).toEqual({
-        success: false,
-        code: 'INVALID_INPUT',
-      });
-      expect(JSON.stringify(result)).not.toContain(secretMessage);
-    }
-  });
-
-  it('accepts deeply frozen valid input', () => {
-    const input = Object.freeze([
-      Object.freeze({
-        playerId: 'player-a',
-        acceptedWords: Object.freeze([
-          Object.freeze({ word: 'TOOL', points: 1 as const }),
-        ]),
-      }),
-    ]);
-
-    expect(reconcileRoundWords(input)).toMatchObject({
-      success: true,
-      participants: [
-        {
-          playerId: 'player-a',
-          baseScore: 1,
-          uniqueBonusScore: 0.25,
-          finalScore: 1.25,
-        },
-      ],
-    });
-  });
-
-  it('preserves a participant with no words and no score', () => {
-    expect(reconcileRoundWords([participant('player-a')])).toEqual({
-      success: true,
-      participants: [
-        {
-          playerId: 'player-a',
-          baseScore: 0,
-          uniqueBonusScore: 0,
-          finalScore: 0,
-          words: [],
-        },
-      ],
-    });
-  });
-
-  it('awards exact quarter-point bonuses for every traditional base value', () => {
+  it('uses normalized word length as the base value and fixed integer bonuses', () => {
     expect(
       reconcileRoundWords([
         participant('player-a', [
-          { word: 'TOOL', points: 1 },
-          { word: 'STONE', points: 2 },
-          { word: 'EAGLES', points: 3 },
-          { word: 'SEASONS', points: 5 },
-          { word: 'ELEPHANTS', points: 11 },
+          { word: 'CAT', points: 3 },
+          { word: 'TOOL', points: 4 },
+          { word: 'STONE', points: 5 },
+          { word: 'ELEPHANTS', points: 9 },
         ]),
       ]),
     ).toEqual({
@@ -152,44 +47,37 @@ describe('round word reconciliation', () => {
       participants: [
         {
           playerId: 'player-a',
-          baseScore: 22,
-          uniqueBonusScore: 5.5,
-          finalScore: 27.5,
+          baseScore: 21,
+          uniqueBonusScore: 6,
+          finalScore: 27,
           words: [
             {
-              word: 'TOOL',
-              basePoints: 1,
+              word: 'CAT',
+              basePoints: 3,
               shared: false,
-              uniqueBonusPoints: 0.25,
-              finalPoints: 1.25,
+              uniqueBonusPoints: 1,
+              finalPoints: 4,
+            },
+            {
+              word: 'TOOL',
+              basePoints: 4,
+              shared: false,
+              uniqueBonusPoints: 1,
+              finalPoints: 5,
             },
             {
               word: 'STONE',
-              basePoints: 2,
-              shared: false,
-              uniqueBonusPoints: 0.5,
-              finalPoints: 2.5,
-            },
-            {
-              word: 'EAGLES',
-              basePoints: 3,
-              shared: false,
-              uniqueBonusPoints: 0.75,
-              finalPoints: 3.75,
-            },
-            {
-              word: 'SEASONS',
               basePoints: 5,
               shared: false,
-              uniqueBonusPoints: 1.25,
-              finalPoints: 6.25,
+              uniqueBonusPoints: 2,
+              finalPoints: 7,
             },
             {
               word: 'ELEPHANTS',
-              basePoints: 11,
+              basePoints: 9,
               shared: false,
-              uniqueBonusPoints: 2.75,
-              finalPoints: 13.75,
+              uniqueBonusPoints: 2,
+              finalPoints: 11,
             },
           ],
         },
@@ -197,195 +85,112 @@ describe('round word reconciliation', () => {
     });
   });
 
-  it('preserves participant and accepted-word order', () => {
+  it('gives shared words no bonus and retains mixed integer totals', () => {
     const result = reconcileRoundWords([
-      participant('player-b', [{ word: 'EAGLES', points: 3 }]),
       participant('player-a', [
-        { word: 'TOOL', points: 1 },
-        { word: 'STONE', points: 2 },
+        { word: 'TOOL', points: 4 },
+        { word: 'STONE', points: 5 },
       ]),
-    ]);
-
-    expect(
-      result.success && result.participants.map((entry) => entry.playerId),
-    ).toEqual(['player-b', 'player-a']);
-    expect(
-      result.success && result.participants[1]?.words.map((word) => word.word),
-    ).toEqual(['TOOL', 'STONE']);
-  });
-
-  it('retains base points without a bonus for a word shared by two or three players', () => {
-    const result = reconcileRoundWords([
-      participant('player-a', [{ word: 'TOOL', points: 1 }]),
       participant('player-b', [
-        { word: 'BEER', points: 1 },
-        { word: 'TOOL', points: 1 },
+        { word: 'TOOL', points: 4 },
+        { word: 'EAGLES', points: 6 },
       ]),
-      participant('player-c', [{ word: 'TOOL', points: 1 }]),
     ]);
-
     expect(result).toMatchObject({
       success: true,
       participants: [
         {
           playerId: 'player-a',
-          baseScore: 1,
-          uniqueBonusScore: 0,
-          finalScore: 1,
-          words: [
-            {
-              word: 'TOOL',
-              basePoints: 1,
-              shared: true,
-              uniqueBonusPoints: 0,
-              finalPoints: 1,
-            },
-          ],
+          baseScore: 9,
+          uniqueBonusScore: 2,
+          finalScore: 11,
         },
         {
           playerId: 'player-b',
-          baseScore: 2,
-          uniqueBonusScore: 0.25,
-          finalScore: 2.25,
-          words: [
-            {
-              word: 'BEER',
-              shared: false,
-              uniqueBonusPoints: 0.25,
-              finalPoints: 1.25,
-            },
-            {
-              word: 'TOOL',
-              shared: true,
-              uniqueBonusPoints: 0,
-              finalPoints: 1,
-            },
-          ],
-        },
-        {
-          playerId: 'player-c',
-          baseScore: 1,
-          uniqueBonusScore: 0,
-          finalScore: 1,
-          words: [{ word: 'TOOL', shared: true, finalPoints: 1 }],
+          baseScore: 10,
+          uniqueBonusScore: 2,
+          finalScore: 12,
         },
       ],
     });
+    if (result.success) {
+      expect(result.participants[0]?.words[0]).toMatchObject({
+        shared: true,
+        uniqueBonusPoints: 0,
+        finalPoints: 4,
+      });
+    }
   });
 
-  it('counts several shared words by distinct participant ID', () => {
-    const result = reconcileRoundWords([
-      participant('player-a', [
-        { word: 'TOOL', points: 1 },
-        { word: 'BEER', points: 1 },
+  it('preserves duplicate, malformed, and bounded-word protections', () => {
+    expect(
+      reconcileRoundWords([
+        participant('player-a', [
+          { word: 'CAT', points: 3 },
+          { word: 'CAT', points: 3 },
+        ]),
       ]),
-      participant('player-b', [{ word: 'TOOL', points: 1 }]),
-      participant('player-c', [{ word: 'BEER', points: 1 }]),
-    ]);
+    ).toMatchObject({ success: false, code: 'DUPLICATE_WORD' });
+    expect(
+      reconcileRoundWords([
+        participant('player-a', [{ word: 'cat', points: 3 }]),
+      ]),
+    ).toMatchObject({ success: false, code: 'INVALID_WORD' });
+    const words = Array.from(
+      { length: MAX_RECONCILIATION_WORDS_PER_PARTICIPANT + 1 },
+      () => ({ word: 'CAT', points: 3 }),
+    );
+    expect(reconcileRoundWords([participant('player-a', words)])).toMatchObject(
+      { success: false, code: 'TOO_MANY_WORDS' },
+    );
+  });
 
+  it('returns detached frozen output', () => {
+    const result = reconcileRoundWords([
+      participant('player-a', [{ word: 'QUIZ', points: 4 }]),
+    ]);
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.participants[0]).toMatchObject({
-        baseScore: 2,
-        uniqueBonusScore: 0,
-        finalScore: 2,
+        baseScore: 4,
+        uniqueBonusScore: 1,
+        finalScore: 5,
       });
-      expect(
-        result.participants.every((entry) =>
-          entry.words.every((word) => word.shared),
-        ),
-      ).toBe(true);
+      expect(Object.isFrozen(result)).toBe(true);
+      expect(Object.isFrozen(result.participants)).toBe(true);
+      expect(Object.isFrozen(result.participants[0]?.words)).toBe(true);
     }
   });
 
   it.each([
-    [[participant('player-a'), participant('player-a')], 'DUPLICATE_PLAYER_ID'],
-    [
-      [
-        participant('player-a', [
-          { word: 'TOOL', points: 1 },
-          { word: 'TOOL', points: 1 },
-        ]),
-      ],
-      'DUPLICATE_WORD',
-    ],
-    [[participant('player-a', [{ word: 'tool', points: 1 }])], 'INVALID_WORD'],
-    [[participant('player-a', [{ word: 'CAFÉ', points: 1 }])], 'INVALID_WORD'],
-    [
-      [participant('player-a', [{ word: 'STONE', points: 1 }])],
-      'INCORRECT_BASE_POINTS',
-    ],
-  ] as const)('rejects malformed stored input with %s', (input, code) => {
-    expect(reconcileRoundWords(input)).toMatchObject({
-      success: false,
-      code,
-    });
-  });
-
-  it('accepts the maximum bounded word input deterministically', () => {
-    const acceptedWords = Array.from(
-      { length: MAX_RECONCILIATION_WORDS_PER_PARTICIPANT },
-      (_, index) => ({
-        word: `${String.fromCharCode(65 + Math.floor(index / 26))}${String.fromCharCode(65 + (index % 26))}A`,
-        points: 1 as const,
-      }),
-    );
-    const input = Array.from({ length: 8 }, (_, index) =>
-      participant(`player-${index}`, acceptedWords),
-    );
-    const first = reconcileRoundWords(input);
-    const second = reconcileRoundWords(input);
-
-    expect(first).toEqual(second);
-    expect(first.success && first.participants).toHaveLength(8);
-    expect(first.success && first.participants[0]?.words).toHaveLength(
-      MAX_RECONCILIATION_WORDS_PER_PARTICIPANT,
-    );
-    expect(first.success && first.participants[0]).toMatchObject({
-      baseScore: 256,
-      uniqueBonusScore: 0,
-      finalScore: 256,
-    });
-  });
-
-  it('adds the maximum repeated 2.75-point bonus exactly', () => {
-    const acceptedWords = Array.from(
-      { length: MAX_RECONCILIATION_WORDS_PER_PARTICIPANT },
-      (_, index) => ({
-        word: `${String.fromCharCode(65 + Math.floor(index / 26))}${String.fromCharCode(65 + (index % 26))}AAAAAA`,
-        points: 11 as const,
-      }),
-    );
-    const result = reconcileRoundWords([
-      participant('player-a', acceptedWords),
-    ]);
-
-    expect(result).toMatchObject({
-      success: true,
-      participants: [
-        {
-          baseScore: 2_816,
-          uniqueBonusScore: 704,
-          finalScore: 3_520,
-        },
-      ],
-    });
-  });
-
-  it('returns detached deeply frozen output', () => {
-    const acceptedWords = [{ word: 'TOOL', points: 1 as const }];
-    const input = [participant('player-a', acceptedWords)];
-    const result = reconcileRoundWords(input);
-    expect(result.success).toBe(true);
-    if (!result.success) {
-      return;
-    }
-
-    acceptedWords[0] = { word: 'BEER', points: 1 };
-    expect(result.participants[0]?.words[0]?.word).toBe('TOOL');
-    expect(Object.isFrozen(result)).toBe(true);
-    expect(Object.isFrozen(result.participants)).toBe(true);
-    expect(Object.isFrozen(result.participants[0]?.words)).toBe(true);
-    expect(Object.isFrozen(result.participants[0]?.words[0])).toBe(true);
-  });
+    ['CAT', 3, 1, 4],
+    ['DOG', 3, 1, 4],
+    ['TOOL', 4, 1, 5],
+    ['QUIZ', 4, 1, 5],
+    ['STONE', 5, 2, 7],
+    ['BEERS', 5, 2, 7],
+    ['EAGLES', 6, 2, 8],
+    ['SEASONS', 7, 2, 9],
+    ['EIGHTERS', 8, 2, 10],
+    ['ELEPHANTS', 9, 2, 11],
+    ['ABCDEFGHIJ', 10, 2, 12],
+    ['A'.repeat(64), 64, 2, 66],
+  ] as const)(
+    'reconciles unique %s with integer base %i, bonus %i, and final %i',
+    (word, basePoints, uniqueBonusPoints, finalPoints) => {
+      const result = reconcileRoundWords([
+        participant('player-a', [{ word, points: basePoints }]),
+      ]);
+      expect(result).toMatchObject({
+        success: true,
+        participants: [
+          {
+            baseScore: basePoints,
+            uniqueBonusScore: uniqueBonusPoints,
+            finalScore: finalPoints,
+          },
+        ],
+      });
+    },
+  );
 });

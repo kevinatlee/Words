@@ -233,8 +233,8 @@ payload in Stage 4B.
   participant and none for a nonparticipant. Departed and grace-expired
   identities remain in the snapshot; mid-round joiners remain out.
 - Pure bounded reconciliation counts canonical words across distinct player
-  IDs, retains every word's traditional base points, and adds an exact 25%
-  bonus only to words held by one participant. It performs no I/O, randomness,
+  IDs, validates every word's length-based base points, and adds the fixed +1
+  or +2 bonus only to words held by one participant. It performs no I/O, randomness,
   dictionary lookup, rounding, or timestamp comparison.
 - The complete ended round is strictly validated before one atomic commit.
   Impossible internal failures expose only a bounded `INTERNAL_ERROR`, publish

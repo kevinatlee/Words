@@ -37,7 +37,7 @@ private production dictionary, and traditional scorer. Personal accepted words
 and provisional points are reconnect-safe and never broadcast while active. At
 the exact deadline, the room store atomically reconciles the immutable
 participant snapshot, retains every accepted word's base points, awards an
-exact 25% bonus only to unique words, ranks final scores, and publishes the
+fixed +1 or +2 bonus only to unique words, ranks final scores, and publishes the
 detached result only through `room:state`. No accepted timestamp, path, private
 version, credential, or dictionary data enters the result. Repeated
 finalization is a no-op and the controller may start the next round from
