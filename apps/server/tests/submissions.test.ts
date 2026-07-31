@@ -5,6 +5,7 @@ import {
   reconcileRoundWords,
   type WordDictionary,
 } from '@words/game-engine';
+import { productConfig } from '@words/shared';
 
 import { PlayerSubmissionRateLimiter } from '../src/rate-limiter.js';
 import {
@@ -514,6 +515,8 @@ describe('RoomStore private submissions', () => {
     );
     game.setNow(deadline);
     game.store.reconcileDueRound(game.display.room.code);
+    game.setNow(deadline + productConfig.resultsDisplaySeconds * 1_000);
+    game.store.advanceDueRounds();
     const next = game.store.startRound(game.firstSession, 'player-one-socket');
     const reconnected = game.store.reconnectPlayer(
       game.display.room.code,
@@ -812,7 +815,7 @@ describe('RoomStore private submissions', () => {
     ).toBe('CAT');
   });
 
-  it('preserves ended results through settings, transfer, and board failure', () => {
+  it('preserves ended results through rejected administration and transfer', () => {
     let generationCall = 0;
     const game = setup({
       roundBoardGenerator: (size) => {
@@ -843,30 +846,34 @@ describe('RoomStore private submissions', () => {
     if (!ended?.round?.results) throw new Error('Result setup failed.');
     const results = ended.round.results;
 
-    const updated = game.store.updateSettings(
-      game.firstSession,
-      {
-        gridSize: 5,
-        roundDurationSeconds: 60,
-        scoringMode: 'length-plus-unique',
-      },
-      'player-one-socket',
-    ).room;
-    expect(updated.round?.settings.gridSize).toBe(4);
-    expect(updated.round?.results).toEqual(results);
+    expect(() =>
+      game.store.updateSettings(
+        game.firstSession,
+        {
+          gridSize: 5,
+          roundDurationSeconds: 60,
+          scoringMode: 'length-plus-unique',
+        },
+        'player-one-socket',
+      ),
+    ).toThrowError('Wait for the current round results to finish.');
+    expect(
+      game.store.getRoomState(game.display.room.code)?.round?.results,
+    ).toEqual(results);
     const transferred = game.store.transferController(
       game.firstSession,
       game.second.session.playerId,
       'player-one-socket',
     ).room;
     expect(transferred.round?.results).toEqual(results);
-    const beforeFailure = game.store.getRoomState(game.display.room.code);
+    const beforeRejectedStart = game.store.getRoomState(game.display.room.code);
     expect(() =>
       game.store.startRound(game.secondSession, 'player-two-socket'),
-    ).toThrowError('A playable board could not be generated.');
+    ).toThrowError('Wait for the current round results to finish.');
     expect(game.store.getRoomState(game.display.room.code)).toEqual(
-      beforeFailure,
+      beforeRejectedStart,
     );
+    expect(generationCall).toBe(1);
 
     const recovered = game.store.reconnectPlayer(
       game.display.room.code,

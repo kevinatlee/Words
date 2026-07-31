@@ -1,235 +1,82 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-
-import type { RoundResults as RoundResultsState } from '@words/shared';
-
+import type { RoundResults as R } from '@words/shared';
 import { RoundResults } from './RoundResults';
-
-const playerA = '00000000-0000-4000-8000-000000000001';
-const playerB = '00000000-0000-4000-8000-000000000002';
-
-const results: RoundResultsState = {
-  players: [
-    {
-      playerId: playerA,
-      displayName: 'Bright Fox',
-      rank: 1,
-      baseScore: 9,
-      uniqueBonusScore: 2,
-      finalScore: 11,
-      words: [
-        {
-          word: 'STONE',
-          basePoints: 5,
-          shared: false,
-          uniqueBonusPoints: 2,
-          finalPoints: 7,
-        },
-        {
-          word: 'TOOL',
-          basePoints: 4,
-          shared: true,
-          uniqueBonusPoints: 0,
-          finalPoints: 4,
-        },
-      ],
-    },
-    {
-      playerId: playerB,
-      displayName: 'Amber Kite',
-      rank: 2,
-      baseScore: 4,
-      uniqueBonusScore: 0,
-      finalScore: 4,
-      words: [
-        {
-          word: 'TOOL',
-          basePoints: 4,
-          shared: true,
-          uniqueBonusPoints: 0,
-          finalPoints: 4,
-        },
-      ],
-    },
-  ],
-  winnerPlayerIds: [playerA],
-};
-
+const a = '00000000-0000-4000-8000-000000000001',
+  b = '00000000-0000-4000-8000-000000000002';
+const word = (word: string, shared = false) => ({
+  word,
+  basePoints: 5,
+  shared,
+  uniqueBonusPoints: (shared ? 0 : 2) as 0 | 2,
+  finalPoints: shared ? 5 : 7,
+});
+const result = (count = 2): R => ({
+  players: Array.from({ length: count }, (_, i) => ({
+    playerId:
+      i === 0
+        ? a
+        : `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`,
+    displayName: i ? 'Amber Kite' : 'Bright Fox',
+    rank: i + 1,
+    baseScore: 7,
+    uniqueBonusScore: 0,
+    finalScore: 7 - i,
+    words: [word('UNIQUE'), word('SHARED', true)],
+  })),
+  winnerPlayerIds: [a],
+});
 describe('RoundResults', () => {
-  it('shows authoritative integer rank order and one winner', () => {
-    render(
-      <RoundResults
-        roundNumber={1}
-        results={results}
-        currentPlayerId={playerB}
-        isDisplay={false}
-      />,
-    );
+  it('uses the Round N Results heading and server card order', () => {
+    render(<RoundResults roundNumber={2} results={result()} />);
     expect(
-      screen.getByRole('heading', { name: 'Bright Fox wins' }),
+      screen.getByRole('heading', { name: 'Round 2 Results' }),
     ).toBeVisible();
     expect(
-      within(screen.getByRole('table'))
-        .getAllByRole('row')
-        .slice(1)
-        .map((row) => row.textContent),
-    ).toEqual(['1Bright Fox11 points', '2Amber Kite (You)4 points']);
+      screen.getAllByRole('heading', { level: 2 }).map((x) => x.textContent),
+    ).toEqual(expect.arrayContaining(['♛ Bright Fox', 'Amber Kite']));
   });
-
-  it('shows integer unique bonuses and shared base points without decimals', () => {
-    render(
-      <RoundResults
-        roundNumber={1}
-        results={results}
-        currentPlayerId={playerA}
-        isDisplay={false}
-      />,
-    );
-    expect(
-      screen.getByText(
-        'unique — 7 points (5 points base + 2 points uniqueness bonus)',
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getAllByText(
-        'shared — 4 points (4 points base; no uniqueness bonus)',
-      ),
-    ).toHaveLength(2);
-    expect(screen.queryByText(/\d+\.\d+ points/)).toBeNull();
+  it('shows integer points and accepted/unique counts', () => {
+    render(<RoundResults roundNumber={1} results={result()} />);
+    expect(screen.getByText('7 points')).toBeVisible();
+    expect(screen.getAllByText('Accepted: 2 · Unique: 1')).toHaveLength(2);
   });
-
-  it('shows all tied positive winners', () => {
-    const tied: RoundResultsState = {
-      players: results.players.map((player) => ({
-        ...player,
-        rank: 1,
-        finalScore: 7,
-        baseScore: 5,
-        uniqueBonusScore: 2,
-        words: [
-          {
-            word: player.playerId === playerA ? 'STONE' : 'BEERS',
-            basePoints: 5,
-            shared: false,
-            uniqueBonusPoints: 2,
-            finalPoints: 7,
-          },
-        ],
-      })),
-      winnerPlayerIds: [playerA, playerB],
-    };
-    render(
-      <RoundResults
-        roundNumber={2}
-        results={tied}
-        currentPlayerId={null}
-        isDisplay
-      />,
-    );
-    expect(
-      screen.getByRole('heading', { name: 'Round ends in a tie' }),
-    ).toBeVisible();
-    expect(
-      screen.getByText('Bright Fox, Amber Kite tie with 7 points each.'),
-    ).toBeVisible();
+  it('lists unique words but not shared words', () => {
+    render(<RoundResults roundNumber={1} results={result()} />);
+    expect(screen.getAllByText('UNIQUE')).toHaveLength(2);
+    expect(screen.queryByText('SHARED')).toBeNull();
   });
-
-  it('keeps an all-shared positive round as a tie', () => {
-    const tied: RoundResultsState = {
-      players: results.players.map((player) => ({
-        ...player,
-        rank: 1,
-        baseScore: 4,
-        uniqueBonusScore: 0,
-        finalScore: 4,
-        words: [
-          {
-            word: 'TOOL',
-            basePoints: 4,
-            shared: true,
-            uniqueBonusPoints: 0,
-            finalPoints: 4,
-          },
-        ],
-      })),
-      winnerPlayerIds: [playerA, playerB],
-    };
-    render(
-      <RoundResults
-        roundNumber={3}
-        results={tied}
-        currentPlayerId={null}
-        isDisplay
-      />,
-    );
-    expect(
-      screen.getByText('Bright Fox, Amber Kite tie with 4 points each.'),
-    ).toBeVisible();
+  it('crowns every tied winner accessibly', () => {
+    const x: R = { ...result(), winnerPlayerIds: [a, b] };
+    render(<RoundResults roundNumber={1} results={x} />);
+    expect(screen.getAllByLabelText('Game Host winner')).toHaveLength(2);
   });
-
-  it('shows no winner when every final score is zero', () => {
-    const none: RoundResultsState = {
-      players: results.players.map((player, index) => ({
-        ...player,
-        rank: 1,
-        baseScore: 0,
-        uniqueBonusScore: 0,
-        finalScore: 0,
-        words: [],
-        displayName: index === 0 ? 'Bright Fox' : 'Amber Kite',
-      })),
-      winnerPlayerIds: [],
-    };
-    render(
-      <RoundResults
-        roundNumber={4}
-        results={none}
-        currentPlayerId={null}
-        isDisplay
-      />,
-    );
-    expect(
-      screen.getByRole('heading', { name: 'No scoring winner this round' }),
-    ).toBeVisible();
+  it('does not crown an all-zero result', () => {
+    const x: R = { ...result(), winnerPlayerIds: [] };
+    render(<RoundResults roundNumber={1} results={x} />);
+    expect(screen.queryByLabelText('Game Host winner')).toBeNull();
   });
-
   it.each([
-    ['CAT', 3, 1, 4],
-    ['ELEPHANTS', 9, 2, 11],
-  ] as const)(
-    'presents integer result values for %s',
-    (word, base, bonus, final) => {
-      const single: RoundResultsState = {
-        players: [
-          {
-            playerId: playerA,
-            displayName: 'Bright Fox',
-            rank: 1,
-            baseScore: base,
-            uniqueBonusScore: bonus,
-            finalScore: final,
-            words: [
-              {
-                word,
-                basePoints: base,
-                shared: false,
-                uniqueBonusPoints: bonus,
-                finalPoints: final,
-              },
-            ],
-          },
-        ],
-        winnerPlayerIds: [playerA],
-      };
-      render(
-        <RoundResults
-          roundNumber={5}
-          results={single}
-          currentPlayerId={playerA}
-          isDisplay={false}
-        />,
-      );
-      expect(screen.getAllByText(`${final} points`).length).toBeGreaterThan(0);
-    },
-  );
+    [2, 5],
+    [4, 4],
+    [6, 3],
+    [8, 2],
+  ])('limits unique words for %i players to %i', (count, limit) => {
+    const base = result(count);
+    const x: R = {
+      ...base,
+      players: base.players.map((p) => ({
+        ...p,
+        words: Array.from({ length: limit + 2 }, (_, i) => word(`WORD${i}`)),
+      })),
+    };
+    render(<RoundResults roundNumber={1} results={x} />);
+    expect(screen.getAllByText('+2 more')).toHaveLength(count);
+  });
+  it('has no table, disclosure, or interactive controls', () => {
+    render(<RoundResults roundNumber={1} results={result()} />);
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByText('Participant word review')).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
+  });
 });

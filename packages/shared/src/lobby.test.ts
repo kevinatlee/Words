@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createEmptyRoomHighlights,
   createDisplayInputSchema,
   displayNameSchema,
   joinPlayerInputSchema,
@@ -30,6 +31,7 @@ function roomStateFixture() {
     lastActivityAt: '2026-07-27T20:00:00.000Z',
     expiresAt: '2026-07-27T22:00:00.000Z',
     maxPlayers: 8,
+    highlights: createEmptyRoomHighlights(),
     display: {
       connected: true,
       createdAt: '2026-07-27T20:00:00.000Z',
@@ -113,6 +115,30 @@ function zeroResults() {
 }
 
 describe('lobby contracts', () => {
+  it('accepts empty highlights and rejects malformed highlight snapshots', () => {
+    const valid = roomStateSchema.parse(roomStateFixture());
+
+    expect(valid.highlights).toEqual(createEmptyRoomHighlights());
+    expect(
+      roomStateSchema.safeParse({
+        ...roomStateFixture(),
+        highlights: { lastRound: null, roomRecord: { score: 7 } },
+      }).success,
+    ).toBe(false);
+    expect(
+      roomStateSchema.safeParse({
+        ...roomStateFixture(),
+        highlights: {
+          lastRound: {
+            roundNumber: 1,
+            winners: [],
+            winningScore: 1,
+          },
+          roomRecord: null,
+        },
+      }).success,
+    ).toBe(false);
+  });
   it('normalizes human-entered room codes consistently', () => {
     expect(normalizeRoomCode(' ab-c 234 ')).toBe('ABC234');
     expect(roomCodeSchema.parse(' ab-c 234 ')).toBe('ABC234');

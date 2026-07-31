@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { RoomState } from '@words/shared';
+import { createEmptyRoomHighlights, type RoomState } from '@words/shared';
 
 import {
   calculateRemainingRoundMs,
@@ -18,6 +18,7 @@ function createRoom(overrides: Partial<RoomState> = {}): RoomState {
     lastActivityAt: '2026-07-29T20:00:00.000Z',
     expiresAt: '2026-07-29T22:00:00.000Z',
     maxPlayers: 8,
+    highlights: createEmptyRoomHighlights(),
     display: {
       connected: true,
       createdAt: '2026-07-29T19:00:00.000Z',

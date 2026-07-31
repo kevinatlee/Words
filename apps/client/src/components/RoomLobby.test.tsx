@@ -2,8 +2,9 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type {
-  PlayerRoundSubmissionState,
+import {
+  createEmptyRoomHighlights,
+  type PlayerRoundSubmissionState,
   RoomState,
   SubmitWordInput,
   SubmitWordResponse,
@@ -30,6 +31,7 @@ function createRoom(overrides: Partial<RoomState> = {}): RoomState {
     lastActivityAt: timestamps.createdAt,
     expiresAt: timestamps.expiresAt,
     maxPlayers: 8,
+    highlights: createEmptyRoomHighlights(),
     display: { connected: true, createdAt: timestamps.createdAt },
     controllerStatus: 'assigned',
     controllerPlayerId: playerId,
@@ -275,9 +277,9 @@ describe('RoomLobby word entry', () => {
     phone.unmount();
 
     renderLobby(undefined, { sessionRole: 'display', currentPlayerId: null });
-    expect(screen.getByText('Authoritative time remaining')).toBeVisible();
+    expect(screen.getByText('Time Remaining')).toBeVisible();
     expect(
-      screen.getByText('Authoritative time remaining').closest('.round-clock'),
+      screen.getByText('Time Remaining').closest('.round-clock'),
     ).not.toHaveClass('round-clock--phone');
   });
 
@@ -298,46 +300,35 @@ describe('RoomLobby word entry', () => {
     expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
   });
 
-  it.each([
-    {
-      phase: 'LOBBY' as const,
+  it('keeps valid controller lobby administration outside the puzzle', () => {
+    const { container } = renderLobby(undefined, {
       room: createRoom({ phase: 'LOBBY', round: null }),
-      button: 'Start Round',
-    },
-    {
-      phase: 'ROUND_ENDED' as const,
-      room: createRoom({ phase: 'ROUND_ENDED' }),
-      button: 'Start Next Round',
-    },
-  ])(
-    'keeps the controller $phase panels as puzzle, settings, then authority',
-    ({ room, button }) => {
-      const { container } = renderLobby(undefined, { room });
-      const preview = container.querySelector('.room-dashboard__preview');
-      const puzzle = screen.getByRole('region', { name: 'Puzzle' });
-      const settings = screen.getByRole('region', { name: 'Game settings' });
-      const authority = screen.getByRole('region', {
-        name: 'Game host controls',
-      });
+    });
+    const preview = container.querySelector('.room-dashboard__preview');
+    const puzzle = screen.getByRole('region', { name: 'Puzzle' });
+    const settings = screen.getByRole('region', { name: 'Game settings' });
+    const authority = screen.getByRole('region', {
+      name: 'Game host controls',
+    });
+    const startRound = screen.getByRole('button', { name: 'Start Round' });
 
-      expect(
-        within(puzzle).getByRole('button', { name: button }),
-      ).toBeVisible();
-      expect(puzzle).not.toContainElement(settings);
-      expect(puzzle).not.toContainElement(authority);
-      expect(Array.from(preview?.children ?? [])).toEqual(
-        expect.arrayContaining([puzzle, settings, authority]),
-      );
-      expect(
-        puzzle.compareDocumentPosition(settings) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
-      ).not.toBe(0);
-      expect(
-        settings.compareDocumentPosition(authority) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
-      ).not.toBe(0);
-    },
-  );
+    expect(startRound).toBeVisible();
+    expect(startRound.closest('.round-action')).not.toBeNull();
+    expect(startRound.closest('.round-action')).not.toBe(puzzle);
+    expect(puzzle).not.toContainElement(settings);
+    expect(puzzle).not.toContainElement(authority);
+    expect(Array.from(preview?.children ?? [])).toEqual(
+      expect.arrayContaining([puzzle, settings, authority]),
+    );
+    expect(
+      puzzle.compareDocumentPosition(settings) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    expect(
+      settings.compareDocumentPosition(authority) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+  });
 
   it('shows controller administration only to the connected controller between rounds', () => {
     const lobby = createRoom({ phase: 'LOBBY', round: null });
@@ -367,10 +358,13 @@ describe('RoomLobby word entry', () => {
     renderLobby(undefined, {
       room: createRoom({ phase: 'ROUND_ENDED' }),
     });
+    expect(screen.getByRole('region', { name: 'Puzzle' })).toBeVisible();
+    expect(screen.getByText('Round Complete')).toBeVisible();
     expect(
-      screen.getByRole('region', { name: 'Game host controls' }),
-    ).toBeVisible();
-    expect(screen.getByRole('region', { name: 'Game settings' })).toBeVisible();
+      screen.queryByRole('region', { name: 'Game host controls' }),
+    ).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Start Round' })).toBeNull();
   });
 
   it('keeps authority transfer accessible without exposing the current host name', () => {
@@ -482,7 +476,7 @@ describe('RoomLobby word entry', () => {
     expect(screen.queryByRole('table')).toBeNull();
   });
 
-  it('keeps room details and finalized results on the display', () => {
+  it('keeps finalized result cards and the footer on the display', () => {
     const activeRoom = createRoom();
     const endedRoom: RoomState = {
       ...activeRoom,
@@ -515,16 +509,24 @@ describe('RoomLobby word entry', () => {
       currentPlayerId: null,
     });
 
-    expect(screen.getByText('Live temporary room')).toBeVisible();
-    expect(screen.getByLabelText('Room code ABC234')).toBeVisible();
-    expect(screen.getByText('Shared Screen')).toBeVisible();
-    expect(screen.getByRole('rowheader', { name: 'Bright Fox' })).toBeVisible();
     expect(
-      screen.getByRole('region', { name: 'Join the next round' }),
+      screen.getByRole('heading', { name: 'Round 1 Results' }),
     ).toBeVisible();
+    expect(screen.getByRole('heading', { name: /Bright Fox/ })).toBeVisible();
+    expect(screen.getByText('4 points')).toBeVisible();
+    expect(screen.getByText('http://localhost:3000/join/ABC234')).toBeVisible();
+    expect(screen.queryByRole('region', { name: 'Puzzle' })).toBeNull();
+    expect(screen.queryByRole('complementary', { name: 'Players' })).toBeNull();
     expect(
-      screen.getByRole('heading', { name: 'Bright Fox wins' }),
-    ).toBeVisible();
+      screen.queryByRole('complementary', { name: 'Room Highlights' }),
+    ).toBeNull();
+    expect(screen.queryByLabelText('Room joining QR code')).toBeNull();
+    expect(screen.queryByRole('timer')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
+    expect(
+      screen.queryByRole('region', { name: 'Game host controls' }),
+    ).toBeNull();
+    expect(screen.queryByRole('table')).toBeNull();
   });
 
   it('uses Tap backtracking without leaving disconnected paths', async () => {

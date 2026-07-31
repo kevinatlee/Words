@@ -24,9 +24,7 @@ class QrVisualBoundary extends Component<
 
   render() {
     return this.state.failed ? (
-      <span className="join-qr__unavailable">
-        QR unavailable. Use the link or room code.
-      </span>
+      <span className="join-qr__unavailable">QR unavailable</span>
     ) : (
       this.props.children
     );
@@ -35,23 +33,21 @@ class QrVisualBoundary extends Component<
 
 const contextCopy = {
   lobby: {
-    heading: 'Scan to join',
-    instruction: 'Scan with your phone, or enter the room code.',
+    heading: 'Scan to Join',
+    instruction: '',
   },
   'active-round': {
-    heading: 'Join the next round',
-    instruction:
-      'Scan with your phone to join now and wait for the next round.',
+    heading: 'Join Next Round',
+    instruction: '',
   },
   'ended-round': {
-    heading: 'Join the next round',
-    instruction: 'Scan with your phone before the next round starts.',
+    heading: 'Join Next Round',
+    instruction: '',
   },
 } as const;
 
 export function JoinQrCode({
   joinUrl,
-  roomCode,
   presentation,
   context,
 }: JoinQrCodeProps) {
@@ -79,16 +75,8 @@ export function JoinQrCode({
         </QrVisualBoundary>
       </div>
       <div className="join-qr__copy">
-        <span className="eyebrow">Phone players</span>
         <h2 id={headingId}>{copy.heading}</h2>
-        <p>{copy.instruction}</p>
-        <p className="join-qr__manual">
-          Room code <strong>{roomCode}</strong> <span>— case-insensitive</span>
-        </p>
-        <a className="join-url join-qr__url" href={joinUrl}>
-          {joinUrl}
-        </a>
-        <small>The QR and link open the ordinary player join form.</small>
+        {copy.instruction && <p>{copy.instruction}</p>}
       </div>
     </section>
   );

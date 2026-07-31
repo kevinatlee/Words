@@ -19,9 +19,8 @@ one connected phone player identified by `controllerPlayerId`.
 
 Only the currently connected controller socket may update settings. The server
 rejects partial objects, unknown fields, unsupported values, display sessions,
-ordinary players, stale sockets, and updates during an active round. An update
-is allowed in `LOBBY` and `ROUND_ENDED` and replaces all three fields
-atomically.
+ordinary players, stale sockets, and updates outside `LOBBY`. An update
+replaces all three fields atomically.
 
 `controller:start-round` accepts only a strict empty object. The server, never
 the client, chooses the round ID, number, board, random input, generation
@@ -35,7 +34,7 @@ Rooms use exactly three phases:
 | -------------- | ----------- | -------------------------------------------- |
 | `LOBBY`        | `null`      | update settings, start first round, transfer |
 | `ROUND_ACTIVE` | active      | transfer only                                |
-| `ROUND_ENDED`  | ended       | update settings, start next round, transfer  |
+| `ROUND_ENDED`  | ended       | transfer only                                |
 
 There is no separate results phase and no pause, resume, cancel, extend,
 manual-end, client-end, or finalize action.
@@ -43,7 +42,12 @@ manual-end, client-end, or finalize action.
 An active round has `endedAt: null` and `results: null`. At or after its
 deadline, the server reconciles it once to `ROUND_ENDED`, sets `endedAt` to the
 official `deadlineAt`, and attaches one non-null finalized result projection.
-Ending a round does not update room activity or extend room TTL.
+Ending a round does not update room activity or extend room TTL. The server then
+keeps that result for a single authoritative 20-second window. The same 250 ms
+lifecycle sweep changes it to `LOBBY`, clears the public round and private
+submission map, and increments the version once without changing activity,
+TTL, settings, players, controller, or display. The next round number is held
+internally, so clearing the temporary snapshot never restarts numbering.
 
 ## Serialized room and round state
 
@@ -77,10 +81,12 @@ when nobody submitted a scoring word the all-zero round has no winner. An
 all-shared positive round can have tied winners. Accepted timestamps, paths,
 private versions, sockets, and credentials remain absent.
 
-The room retains only its current round. Starting a later round replaces the
-ended snapshot and increments the round number exactly once, so round history
-cannot grow without bound. Returned arrays and objects are copies; caller
-mutation cannot alter internal state.
+The room retains only its current round. After the authoritative 20-second
+window, the lifecycle sweep clears the ended snapshot and private submissions;
+the next lobby start creates the next numbered round. Only bounded highlights
+remain, so round history and cumulative scoring cannot grow without bound.
+Returned arrays and objects are copies; caller mutation cannot alter internal
+state.
 
 ## Participant and reconnect semantics
 
@@ -96,7 +102,8 @@ ordered by `joinedAt`, then player ID.
 - Display and player reconnects restore the same board, round ID, phase, and
   official deadline.
 - Reconnect does not pause or extend a round.
-- Controller transfer remains allowed while active and changes only authority.
+- Controller transfer remains allowed while active or ended and changes only
+  authority.
 
 ## Controlled production startup
 

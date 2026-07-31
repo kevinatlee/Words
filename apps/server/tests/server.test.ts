@@ -1612,12 +1612,219 @@ describe('Words Stage 4B server', () => {
     });
   });
 
-  it('publishes due results before starting exactly one next round', async () => {
+  it('keeps one authoritative results window before resetting to the lobby', async () => {
     await server.stop();
     let now = Date.parse('2026-07-30T20:00:00.000Z');
+    let lifecycleSweep: (() => void) | undefined;
     server = createWordsServer(
       { port: 0, cleanupIntervalMs: 60_000 },
-      { ...testDependencies, now: () => now },
+      {
+        ...testDependencies,
+        now: () => now,
+        setInterval: (callback) => {
+          lifecycleSweep = callback;
+          return { unref: vi.fn() } as unknown as ReturnType<
+            typeof setInterval
+          >;
+        },
+        clearInterval: vi.fn(),
+      },
+    );
+    port = await server.start(0);
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) throw new Error('Display creation failed.');
+    const controller = await connectClient();
+    const controllerJoin = await emitJoinPlayer(controller, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+    const successor = await connectClient();
+    const successorJoin = await emitJoinPlayer(successor, {
+      roomCode: created.room.code,
+      displayName: 'Amber Kite',
+    });
+    const started = await emitStartRound(controller);
+    if (
+      !started.ok ||
+      !started.room.round ||
+      !controllerJoin.ok ||
+      !successorJoin.ok
+    ) {
+      throw new Error('Round setup failed.');
+    }
+
+    expect(
+      await emitSubmitWord(controller, {
+        roundId: started.room.round.id,
+        word: 'ABC',
+        path: [0, 1, 2],
+      }),
+    ).toMatchObject({ ok: true });
+
+    const observedPhases: string[] = [];
+    const lifecycleEvents = new Set<string>();
+    display.on('room:state', (room) => {
+      observedPhases.push(room.phase);
+    });
+    display.onAny((event) => lifecycleEvents.add(event));
+    const endedState = nextRoomState(
+      display,
+      (room) => room.phase === 'ROUND_ENDED',
+    );
+    now = Date.parse(started.room.round.deadlineAt);
+    lifecycleSweep?.();
+    const ended = await endedState;
+
+    expect(ended.round?.results).toMatchObject({
+      players: expect.arrayContaining([
+        expect.objectContaining({
+          playerId: controllerJoin.session.playerId,
+          finalScore: 4,
+        }),
+      ]),
+    });
+    expect(lifecycleEvents).toEqual(new Set(['room:state']));
+    expect(
+      await emitUpdateSettings(controller, {
+        gridSize: 6,
+        roundDurationSeconds: 60,
+        scoringMode: 'length-plus-unique',
+      }),
+    ).toMatchObject({ ok: false, error: { code: 'ROUND_IN_PROGRESS' } });
+    expect(await emitStartRound(controller)).toMatchObject({
+      ok: false,
+      error: { code: 'ROUND_IN_PROGRESS' },
+    });
+
+    const transferBroadcast = nextRoomState(
+      display,
+      (room) =>
+        room.phase === 'ROUND_ENDED' &&
+        room.controllerPlayerId === successorJoin.session.playerId,
+    );
+    expect(
+      await emitTransferController(controller, {
+        targetPlayerId: successorJoin.session.playerId,
+      }),
+    ).toMatchObject({
+      ok: true,
+      room: {
+        phase: 'ROUND_ENDED',
+        controllerPlayerId: successorJoin.session.playerId,
+      },
+    });
+
+    await transferBroadcast;
+    const broadcastCountAfterTransfer = observedPhases.length;
+    lifecycleSweep?.();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(observedPhases).toHaveLength(broadcastCountAfterTransfer);
+
+    const controllerDisconnected = nextRoomState(
+      display,
+      (room) =>
+        room.players.find(
+          (player) => player.id === controllerJoin.session.playerId,
+        )?.connected === false,
+    );
+    controller.disconnect();
+    await controllerDisconnected;
+    const reconnected = await connectClient();
+    const recovered = await emitReconnectPlayer(reconnected, {
+      roomCode: created.room.code,
+      playerReconnectToken: controllerJoin.session.playerReconnectToken,
+    });
+    expect(recovered).toMatchObject({
+      ok: true,
+      room: {
+        phase: 'ROUND_ENDED',
+        round: { results: ended.round?.results },
+        highlights: ended.highlights,
+      },
+      submissionState: {
+        playerId: controllerJoin.session.playerId,
+        acceptedWords: [{ word: 'ABC' }],
+      },
+    });
+    if (!recovered.ok) throw new Error('Ended-round reconnect failed.');
+
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const broadcastCountBeforeReset = observedPhases.length;
+    const lobbyState = nextRoomState(
+      display,
+      (room) => room.phase === 'LOBBY' && room.round === null,
+    );
+    now += 20_000;
+    lifecycleSweep?.();
+    const lobby = await lobbyState;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(lobby.highlights).toEqual(ended.highlights);
+    expect(observedPhases.slice(broadcastCountBeforeReset)).toEqual(['LOBBY']);
+    expect(observedPhases).toContain('ROUND_ENDED');
+    lifecycleSweep?.();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(observedPhases).toHaveLength(broadcastCountBeforeReset + 1);
+
+    const reconnectedDisconnected = nextRoomState(
+      display,
+      (room) =>
+        room.players.find(
+          (player) => player.id === controllerJoin.session.playerId,
+        )?.connected === false,
+    );
+    reconnected.disconnect();
+    await reconnectedDisconnected;
+    const afterReset = await connectClient();
+    expect(
+      await emitReconnectPlayer(afterReset, {
+        roomCode: created.room.code,
+        playerReconnectToken: recovered.session.playerReconnectToken,
+      }),
+    ).toMatchObject({
+      ok: true,
+      room: { phase: 'LOBBY', round: null, highlights: ended.highlights },
+      submissionState: null,
+    });
+
+    expect(
+      await emitUpdateSettings(successor, {
+        gridSize: 6,
+        roundDurationSeconds: 60,
+        scoringMode: 'length-plus-unique',
+      }),
+    ).toMatchObject({ ok: true, room: { phase: 'LOBBY' } });
+    expect(await emitStartRound(successor)).toMatchObject({
+      ok: true,
+      room: {
+        phase: 'ROUND_ACTIVE',
+        round: { number: 2, results: null },
+      },
+    });
+  });
+
+  it('lets room expiry suppress an otherwise due result snapshot', async () => {
+    await server.stop();
+    let now = Date.parse('2026-07-30T20:00:00.000Z');
+    let lifecycleSweep: (() => void) | undefined;
+    server = createWordsServer(
+      {
+        port: 0,
+        roomTtlMs: 30_000,
+        cleanupIntervalMs: 1_000,
+      },
+      {
+        ...testDependencies,
+        now: () => now,
+        setInterval: (callback) => {
+          lifecycleSweep = callback;
+          return { unref: vi.fn() } as unknown as ReturnType<
+            typeof setInterval
+          >;
+        },
+        clearInterval: vi.fn(),
+      },
     );
     port = await server.start(0);
     const display = await connectClient();
@@ -1628,32 +1835,28 @@ describe('Words Stage 4B server', () => {
       roomCode: created.room.code,
       displayName: 'Silver Owl',
     });
+    await emitUpdateSettings(controller, {
+      gridSize: 4,
+      roundDurationSeconds: 30,
+      scoringMode: 'length-plus-unique',
+    });
     const started = await emitStartRound(controller);
     if (!started.ok || !started.room.round) {
       throw new Error('Round setup failed.');
     }
 
-    const observedPhases: string[] = [];
-    display.on('room:state', (room) => {
-      if (
-        room.phase === 'ROUND_ENDED' ||
-        (room.phase === 'ROUND_ACTIVE' && room.round?.number === 2)
-      ) {
-        observedPhases.push(room.phase);
-      }
-    });
+    const roomStates: RoomState[] = [];
+    display.on('room:state', (room) => roomStates.push(room));
+    const expired = nextRoomError(display);
     now = Date.parse(started.room.round.deadlineAt);
-    const next = await emitStartRound(controller);
-    await new Promise<void>((resolve) => setImmediate(resolve));
+    lifecycleSweep?.();
 
-    expect(next).toMatchObject({
-      ok: true,
-      room: {
-        phase: 'ROUND_ACTIVE',
-        round: { number: 2, results: null },
-      },
-    });
-    expect(observedPhases).toEqual(['ROUND_ENDED', 'ROUND_ACTIVE']);
+    await expect(expired).resolves.toMatchObject({ code: 'ROOM_EXPIRED' });
+    expect(roomStates).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ phase: 'ROUND_ENDED' }),
+      ]),
+    );
   });
 
   it('broadcasts a deadline transition even when the triggering action is rejected', async () => {

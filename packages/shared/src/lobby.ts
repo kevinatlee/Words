@@ -542,6 +542,73 @@ export const playerStateSchema = z
 
 export const controllerStatusSchema = z.enum(['none', 'assigned']);
 
+export const roomHighlightPlayerSchema = z
+  .object({
+    playerId: playerIdSchema,
+    displayName: serializedDisplayNameSchema,
+  })
+  .strict()
+  .readonly();
+const uniqueHighlightPlayers = (
+  players: readonly { playerId: string }[],
+  context: z.RefinementCtx,
+  key: string,
+) => {
+  if (
+    new Set(players.map((player) => player.playerId)).size !== players.length
+  ) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Highlight players must be unique.',
+      path: [key],
+    });
+  }
+};
+export const lastRoundHighlightSchema = z
+  .object({
+    roundNumber: z.number().int().positive().safe(),
+    winners: z.array(roomHighlightPlayerSchema).max(productConfig.maxPlayers),
+    winningScore: z.number().int().safe().nullable(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    uniqueHighlightPlayers(value.winners, context, 'winners');
+    if (
+      (value.winningScore === null) !== (value.winners.length === 0) ||
+      (value.winningScore !== null && value.winningScore <= 0)
+    )
+      context.addIssue({
+        code: 'custom',
+        message: 'Last-round winners and score must agree.',
+      });
+  })
+  .readonly();
+export const roomRecordHighlightSchema = z
+  .object({
+    roundNumber: z.number().int().positive().safe(),
+    holders: z
+      .array(roomHighlightPlayerSchema)
+      .min(1)
+      .max(productConfig.maxPlayers),
+    score: z.number().int().positive().safe(),
+  })
+  .strict()
+  .superRefine((value, context) =>
+    uniqueHighlightPlayers(value.holders, context, 'holders'),
+  )
+  .readonly();
+export const roomHighlightsSchema = z
+  .object({
+    lastRound: lastRoundHighlightSchema.nullable(),
+    roomRecord: roomRecordHighlightSchema.nullable(),
+  })
+  .strict()
+  .readonly();
+export type RoomHighlights = z.infer<typeof roomHighlightsSchema>;
+export function createEmptyRoomHighlights(): RoomHighlights {
+  return { lastRound: null, roomRecord: null };
+}
+
 export const roomStateSchema = z
   .object({
     code: roomCodeSchema,
@@ -557,6 +624,7 @@ export const roomStateSchema = z
     controllerPlayerId: playerIdSchema.nullable(),
     players: z.array(playerStateSchema).max(productConfig.maxPlayers),
     settings: roomSettingsSchema,
+    highlights: roomHighlightsSchema,
     round: roundStateSchema.nullable(),
   })
   .strict()

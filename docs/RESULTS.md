@@ -171,32 +171,27 @@ paths, credentials, or private state.
 Room expiration retains its earlier precedence: a room deleted at its TTL does
 not publish obsolete results.
 
-## Results interface and next round
+## Timed results interface and return to lobby
 
-The display and phones use the authoritative result order. They show:
-
-- a single-winner, tied-winner, or no-scoring-winner heading
-- a semantic ranking table
-- every participant, including departed participants and zero scores
-- keyboard-accessible participant word reviews
-- explicit shared/unique text, base points, uniqueness bonus, and clear final
-  points
-- a textual “You” marker only on the matching player phone
+`ROUND_ENDED` is a 20-second server-authoritative results window, not a fourth
+phase. The display replaces its header with redesigned result cards for every
+authoritative participant, including departed players, plus the join URL footer.
+Cards show final integer points, accepted and unique counts, and a bounded
+unique-word list; there is no board, QR, timer, side bubble, control, table, or
+word review. Phones retain only their completed board, `Round Complete`,
+Tap/Trace, and connection status; they receive no administration or detailed
+results.
 
 The client rejects lower state versions, older timestamps at the same version,
 and same-version changes to the finalized result projection. This prevents a
 conflicting rank or winner snapshot from replacing an accepted result while
 preserving established same-version lobby refresh behavior.
 
-The old official board can remain visible. Only the connected controller sees
-`Start Next Round`. Settings may change for the next round without changing the
-old round's settings snapshot or results.
-
-Starting the next round uses the existing `controller:start-round` event. It
-creates a new board and participant snapshot, sets `results` to null, replaces
-the private submission map with empty states, and removes the old result from
-the only retained round slot. A generation failure leaves the ended round and
-results unchanged.
+After the results window, the lifecycle sweep automatically returns the room to
+`LOBBY`, permanently discarding the round result and private submissions while
+retaining only bounded last-round and room-record highlights. Settings and start
+requests are rejected during the window and return only once the lobby snapshot
+arrives. No cumulative history or persistence is retained.
 
 There is no cumulative score, prior-round history, saved result, leaderboard,
 series, ready-up flow, rematch vote, or automatic next round. This is a

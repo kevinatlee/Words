@@ -15,6 +15,7 @@ import {
   maximumRoundGenerationAttempts,
   roomCodeAlphabet,
   roomCodeSchema,
+  roomHighlightsSchema,
   roomSettingsSchema,
   roundStateSchema,
   type ControllerStatus,
@@ -26,9 +27,11 @@ import {
   type PlayerRoundSubmissionState,
   type PlayerState,
   type RoomPhase,
+  type RoomHighlights,
   type RoomErrorCode,
   type RoomSettings,
   type RoomState,
+  createEmptyRoomHighlights,
   type RoundResults,
   type RoundState,
   type SubmissionError,
@@ -71,6 +74,9 @@ type InternalRoom = {
   settings: RoomSettings;
   round: InternalRound | null;
   roundSubmissions: Map<string, InternalPlayerSubmissionState> | null;
+  highlights: RoomState['highlights'];
+  resultsExpiresAt: number | null;
+  nextRoundNumber: number;
 };
 
 type InternalPlayerSubmissionState = {
@@ -351,6 +357,9 @@ export class RoomStore {
       },
       round: null,
       roundSubmissions: null,
+      highlights: createEmptyRoomHighlights(),
+      resultsExpiresAt: null,
+      nextRoundNumber: 1,
     };
 
     this.rooms.set(code, room);
@@ -466,10 +475,10 @@ export class RoomStore {
     const room = this.requireActiveRoom(session.roomCode);
     this.requireConnectedController(room, session, socketId);
 
-    if (room.phase === 'ROUND_ACTIVE') {
+    if (room.phase !== 'LOBBY') {
       throw new RoomOperationError(
         'ROUND_IN_PROGRESS',
-        'Room settings cannot change during an active round.',
+        'Wait for the current round results to finish.',
       );
     }
 
@@ -503,10 +512,10 @@ export class RoomStore {
     const room = this.requireActiveRoom(session.roomCode);
     this.requireConnectedController(room, session, socketId);
 
-    if (room.phase === 'ROUND_ACTIVE') {
+    if (room.phase !== 'LOBBY') {
       throw new RoomOperationError(
         'ROUND_IN_PROGRESS',
-        'A round is already in progress.',
+        'Wait for the current round results to finish.',
       );
     }
 
@@ -547,7 +556,7 @@ export class RoomStore {
     try {
       round = Object.freeze({
         id: this.roundIdGenerator(),
-        number: (room.round?.number ?? 0) + 1,
+        number: room.nextRoundNumber,
         settings,
         board,
         participants,
@@ -572,6 +581,7 @@ export class RoomStore {
     }
 
     room.round = round;
+    room.nextRoundNumber += 1;
     room.roundSubmissions = new Map(
       participants.map((participant) => [
         participant.playerId,
@@ -1259,6 +1269,7 @@ export class RoomStore {
       display: this.toDisplayState(room.display),
       controllerStatus: room.controllerStatus,
       controllerPlayerId: room.controllerPlayerId,
+      highlights: structuredClone(room.highlights),
       players: [...room.players.values()]
         .sort(comparePlayersByJoinOrder)
         .map((player) => this.toPlayerState(room, player)),
@@ -1380,6 +1391,18 @@ export class RoomStore {
   }
 
   private reconcileRound(room: InternalRoom, now: number): boolean {
+    if (
+      room.phase === 'ROUND_ENDED' &&
+      room.resultsExpiresAt !== null &&
+      now >= room.resultsExpiresAt
+    ) {
+      room.phase = 'LOBBY';
+      room.round = null;
+      room.roundSubmissions = null;
+      room.resultsExpiresAt = null;
+      room.stateVersion += 1;
+      return true;
+    }
     const round = room.round;
     if (
       room.phase !== 'ROUND_ACTIVE' ||
@@ -1515,11 +1538,77 @@ export class RoomStore {
         'The authoritative round could not be finalized.',
       );
     }
+    const highlights = this.deriveFinalizedHighlights(room, finalizedRound);
 
     room.phase = 'ROUND_ENDED';
     room.round = finalizedRound;
+    room.highlights = highlights;
+    room.resultsExpiresAt = now + productConfig.resultsDisplaySeconds * 1_000;
     room.stateVersion += 1;
     return true;
+  }
+
+  private deriveFinalizedHighlights(
+    room: InternalRoom,
+    finalizedRound: InternalRound,
+  ): RoomHighlights {
+    const results = finalizedRound.results;
+    if (!results) {
+      throw new RoomOperationError(
+        'INTERNAL_ERROR',
+        'The authoritative round could not be finalized.',
+      );
+    }
+
+    const winningScore = results.players[0]?.finalScore ?? 0;
+    const playersById = new Map(
+      results.players.map((player) => [player.playerId, player]),
+    );
+    const winners = results.winnerPlayerIds.map((playerId) => {
+      const player = playersById.get(playerId);
+      if (!player) {
+        throw new RoomOperationError(
+          'INTERNAL_ERROR',
+          'The authoritative round could not be finalized.',
+        );
+      }
+      return { playerId: player.playerId, displayName: player.displayName };
+    });
+    const lastRound =
+      winningScore > 0
+        ? {
+            roundNumber: finalizedRound.number,
+            winners,
+            winningScore,
+          }
+        : {
+            roundNumber: finalizedRound.number,
+            winners: [],
+            winningScore: null,
+          };
+    const existingRecord = room.highlights.roomRecord;
+    const roomRecord =
+      winningScore > 0 &&
+      (!existingRecord || winningScore > existingRecord.score)
+        ? {
+            roundNumber: finalizedRound.number,
+            holders: winners,
+            score: winningScore,
+          }
+        : existingRecord;
+    const parsedHighlights = roomHighlightsSchema.safeParse({
+      lastRound,
+      roomRecord,
+    });
+
+    if (!parsedHighlights.success) {
+      throw new RoomOperationError(
+        'INTERNAL_ERROR',
+        'The authoritative round could not be finalized.',
+      );
+    }
+
+    return parsedHighlights.data;
   }
 
   private requireConnectedController(

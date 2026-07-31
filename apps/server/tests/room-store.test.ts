@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { roomStateSchema } from '@words/shared';
+import { productConfig, roomStateSchema } from '@words/shared';
 
 import {
   RoomOperationError,
@@ -23,6 +23,7 @@ function createStore(
     playerIds?: string[];
     roundIds?: string[];
     roundBoardGenerator?: RoomStoreOptions['roundBoardGenerator'];
+    reconcileWords?: RoomStoreOptions['reconcileWords'];
   } = {},
 ) {
   const codes = options.codes ?? ['ABC234'];
@@ -51,6 +52,9 @@ function createStore(
       options.roundIds?.[roundIndex++] ?? createUuid(500 + roundIndex),
     ...(options.roundBoardGenerator
       ? { roundBoardGenerator: options.roundBoardGenerator }
+      : {}),
+    ...(options.reconcileWords
+      ? { reconcileWords: options.reconcileWords }
       : {}),
     reconnectTokenGenerator: () =>
       `${String(++tokenIndex).padStart(3, '0')}${'t'.repeat(40)}`,
@@ -119,6 +123,10 @@ describe('RoomStore display and player sessions', () => {
     expect(result.room.players).toHaveLength(0);
     expect(result.room.controllerStatus).toBe('none');
     expect(result.room.controllerPlayerId).toBeNull();
+    expect(result.room.highlights).toEqual({
+      lastRound: null,
+      roomRecord: null,
+    });
     expect(result.session.displaySessionId).toMatch(
       /^00000000-0000-4000-8000-/,
     );
@@ -528,6 +536,11 @@ describe('RoomStore display and player sessions', () => {
     );
     expect(reconnected.room.display.connected).toBe(true);
     expect(reconnected.room.players[0]?.id).toBe(joined.session.playerId);
+    expect(reconnected.room.highlights).toEqual({
+      lastRound: null,
+      roomRecord: null,
+    });
+    expect(reconnected.room.highlights).not.toBe(created.room.highlights);
     expectRoomError(
       () =>
         store.reconnectDisplay(
@@ -1463,6 +1476,7 @@ describe('RoomStore authoritative settings and rounds', () => {
     options: {
       now?: () => number;
       generator?: RoomStoreOptions['roundBoardGenerator'];
+      reconcileWords?: RoomStoreOptions['reconcileWords'];
     } = {},
   ) {
     const store = createStore({
@@ -1470,6 +1484,9 @@ describe('RoomStore authoritative settings and rounds', () => {
       roundBoardGenerator:
         options.generator ?? ((size) => createSuccessfulBoard(size)),
       roundIds: [createUuid(701), createUuid(702)],
+      ...(options.reconcileWords
+        ? { reconcileWords: options.reconcileWords }
+        : {}),
     });
     const display = store.createDisplay('socket-display');
     const controller = store.joinPlayer(
@@ -1483,6 +1500,61 @@ describe('RoomStore authoritative settings and rounds', () => {
       playerId: controller.session.playerId,
     };
     return { store, display, controller, controllerSession };
+  }
+
+  function reconcileWithFinalScores(
+    scores: readonly number[],
+  ): NonNullable<RoomStoreOptions['reconcileWords']> {
+    return (participants) => ({
+      success: true,
+      participants: participants.map((participant, index) => {
+        const score = scores[index] ?? 0;
+        const words =
+          score === 0
+            ? []
+            : score === 4
+              ? [
+                  {
+                    word: index === 0 ? 'CAT' : 'DOG',
+                    basePoints: 3 as const,
+                    shared: false,
+                    uniqueBonusPoints: 1 as const,
+                    finalPoints: 4,
+                  },
+                ]
+              : score === 8
+                ? [
+                    {
+                      word: index === 0 ? 'CAT' : 'DOG',
+                      basePoints: 3 as const,
+                      shared: false,
+                      uniqueBonusPoints: 1 as const,
+                      finalPoints: 4,
+                    },
+                    {
+                      word: index === 0 ? 'HEN' : 'OWL',
+                      basePoints: 3 as const,
+                      shared: false,
+                      uniqueBonusPoints: 1 as const,
+                      finalPoints: 4,
+                    },
+                  ]
+                : (() => {
+                    throw new Error(`Unsupported test score: ${score}`);
+                  })();
+
+        return {
+          playerId: participant.playerId,
+          baseScore: words.reduce((total, word) => total + word.basePoints, 0),
+          uniqueBonusScore: words.reduce(
+            (total, word) => total + word.uniqueBonusPoints,
+            0,
+          ),
+          finalScore: score,
+          words,
+        };
+      }),
+    });
   }
 
   it('lets only the connected controller update complete room settings', () => {
@@ -1872,7 +1944,7 @@ describe('RoomStore authoritative settings and rounds', () => {
     });
   });
 
-  it('rejects a duplicate round ID without replacing an ended round', () => {
+  it('rejects a start while an ended round remains visible', () => {
     let now = Date.parse('2026-07-29T20:00:00.000Z');
     const duplicateId = createUuid(711);
     const store = createStore({
@@ -1897,7 +1969,7 @@ describe('RoomStore authoritative settings and rounds', () => {
 
     expectRoomError(
       () => store.startRound(session, 'socket-controller'),
-      'INTERNAL_ERROR',
+      'ROUND_IN_PROGRESS',
     );
     expect(store.getRoomState(display.room.code)).toMatchObject({
       phase: 'ROUND_ENDED',
@@ -2117,7 +2189,7 @@ describe('RoomStore authoritative settings and rounds', () => {
     expect(store.getRoomState(display.room.code)).toBeNull();
   });
 
-  it('reconciles an expired round before a controller action', () => {
+  it('keeps finalized results until the authoritative window expires', () => {
     let now = Date.parse('2026-07-29T20:00:00.000Z');
     const { store, controllerSession } = createRoundRoom({ now: () => now });
     store.updateSettings(
@@ -2132,21 +2204,35 @@ describe('RoomStore authoritative settings and rounds', () => {
     store.startRound(controllerSession, 'socket-controller');
     now += 30_000;
 
-    const updated = store.updateSettings(
-      controllerSession,
-      {
-        gridSize: 6,
-        roundDurationSeconds: 60,
-        scoringMode: 'length-plus-unique',
-      },
-      'socket-controller',
-    ).room;
-    expect(updated.phase).toBe('ROUND_ENDED');
-    expect(updated.settings.gridSize).toBe(6);
-    expect(updated.round?.settings.gridSize).toBe(4);
+    expectRoomError(
+      () =>
+        store.updateSettings(
+          controllerSession,
+          {
+            gridSize: 6,
+            roundDurationSeconds: 60,
+            scoringMode: 'length-plus-unique',
+          },
+          'socket-controller',
+        ),
+      'ROUND_IN_PROGRESS',
+    );
+    const ended = store.getRoomState('ABC234');
+    expect(ended?.phase).toBe('ROUND_ENDED');
+    const version = ended?.stateVersion;
+    now += productConfig.resultsDisplaySeconds * 1_000 - 1;
+    expect(store.advanceDueRounds()).toEqual([]);
+    expect(store.getRoomState('ABC234')?.round).not.toBeNull();
+    now += 1;
+    expect(store.advanceDueRounds()).toEqual(['ABC234']);
+    const lobby = store.getRoomState('ABC234');
+    expect(lobby?.phase).toBe('LOBBY');
+    expect(lobby?.round).toBeNull();
+    expect(lobby?.stateVersion).toBe((version ?? 0) + 1);
+    expect(store.advanceDueRounds()).toEqual([]);
   });
 
-  it('starts the next numbered round after the prior round ends', () => {
+  it('starts Round 2 after temporary Round 1 results are discarded', () => {
     let now = Date.parse('2026-07-29T20:00:00.000Z');
     const { store, controllerSession } = createRoundRoom({ now: () => now });
     store.updateSettings(
@@ -2160,11 +2246,195 @@ describe('RoomStore authoritative settings and rounds', () => {
     );
     store.startRound(controllerSession, 'socket-controller');
     now += 30_000;
+    store.advanceDueRounds();
+    now += productConfig.resultsDisplaySeconds * 1_000;
+    store.advanceDueRounds();
 
     const next = store.startRound(controllerSession, 'socket-controller').room;
     expect(next.phase).toBe('ROUND_ACTIVE');
     expect(next.round?.number).toBe(2);
     expect(next.round?.id).toBe(createUuid(702));
+  });
+
+  it('derives, preserves, and replaces authoritative highlights across rounds', () => {
+    let now = Date.parse('2026-07-29T20:00:00.000Z');
+    const scorePlans = [
+      [4, 0],
+      [4, 4],
+      [0, 0],
+      [8, 8],
+    ] as const;
+    let finalizationIndex = 0;
+    const { store, display, controllerSession } = createRoundRoom({
+      now: () => now,
+      reconcileWords: (participants) =>
+        reconcileWithFinalScores(scorePlans[finalizationIndex++] ?? [])(
+          participants,
+        ),
+    });
+    const ordinary = store.joinPlayer(
+      display.room.code,
+      'Amber Kite',
+      'socket-ordinary',
+    );
+    const finishRound = () => {
+      const started = store.startRound(
+        controllerSession,
+        'socket-controller',
+      ).room;
+      const activity = started.lastActivityAt;
+      const expiry = started.expiresAt;
+      now += 120_000;
+      expect(store.advanceDueRounds()).toEqual([display.room.code]);
+      const ended = store.getRoomState(display.room.code);
+      expect(ended?.lastActivityAt).toBe(activity);
+      expect(ended?.expiresAt).toBe(expiry);
+      expect(roomStateSchema.safeParse(ended).success).toBe(true);
+      return ended;
+    };
+    const resetRound = () => {
+      now += productConfig.resultsDisplaySeconds * 1_000;
+      expect(store.advanceDueRounds()).toEqual([display.room.code]);
+      return store.getRoomState(display.room.code);
+    };
+
+    const first = finishRound();
+    expect(first?.highlights).toEqual({
+      lastRound: {
+        roundNumber: 1,
+        winners: [
+          { playerId: controllerSession.playerId, displayName: 'Silver Owl' },
+        ],
+        winningScore: 4,
+      },
+      roomRecord: {
+        roundNumber: 1,
+        holders: [
+          { playerId: controllerSession.playerId, displayName: 'Silver Owl' },
+        ],
+        score: 4,
+      },
+    });
+
+    const firstWinner = first?.highlights.lastRound?.winners[0];
+    if (!firstWinner) {
+      throw new Error('Expected a first-round winner.');
+    }
+    Reflect.set(firstWinner, 'displayName', 'Mutated');
+    const freshFirst = store.getRoomState(display.room.code);
+    expect(freshFirst?.highlights.lastRound?.winners[0]?.displayName).toBe(
+      'Silver Owl',
+    );
+
+    const lobbyAfterFirst = resetRound();
+    expect(lobbyAfterFirst?.phase).toBe('LOBBY');
+    expect(lobbyAfterFirst?.round).toBeNull();
+    expect(lobbyAfterFirst?.highlights.roomRecord).toEqual({
+      roundNumber: 1,
+      holders: [
+        { playerId: controllerSession.playerId, displayName: 'Silver Owl' },
+      ],
+      score: 4,
+    });
+
+    const second = finishRound();
+    expect(second?.round?.number).toBe(2);
+    expect(second?.highlights.lastRound).toEqual({
+      roundNumber: 2,
+      winners: [
+        { playerId: controllerSession.playerId, displayName: 'Silver Owl' },
+        { playerId: ordinary.session.playerId, displayName: 'Amber Kite' },
+      ],
+      winningScore: 4,
+    });
+    expect(second?.highlights.roomRecord?.roundNumber).toBe(1);
+
+    resetRound();
+    const third = finishRound();
+    expect(third?.highlights.lastRound).toEqual({
+      roundNumber: 3,
+      winners: [],
+      winningScore: null,
+    });
+    expect(third?.highlights.roomRecord?.score).toBe(4);
+
+    resetRound();
+    const fourth = finishRound();
+    expect(fourth?.highlights.roomRecord).toEqual({
+      roundNumber: 4,
+      holders: [
+        { playerId: controllerSession.playerId, displayName: 'Silver Owl' },
+        { playerId: ordinary.session.playerId, displayName: 'Amber Kite' },
+      ],
+      score: 8,
+    });
+    const recordHolders = fourth?.highlights.roomRecord?.holders;
+    if (!recordHolders) {
+      throw new Error('Expected record holders.');
+    }
+    Reflect.apply(Array.prototype.push, recordHolders, [
+      { playerId: createUuid(999), displayName: 'Mutated' },
+    ]);
+    const freshFourth = store.getRoomState(display.room.code);
+    expect(freshFourth?.highlights.roomRecord?.holders).toHaveLength(2);
+    expect(freshFourth?.highlights.roomRecord?.holders[0]?.displayName).toBe(
+      'Silver Owl',
+    );
+    const version = fourth?.stateVersion;
+    expect(store.advanceDueRounds()).toEqual([]);
+    expect(store.getRoomState(display.room.code)?.stateVersion).toBe(version);
+  });
+
+  it('leaves the room unchanged when finalization validation fails', () => {
+    let now = Date.parse('2026-07-29T20:00:00.000Z');
+    let returnValidResults = false;
+    const { store, display, controllerSession } = createRoundRoom({
+      now: () => now,
+      reconcileWords: (participants) =>
+        returnValidResults
+          ? reconcileWithFinalScores([4])(participants)
+          : {
+              success: true,
+              participants: participants.map((participant) => ({
+                playerId: participant.playerId,
+                baseScore: 4,
+                uniqueBonusScore: 0,
+                finalScore: 4,
+                words: [],
+              })),
+            },
+    });
+    const started = store.startRound(
+      controllerSession,
+      'socket-controller',
+    ).room;
+    now += 120_000;
+
+    expectRoomError(
+      () => store.reconcileDueRound(display.room.code, now),
+      'INTERNAL_ERROR',
+    );
+    returnValidResults = true;
+    const ended = store.reconcileDueRound(display.room.code, now);
+
+    expect(ended?.phase).toBe('ROUND_ENDED');
+    expect(ended?.stateVersion).toBe(started.stateVersion + 1);
+    expect(ended?.highlights).toEqual({
+      lastRound: {
+        roundNumber: 1,
+        winners: [
+          { playerId: controllerSession.playerId, displayName: 'Silver Owl' },
+        ],
+        winningScore: 4,
+      },
+      roomRecord: {
+        roundNumber: 1,
+        holders: [
+          { playerId: controllerSession.playerId, displayName: 'Silver Owl' },
+        ],
+        score: 4,
+      },
+    });
   });
 
   it('transfers controller during a round without changing round state', () => {

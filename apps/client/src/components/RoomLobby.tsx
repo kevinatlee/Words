@@ -24,11 +24,9 @@ import {
 } from '../utils/word-entry';
 import { ControllerPanel } from './ControllerPanel';
 import { GameSettings } from './GameSettings';
-import { JoinQrCode } from './JoinQrCode';
+import { DisplayJoinBoard } from './DisplayJoinBoard';
 import { LetterGrid } from './LetterGrid';
-import { PlayerList } from './PlayerList';
 import { PrototypeNotice } from './PrototypeNotice';
-import { RoomCode } from './RoomCode';
 import { RoundResults } from './RoundResults';
 
 type RoomLobbyProps = {
@@ -42,6 +40,12 @@ type RoomLobbyProps = {
   submissionState: PlayerRoundSubmissionState | null;
   onSubmitWord: (input: SubmitWordInput) => Promise<SubmitWordResponse>;
 };
+
+function formatHighlightNames(
+  people: readonly { readonly displayName: string }[],
+): string {
+  return people.map((person) => person.displayName).join(' & ');
+}
 
 export function RoomLobby({
   room,
@@ -67,9 +71,6 @@ export function RoomLobby({
   const currentPlayer = room.players.find(
     (player) => player.id === currentPlayerId,
   );
-  const controller = room.players.find(
-    (player) => player.id === room.controllerPlayerId,
-  );
   const isDisplay = sessionRole === 'display';
   const isConnectedController =
     sessionRole === 'player' &&
@@ -78,15 +79,11 @@ export function RoomLobby({
     currentPlayer.id === room.controllerPlayerId;
   const roundIsActive = room.phase === 'ROUND_ACTIVE';
   const roundIsEnded = room.phase === 'ROUND_ENDED';
-  const canChangeSettings = isConnectedController && !roundIsActive;
-  const canStartRound = isConnectedController && !roundIsActive;
-  const showControllerAdministration = isConnectedController && !roundIsActive;
+  const canChangeSettings = isConnectedController && room.phase === 'LOBBY';
+  const canStartRound = isConnectedController && room.phase === 'LOBBY';
+  const showControllerAdministration =
+    isConnectedController && room.phase === 'LOBBY';
   const joinUrl = buildJoinUrl(window.location.origin, room.code);
-  const joinQrContext = roundIsActive
-    ? 'active-round'
-    : roundIsEnded
-      ? 'ended-round'
-      : 'lobby';
   const countdownMs = useRoundCountdown(room);
   const letters = useMemo(
     () =>
@@ -219,27 +216,6 @@ export function RoomLobby({
     void submitSelection();
   }, [submitSelection]);
 
-  const heading = isDisplay
-    ? roundIsActive
-      ? `Round ${room.round?.number ?? ''} is live.`
-      : roundIsEnded
-        ? `Round ${room.round?.number ?? ''} results.`
-        : 'Shared display is ready.'
-    : currentPlayer?.isController
-      ? 'You’re the game host.'
-      : 'You’re in the room.';
-  const supportingText = isDisplay
-    ? roundIsActive
-      ? 'The server owns this board and the official round deadline.'
-      : roundIsEnded
-        ? 'Final results are shared with everyone in this room.'
-        : 'Share the code and keep this screen visible while phone players join.'
-    : currentPlayer?.isController
-      ? roundIsActive
-        ? 'Play normally. Settings and another start unlock after the official deadline.'
-        : 'Choose the next round settings, start it, and play normally.'
-      : `Waiting with ${controller?.displayName ?? 'the next Game Host'}.`;
-
   const runSettingsUpdate = async (settings: RoomSettings) => {
     if (!canChangeSettings || actionPending) {
       return;
@@ -262,40 +238,138 @@ export function RoomLobby({
     setActionPending(false);
   };
 
+  if (isDisplay) {
+    const controller = room.players.find(
+      (player) => player.id === room.controllerPlayerId,
+    );
+    const orderedPlayers = [
+      ...(controller ? [controller] : []),
+      ...room.players.filter(
+        (player) => player.id !== controller?.id && player.connected,
+      ),
+      ...room.players.filter(
+        (player) => player.id !== controller?.id && !player.connected,
+      ),
+    ];
+    const lastRound = room.highlights.lastRound;
+    const roomRecord = room.highlights.roomRecord;
+
+    return (
+      <div className="room-page display-room-page">
+        {roundIsEnded && room.round?.results ? (
+          <RoundResults
+            roundNumber={room.round.number}
+            results={room.round.results}
+          />
+        ) : (
+          <div className="display-room-layout">
+            <aside
+              className="panel display-side-panel"
+              aria-labelledby="display-players-title"
+            >
+              <h2 id="display-players-title">Players</h2>
+              {orderedPlayers.length === 0 ? (
+                <p>No players connected</p>
+              ) : (
+                <ol className="display-player-list">
+                  {orderedPlayers.map((player) => (
+                    <li
+                      className={
+                        !player.connected
+                          ? 'display-player-list__item--offline'
+                          : ''
+                      }
+                      key={player.id}
+                    >
+                      <span
+                        className="display-player-list__name"
+                        title={player.displayName}
+                      >
+                        {player.id === controller?.id && (
+                          <span aria-label="Game Host">♛ </span>
+                        )}
+                        {player.displayName}
+                      </span>
+                      <small>
+                        {player.connected
+                          ? 'Connected'
+                          : 'Recently disconnected'}
+                      </small>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </aside>
+            <section
+              className={`panel display-puzzle-panel${roundIsActive ? ' display-puzzle-panel--active' : ''}`}
+              aria-label="Puzzle"
+            >
+              {roundIsActive && room.round ? (
+                <>
+                  <div className="round-clock" role="timer" aria-live="off">
+                    <small>Time Remaining</small>
+                    <strong>
+                      {Math.ceil((countdownMs ?? 0) / 1_000)} seconds
+                    </strong>
+                  </div>
+                  <LetterGrid
+                    letters={[...room.round.board.tiles]}
+                    size={room.round.board.size}
+                    label={`${room.round.board.size} by ${room.round.board.size} official letter grid`}
+                    selectedIndices={[]}
+                    interactive={false}
+                    disabled
+                    onSelect={() => undefined}
+                    entryMode="touch"
+                    traceResetKey={room.round.id}
+                  />
+                </>
+              ) : (
+                <DisplayJoinBoard joinUrl={joinUrl} />
+              )}
+            </section>
+            <aside
+              className="panel display-side-panel"
+              aria-labelledby="display-highlights-title"
+            >
+              <h2 id="display-highlights-title">Room Highlights</h2>
+              <section>
+                <h3>Last Round</h3>
+                {lastRound === null ? (
+                  <p>No completed rounds yet</p>
+                ) : lastRound.winners.length === 0 ? (
+                  <p>No scoring winner</p>
+                ) : (
+                  <p>
+                    <strong>{formatHighlightNames(lastRound.winners)}</strong>
+                    <br />
+                    {lastRound.winningScore} points
+                  </p>
+                )}
+              </section>
+              <section>
+                <h3>Room Record</h3>
+                {roomRecord === null ? (
+                  <p>No room record yet</p>
+                ) : (
+                  <p>
+                    <strong>{formatHighlightNames(roomRecord.holders)}</strong>
+                    <br />
+                    {roomRecord.score} points{' '}
+                    <small>Round {roomRecord.roundNumber}</small>
+                  </p>
+                )}
+              </section>
+            </aside>
+          </div>
+        )}
+        <footer className="display-room-footer">{joinUrl}</footer>
+      </div>
+    );
+  }
+
   return (
     <div className={`room-page${isDisplay ? '' : ' room-page--phone'}`}>
-      {isDisplay && (
-        <section className="room-intro">
-          <div>
-            <span className="eyebrow">Live temporary room</span>
-            <h1>{heading}</h1>
-            <p>{supportingText}</p>
-          </div>
-          <RoomCode code={room.code} />
-        </section>
-      )}
-
-      {isDisplay && (
-        <div className="lobby-toolbar">
-          <span
-            className={`connection-status connection-status--${connectionStatus}`}
-          >
-            {connectionStatus === 'connected'
-              ? 'Connected'
-              : connectionStatus === 'connecting'
-                ? 'Reconnecting…'
-                : 'Disconnected'}
-          </span>
-          <span className="status-label">
-            {room.phase === 'LOBBY'
-              ? 'Lobby'
-              : room.phase === 'ROUND_ACTIVE'
-                ? 'Round active'
-                : 'Round ended'}
-          </span>
-        </div>
-      )}
-
       {actionError && (
         <p className="form-error" role="alert">
           {actionError.message}
@@ -333,69 +407,7 @@ export function RoomLobby({
       <div
         className={`room-dashboard${isDisplay ? '' : ' room-dashboard--phone'}`}
       >
-        {isDisplay && (
-          <div className="room-dashboard__lobby">
-            <section className="panel share-panel">
-              <div className="panel-heading">
-                <div>
-                  <span className="eyebrow">Display session</span>
-                  <h2>Shared Screen</h2>
-                </div>
-                <span
-                  className={`status-label${room.display.connected ? ' status-label--display' : ''}`}
-                >
-                  {room.display.connected
-                    ? 'Display connected'
-                    : 'Display offline'}
-                </span>
-              </div>
-              {isDisplay ? (
-                <p>
-                  This shared screen presents the room while phone players join
-                  and play.
-                </p>
-              ) : (
-                <p>
-                  Players can open{' '}
-                  <a className="join-url" href={joinUrl}>
-                    {joinUrl}
-                  </a>{' '}
-                  to join this room.
-                </p>
-              )}
-            </section>
-            {isDisplay && (
-              <JoinQrCode
-                joinUrl={joinUrl}
-                roomCode={room.code}
-                presentation={roundIsActive ? 'compact' : 'prominent'}
-                context={joinQrContext}
-              />
-            )}
-            <PlayerList
-              players={room.players}
-              maxPlayers={room.maxPlayers}
-              currentPlayerId={currentPlayerId}
-            />
-            {showControllerAdministration && (
-              <ControllerPanel
-                room={room}
-                currentPlayerId={currentPlayerId}
-                onTransfer={onTransferController}
-              />
-            )}
-          </div>
-        )}
-
         <div className="room-dashboard__preview">
-          {isDisplay && showControllerAdministration && (
-            <GameSettings
-              settings={room.settings}
-              disabled={!canChangeSettings || actionPending}
-              pending={actionPending}
-              onChange={(settings) => void runSettingsUpdate(settings)}
-            />
-          )}
           <section
             className="panel board-panel"
             aria-labelledby={isDisplay ? 'board-title' : undefined}
@@ -403,23 +415,6 @@ export function RoomLobby({
             data-round-id={room.round?.id}
             data-round-deadline-at={room.round?.deadlineAt}
           >
-            {isDisplay && (
-              <div className="panel-heading board-panel__heading">
-                <div>
-                  <span className="eyebrow">
-                    {room.round
-                      ? `Round ${room.round.number}`
-                      : 'Layout preview'}
-                  </span>
-                  <h2 id="board-title">{`${boardSize} × ${boardSize} Letter Grid`}</h2>
-                </div>
-                <span
-                  className={`status-label${room.round ? ' status-label--display' : ''}`}
-                >
-                  {room.round ? 'Official board' : 'Non-official preview'}
-                </span>
-              </div>
-            )}
             {room.round && (
               <div
                 className={`round-clock${isDisplay ? '' : ' round-clock--phone'}`}
@@ -500,43 +495,22 @@ export function RoomLobby({
                   </div>
                 </section>
               )}
-            {isDisplay && roundIsEnded && room.round?.results && (
-              <RoundResults
-                roundNumber={room.round.number}
-                results={room.round.results}
-                currentPlayerId={currentPlayerId}
-                isDisplay={isDisplay}
-              />
-            )}
-            {(isDisplay || (isConnectedController && !roundIsActive)) && (
-              <div className="round-action">
-                {isDisplay && (
-                  <p>
-                    {roundIsActive
-                      ? `${room.round?.participants.length ?? 0} players were present when this round started.`
-                      : `Next round: ${room.settings.roundDurationSeconds} seconds with a server-owned board.`}
-                  </p>
-                )}
-                {(isDisplay
-                  ? !roundIsEnded || isConnectedController
-                  : true) && (
-                  <button
-                    className="button button--primary"
-                    type="button"
-                    disabled={!canStartRound || actionPending}
-                    onClick={() => void runStartRound()}
-                  >
-                    {actionPending
-                      ? 'Working…'
-                      : room.phase === 'ROUND_ENDED'
-                        ? 'Start Next Round'
-                        : 'Start Round'}
-                  </button>
-                )}
-              </div>
-            )}
           </section>
-          {!isDisplay && showControllerAdministration && (
+          {isConnectedController && room.phase === 'LOBBY' && (
+            <div className="round-action">
+              {
+                <button
+                  className="button button--primary"
+                  type="button"
+                  disabled={!canStartRound || actionPending}
+                  onClick={() => void runStartRound()}
+                >
+                  {actionPending ? 'Working…' : 'Start Round'}
+                </button>
+              }
+            </div>
+          )}
+          {showControllerAdministration && (
             <GameSettings
               settings={room.settings}
               disabled={!canChangeSettings || actionPending}
@@ -544,7 +518,7 @@ export function RoomLobby({
               onChange={(settings) => void runSettingsUpdate(settings)}
             />
           )}
-          {!isDisplay && showControllerAdministration && (
+          {showControllerAdministration && (
             <ControllerPanel
               room={room}
               currentPlayerId={currentPlayerId}

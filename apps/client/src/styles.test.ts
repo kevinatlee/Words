@@ -42,4 +42,28 @@ describe('tile typography', () => {
     );
     expect(styles).toMatch(/\.word-entry__actions\s*\{[^}]*margin-top: 0;/s);
   });
+
+  it('keeps the display presentation centered and within TV-height bounds', () => {
+    expect(styles).toMatch(
+      /\.site-header--display\s*\{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/s,
+    );
+    expect(styles).toMatch(
+      /\.display-room-layout\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\) auto minmax\(0, 1fr\);/s,
+    );
+    expect(styles).toMatch(
+      /\.display-room-page\s*\{[^}]*min-height: calc\(100dvh - 4\.75rem\);/s,
+    );
+    expect(styles).toMatch(
+      /\.display-puzzle-panel--active\s*\{[^}]*100dvh - 14\.5rem/s,
+    );
+    expect(styles).toMatch(
+      /\.display-player-list__name\s*\{[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-results__cards--7,\s*\.display-results__cards--8\s*\{[^}]*repeat\(4, minmax\(0, 1fr\)\);/s,
+    );
+    expect(styles).toMatch(
+      /\.result-player-card\s*\{[^}]*border-radius: var\(--radius-md\);[^}]*color: var\(--ink-950\);/s,
+    );
+  });
 });
