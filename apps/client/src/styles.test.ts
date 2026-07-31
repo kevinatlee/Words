@@ -23,4 +23,14 @@ describe('tile typography', () => {
       /\.room-page--phone \.round-clock--phone small\s*\{[^}]*font-size: clamp\(1\.2rem, 3vw, 1\.8rem\);[^}]*font-weight: 900;/s,
     );
   });
+
+  it('insets phone connection status and stacks phone word submission controls', () => {
+    expect(styles).toMatch(
+      /\.connection-status--phone\s*\{[^}]*margin-right: calc\(env\(safe-area-inset-right\) \+ 0\.5rem\);/s,
+    );
+    expect(styles).toMatch(/\.word-entry\s*\{[^}]*flex-direction: column;/s);
+    expect(styles).toMatch(
+      /\.word-entry__actions \.button\s*\{[^}]*width: 100%;/s,
+    );
+  });
 });

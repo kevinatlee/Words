@@ -648,6 +648,18 @@ export function App({
   let pageClassName: string;
   const routeRoomCode = roomCodeFromPath(currentPath);
   const routeJoinRoomCode = joinRoomCodeFromPath(currentPath);
+  const currentPlayer =
+    room && session?.role === 'player'
+      ? room.players.find((player) => player.id === session.playerId)
+      : null;
+  const showJoinAnotherRoom =
+    currentPath !== '/' &&
+    (!routeRoomCode ||
+      session?.role !== 'player' ||
+      Boolean(
+        currentPlayer?.connected &&
+        currentPlayer.id === room?.controllerPlayerId,
+      ));
 
   if (currentPath === '/') {
     if (room && session?.role === 'display') {
@@ -762,6 +774,7 @@ export function App({
       phoneConnectionStatus={
         room && session?.role === 'player' ? connectionStatus : null
       }
+      showJoinAnotherRoom={showJoinAnotherRoom}
     >
       {page}
     </AppShell>

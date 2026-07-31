@@ -67,8 +67,8 @@ This is planned, not implemented by Stage 4F:
 - Puzzle bubbles have no visible heading on phones but retain an accessible
   puzzle label. During active participation, the headingless Tap/Trace control
   is a separate bubble directly below the puzzle.
-- Ordinary players see a concise waiting message between rounds and never see
-  settings or controller delegation.
+- Ordinary players see only the puzzle preview between rounds and never see
+  settings, controller delegation, or a waiting message.
 - The controller sees three distinct sibling bubbles in the lobby and after
   results: Puzzle (including Start Round or Start Next Round), Game Settings,
   then Player Authority. Those administration bubbles are absent during active
@@ -82,6 +82,11 @@ This is planned, not implemented by Stage 4F:
   active-TV word-count presentation remains deferred to the separate TV
   redesign because it needs an aggregate-display decision.
 - The production UI does not display a development-stage identifier.
+- Phone connection status includes safe-area-aware right-side breathing room.
+  The Game Settings bubble begins with its titled fieldset legends and compact
+  duration labels; the Game Host bubble retains its heading and transfer
+  controls without repeating the current host identity. Active word entry
+  stacks the selected word, Submit action, and feedback vertically.
 
 ## Current boundary
 

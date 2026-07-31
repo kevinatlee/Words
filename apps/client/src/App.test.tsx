@@ -598,12 +598,19 @@ describe('Stage 4B display and player room routes', () => {
       await screen.findByRole('region', { name: 'Puzzle' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Game Settings' }),
+      screen.getByRole('region', { name: 'Game settings' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start Round' })).toBeEnabled();
     expect(
       within(screen.getByRole('banner')).getByText('Connected'),
     ).toBeVisible();
+    expect(
+      within(screen.getByRole('banner')).getByText('Connected'),
+    ).toHaveClass('connection-status--phone');
+    expect(
+      screen.getByRole('link', { name: 'Join Another Room' }),
+    ).toBeVisible();
+    expect(screen.queryByRole('contentinfo')).toBeNull();
     expect(container.querySelector('.lobby-toolbar--phone')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Leave room' })).toBeNull();
     expect(screen.queryByText('Live temporary room')).toBeNull();
@@ -642,16 +649,19 @@ describe('Stage 4B display and player room routes', () => {
       await screen.findByRole('region', { name: 'Puzzle' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Waiting for the game host to start the round.'),
-    ).toBeInTheDocument();
+      screen.queryByText('Waiting for the game host to start the round.'),
+    ).toBeNull();
     expect(screen.queryByText('<Bright Fox> (you)')).toBeNull();
     expect(screen.queryByText('Silver Owl')).toBeNull();
     expect(container.querySelector('b')).toBeNull();
     expect(
       screen.queryByRole('button', { name: 'Make Game Host' }),
     ).not.toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Game Settings' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Start Round' })).toBeNull();
+    expect(
+      screen.queryByRole('link', { name: 'Join Another Room' }),
+    ).toBeNull();
     expect(
       screen.queryByRole('region', {
         name: /scan to join|join the next round/i,
@@ -1207,8 +1217,8 @@ describe('Stage 4B display and player room routes', () => {
       await screen.findByRole('region', { name: 'Puzzle' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Waiting for the game host to start the round.'),
-    ).toBeInTheDocument();
+      screen.queryByText('Waiting for the game host to start the round.'),
+    ).toBeNull();
     expect(screen.queryByText('Display offline')).toBeNull();
     expect(screen.queryByText('Game Host offline')).toBeNull();
   });

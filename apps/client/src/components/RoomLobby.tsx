@@ -310,7 +310,7 @@ export function RoomLobby({
               <div className="panel-heading">
                 <div>
                   <span className="eyebrow">Display session</span>
-                  <h2>Shared screen</h2>
+                  <h2>Shared Screen</h2>
                 </div>
                 <span
                   className={`status-label${room.display.connected ? ' status-label--display' : ''}`}
@@ -364,7 +364,6 @@ export function RoomLobby({
               settings={room.settings}
               disabled={!canChangeSettings || actionPending}
               pending={actionPending}
-              canEdit={canChangeSettings}
               onChange={(settings) => void runSettingsUpdate(settings)}
             />
           )}
@@ -383,7 +382,7 @@ export function RoomLobby({
                       ? `Round ${room.round.number}`
                       : 'Layout preview'}
                   </span>
-                  <h2 id="board-title">{`${boardSize} × ${boardSize} letter grid`}</h2>
+                  <h2 id="board-title">{`${boardSize} × ${boardSize} Letter Grid`}</h2>
                 </div>
                 <span
                   className={`status-label${room.round ? ' status-label--display' : ''}`}
@@ -443,8 +442,8 @@ export function RoomLobby({
                   className="word-entry"
                   aria-labelledby="word-entry-title"
                 >
-                  <div>
-                    <span className="eyebrow">Your word</span>
+                  <div className="word-entry__content">
+                    <span className="eyebrow">Your Word</span>
                     <h3 id="word-entry-title">
                       {candidateWord || 'Select adjacent tiles'}
                     </h3>
@@ -478,14 +477,6 @@ export function RoomLobby({
                 isDisplay={isDisplay}
               />
             )}
-            {!isDisplay &&
-              !roundIsActive &&
-              !roundIsEnded &&
-              !isConnectedController && (
-                <p className="phone-round-message" role="status">
-                  Waiting for the game host to start the round.
-                </p>
-              )}
             {(isDisplay || (isConnectedController && !roundIsActive)) && (
               <div className="round-action">
                 {isDisplay && (
@@ -548,7 +539,6 @@ export function RoomLobby({
               settings={room.settings}
               disabled={!canChangeSettings || actionPending}
               pending={actionPending}
-              canEdit={canChangeSettings}
               onChange={(settings) => void runSettingsUpdate(settings)}
             />
           )}

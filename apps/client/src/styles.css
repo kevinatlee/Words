@@ -118,7 +118,6 @@ button:disabled {
 }
 
 .site-header,
-.site-footer,
 #main-content {
   width: min(100% - 2rem, 90rem);
   margin-inline: auto;
@@ -142,18 +141,6 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 1rem;
-}
-
-.site-footer {
-  display: flex;
-  margin-top: auto;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
-  padding-block: 2.25rem;
-  color: var(--paper-muted);
-  font-size: 0.82rem;
-  text-align: center;
 }
 
 .skip-link {
@@ -1119,9 +1106,8 @@ button:disabled {
 
 .word-entry {
   display: flex;
-  min-height: 5rem;
-  align-items: center;
-  justify-content: space-between;
+  align-items: stretch;
+  flex-direction: column;
   gap: 1rem;
   margin-block: 1rem;
   padding: 0.75rem 0.9rem;
@@ -1131,13 +1117,11 @@ button:disabled {
 }
 
 .word-entry__actions {
-  flex-flow: row wrap !important;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.55rem;
+  margin-top: 0.35rem;
 }
 
 .word-entry__actions .button {
+  width: 100%;
   min-height: 2.75rem;
   padding: 0.65rem 0.9rem;
 }
@@ -1607,7 +1591,6 @@ button:disabled {
 
 @media (max-width: 44rem) {
   .site-header,
-  .site-footer,
   #main-content {
     width: min(100% - 1.25rem, 90rem);
   }
@@ -1616,13 +1599,12 @@ button:disabled {
     min-height: 4.5rem;
   }
 
-  .site-header__actions .text-link {
+  .app-shell--display .site-header__actions .text-link {
     display: none;
   }
 
-  .site-footer {
-    flex-wrap: wrap;
-    padding-block: 1.5rem;
+  .connection-status--phone {
+    margin-right: calc(env(safe-area-inset-right) + 0.5rem);
   }
 
   .role-hero {

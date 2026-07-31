@@ -64,6 +64,9 @@ contract.
   During active play, Tap/Trace is a separate control bubble and phones do not
   show provisional scores or accepted-word counts. Any active-TV word-count
   presentation remains deferred to the future TV redesign.
+- Between rounds, controller settings use compact duration labels and distinct
+  Game Settings and Game Host bubbles; ordinary player phones retain only the
+  puzzle preview.
 - Display and player tabs use separate, temporary reconnect credentials.
 - A display or controller disconnect does not immediately close the room.
 - Rooms and credentials live only in bounded server memory.

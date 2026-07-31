@@ -55,7 +55,7 @@ export function ControllerPanel({
         ? 'The first phone player to join will become the Game Host.'
         : 'No connected player is available. The next player to join or reconnect will become Game Host automatically.'
       : controller?.connected
-        ? `${controller.displayName} is the current Game Host.`
+        ? null
         : 'Waiting for the Game Host to reconnect. If grace expires, the server will select the earliest-joined connected player automatically.';
 
   const submit = async () => {
@@ -83,7 +83,6 @@ export function ControllerPanel({
     <section className="panel controller-panel" aria-labelledby="host-title">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">Player authority</span>
           <h2 id="host-title">Game Host</h2>
         </div>
         <span
@@ -93,18 +92,18 @@ export function ControllerPanel({
         </span>
       </div>
 
-      <p className="controller-panel__status">{statusMessage}</p>
+      {statusMessage && (
+        <p className="controller-panel__status">{statusMessage}</p>
+      )}
 
       {canTransfer && (
         <div className="controller-actions">
           {eligiblePlayers.length > 0 ? (
             <>
-              <label htmlFor="controller-target">
-                Choose a connected phone player
-              </label>
               <div className="transfer-controls">
                 <select
                   id="controller-target"
+                  aria-label="Select New Game Host"
                   value={targetPlayerId}
                   onChange={(event) =>
                     setSelectedPlayerId(event.currentTarget.value)

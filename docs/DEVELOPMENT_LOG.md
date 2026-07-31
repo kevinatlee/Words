@@ -1,5 +1,16 @@
 # Development log
 
+## 2026-07-31 — Phone information architecture refinement (draft)
+
+- Reduced phone visual density while preserving the authoritative lobby and
+  gameplay behavior: the connection status has safe-area-aware spacing, the
+  footer is removed, and ordinary player lobbies contain only the puzzle.
+- Simplified controller-only Game Settings and Game Host bubbles, added compact
+  accessible duration labels, and limited Join Another Room to the currently
+  connected controller according to the authoritative room assignment.
+- Stacked active phone word submission content vertically and retained all
+  existing submission, transfer, reconnect, and display behavior.
+
 ## 2026-07-31 — Integer letter-count scoring (draft)
 
 - Replaced the former tiered and fractional scoring rule with integer

@@ -7,6 +7,7 @@ type AppShellProps = {
   currentPath: string;
   pageClassName?: string;
   phoneConnectionStatus?: 'connected' | 'connecting' | 'disconnected' | null;
+  showJoinAnotherRoom?: boolean;
 };
 
 export function AppShell({
@@ -14,6 +15,7 @@ export function AppShell({
   currentPath,
   pageClassName = '',
   phoneConnectionStatus = null,
+  showJoinAnotherRoom = currentPath !== '/',
 }: AppShellProps) {
   return (
     <div className={`app-shell ${pageClassName}`}>
@@ -27,7 +29,7 @@ export function AppShell({
         <div className="site-header__actions">
           {phoneConnectionStatus && (
             <span
-              className={`connection-status connection-status--${phoneConnectionStatus}`}
+              className={`connection-status connection-status--phone connection-status--${phoneConnectionStatus}`}
             >
               {phoneConnectionStatus === 'connected'
                 ? 'Connected'
@@ -36,19 +38,14 @@ export function AppShell({
                   : 'Disconnected'}
             </span>
           )}
-          {currentPath !== '/' && (
+          {showJoinAnotherRoom && (
             <a className="text-link" href="/join">
-              Join another room
+              Join Another Room
             </a>
           )}
         </div>
       </header>
       <main id="main-content">{children}</main>
-      <footer className="site-footer">
-        <span>Temporary real-time lobbies</span>
-        <span aria-hidden="true">•</span>
-        <span>No account. No progress grind. Just a temporary room.</span>
-      </footer>
     </div>
   );
 }

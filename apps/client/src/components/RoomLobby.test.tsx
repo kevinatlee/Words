@@ -287,7 +287,7 @@ describe('RoomLobby word entry', () => {
     renderLobby();
 
     expect(screen.queryByRole('heading', { name: 'Game Host' })).toBeNull();
-    expect(screen.queryByRole('heading', { name: 'Game Settings' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
   });
 
   it.each([
@@ -307,7 +307,7 @@ describe('RoomLobby word entry', () => {
       const { container } = renderLobby(undefined, { room });
       const preview = container.querySelector('.room-dashboard__preview');
       const puzzle = screen.getByRole('region', { name: 'Puzzle' });
-      const settings = screen.getByRole('region', { name: 'Game Settings' });
+      const settings = screen.getByRole('region', { name: 'Game settings' });
       const authority = screen.getByRole('region', { name: 'Game Host' });
 
       expect(
@@ -333,17 +333,58 @@ describe('RoomLobby word entry', () => {
     const lobby = createRoom({ phase: 'LOBBY', round: null });
     const lobbyView = renderLobby(undefined, { room: lobby });
     expect(screen.getByRole('heading', { name: 'Game Host' })).toBeVisible();
+    expect(screen.getByRole('region', { name: 'Game settings' })).toBeVisible();
+    expect(screen.queryByText('Game settings')).toBeNull();
+    expect(screen.queryByText('Game Host controls')).toBeNull();
+    expect(screen.getByRole('group', { name: 'Grid Size' })).toBeVisible();
+    expect(screen.getByRole('group', { name: 'Round Duration' })).toBeVisible();
     expect(
-      screen.getByRole('heading', { name: 'Game Settings' }),
-    ).toBeVisible();
+      screen
+        .getAllByRole('button')
+        .filter((button) =>
+          ['30s', '1m', '1.5m', '2m', '2.5m', '3m'].includes(
+            button.textContent ?? '',
+          ),
+        ),
+    ).toHaveLength(6);
     lobbyView.unmount();
 
     renderLobby(undefined, {
       room: createRoom({ phase: 'ROUND_ENDED' }),
     });
     expect(screen.getByRole('heading', { name: 'Game Host' })).toBeVisible();
+    expect(screen.getByRole('region', { name: 'Game settings' })).toBeVisible();
+  });
+
+  it('keeps authority transfer accessible without exposing the current host name', () => {
+    const secondPlayerId = '00000000-0000-4000-8000-000000000002';
+    renderLobby(undefined, {
+      room: createRoom({
+        phase: 'LOBBY',
+        round: null,
+        players: [
+          ...createRoom().players,
+          {
+            id: secondPlayerId,
+            displayName: 'Calm Otter',
+            connected: true,
+            joinedAt: '2026-07-31T00:01:00.000Z',
+            isController: false,
+          },
+        ],
+      }),
+    });
+
+    expect(screen.queryByText('Player authority')).toBeNull();
     expect(
-      screen.getByRole('heading', { name: 'Game Settings' }),
+      screen.queryByText('Bright Fox is the current Game Host.'),
+    ).toBeNull();
+    expect(screen.queryByText('Choose a connected phone player')).toBeNull();
+    expect(
+      screen.getByRole('combobox', { name: 'Select New Game Host' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Make Game Host' }),
     ).toBeVisible();
   });
 
@@ -373,7 +414,7 @@ describe('RoomLobby word entry', () => {
       });
       expect(screen.queryByRole('heading', { name: 'Game Host' })).toBeNull();
       expect(
-        screen.queryByRole('heading', { name: 'Game Settings' }),
+        screen.queryByRole('region', { name: 'Game settings' }),
       ).toBeNull();
       view.unmount();
     }
@@ -384,7 +425,7 @@ describe('RoomLobby word entry', () => {
       currentPlayerId: null,
     });
     expect(screen.queryByRole('heading', { name: 'Game Host' })).toBeNull();
-    expect(screen.queryByRole('heading', { name: 'Game Settings' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
   });
 
   it('leaves ordinary ended phones with only the completed puzzle', () => {
@@ -413,7 +454,7 @@ describe('RoomLobby word entry', () => {
     expect(
       screen.queryByText('Round complete — results are on the TV.'),
     ).toBeNull();
-    expect(screen.queryByRole('heading', { name: 'Game Settings' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Game Host' })).toBeNull();
     expect(screen.queryByRole('table')).toBeNull();
   });
@@ -453,7 +494,7 @@ describe('RoomLobby word entry', () => {
 
     expect(screen.getByText('Live temporary room')).toBeVisible();
     expect(screen.getByLabelText('Room code ABC234')).toBeVisible();
-    expect(screen.getByText('Shared screen')).toBeVisible();
+    expect(screen.getByText('Shared Screen')).toBeVisible();
     expect(screen.getByRole('rowheader', { name: 'Bright Fox' })).toBeVisible();
     expect(
       screen.getByRole('region', { name: 'Join the next round' }),
@@ -477,6 +518,44 @@ describe('RoomLobby word entry', () => {
     expect(
       screen.getByRole('heading', { name: 'Select adjacent tiles' }),
     ).toBeVisible();
+  });
+
+  it('stacks the submit action and feedback below the selected word', async () => {
+    const user = userEvent.setup();
+    renderLobby(async () => ({
+      ok: false,
+      error: { code: 'WORD_NOT_IN_DICTIONARY', message: 'Not in dictionary.' },
+      state: createSubmissionState(),
+    }));
+    await selectFirstThree(user);
+
+    const wordEntry = screen
+      .getByRole('heading', { name: 'ABC' })
+      .closest('.word-entry');
+    const submit = screen.getByRole('button', { name: 'Submit' });
+    const wordContent = wordEntry?.querySelector('.word-entry__content');
+    expect(wordContent).toContainElement(
+      screen.getByRole('heading', { name: 'ABC' }),
+    );
+    expect(wordEntry?.querySelector('.word-entry__actions')).toContainElement(
+      submit,
+    );
+    expect(wordContent).not.toBeNull();
+    if (!wordContent) {
+      throw new Error('Word entry content was not rendered.');
+    }
+    expect(
+      wordContent.compareDocumentPosition(submit) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    await user.click(submit);
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Not in dictionary.',
+    );
+    expect(
+      submit.compareDocumentPosition(screen.getByRole('status')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
   });
 
   it('submits once on Trace lift, ignores nonadjacent movement, and keeps keyboard Submit usable', async () => {
