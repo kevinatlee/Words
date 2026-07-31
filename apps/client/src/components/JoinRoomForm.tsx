@@ -63,9 +63,6 @@ export function JoinRoomForm({
           placeholder="Bright Fox"
           required
         />
-        <p className="field-note">
-          Names must be unique within the room and are rendered as plain text.
-        </p>
         <LobbyError error={error} />
         <button
           className="button button--accent"

@@ -124,11 +124,10 @@ button:disabled {
 }
 
 .site-header {
-  display: flex;
+  display: grid;
   min-height: 5.5rem;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   border-bottom: 1px solid var(--line);
 }
 
@@ -138,9 +137,12 @@ button:disabled {
 }
 
 .site-header__actions {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
+  display: contents;
+}
+
+.connection-status--phone {
+  grid-column: 3;
+  justify-self: end;
 }
 
 .skip-link {
@@ -748,6 +750,15 @@ button:disabled {
   margin: 0;
 }
 
+.controller-actions__empty {
+  display: flex;
+  min-height: 3rem;
+  align-items: center;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 750;
+}
+
 .controller-actions label {
   display: block;
   margin-bottom: 0.45rem;
@@ -1100,7 +1111,7 @@ button:disabled {
 }
 
 .word-entry__actions {
-  margin-top: 0.35rem;
+  margin-top: 0;
 }
 
 .word-entry__actions .button {
@@ -1135,38 +1146,43 @@ button:disabled {
   margin: 0;
   color: var(--sun);
   font-size: 0.86rem;
-  line-height: 1.35;
-  min-height: 2.7em;
+  line-height: 1.2;
+  min-height: 1.2em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.word-entry__content h3 {
+  margin-bottom: 0;
+}
+#phone-entry-mode-slot {
+  grid-column: 2;
+}
+.site-header .word-entry__mode {
+  flex: 0 0 auto;
+}
+.site-header .word-entry__mode .button {
+  min-height: 1.9rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.72rem;
 }
 
 .duration-slider {
-  display: grid;
-  gap: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
 }
 
 .duration-slider__value {
   color: var(--paper);
-  font-size: 1.35rem;
+  font-size: 1rem;
   font-weight: 850;
 }
 
 .duration-slider input {
-  width: 100%;
+  flex: 1;
   accent-color: var(--mint-strong);
-}
-
-.duration-slider__ticks {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  color: var(--paper-muted);
-  font-size: 0.72rem;
-  font-weight: 750;
-  text-align: center;
-}
-
-.duration-slider__unit {
-  color: var(--paper-muted);
-  font-size: 0.78rem;
 }
 
 .accepted-word-list {

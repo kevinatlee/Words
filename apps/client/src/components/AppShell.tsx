@@ -23,6 +23,7 @@ export function AppShell({
           <ProductTitle compact />
         </a>
         <div className="site-header__actions">
+          <div id="phone-entry-mode-slot" />
           {phoneConnectionStatus && (
             <span
               className={`connection-status connection-status--phone connection-status--${phoneConnectionStatus}`}

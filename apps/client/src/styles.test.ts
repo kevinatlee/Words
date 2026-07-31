@@ -34,15 +34,12 @@ describe('tile typography', () => {
     );
   });
 
-  it('keeps slider ticks and compact control gaps', () => {
-    expect(styles).toMatch(
-      /\.duration-slider__ticks\s*\{[^}]*grid-template-columns: repeat\(6, minmax\(0, 1fr\)\);/s,
-    );
+  it('keeps the compact slider and word-entry gaps', () => {
+    expect(styles).toMatch(/\.duration-slider\s*\{[^}]*display: flex;/s);
+    expect(styles).not.toContain('.duration-slider__ticks');
     expect(styles).toMatch(
       /\.choice-group \+ \.choice-group\s*\{[^}]*margin-top: 0\.8rem;/s,
     );
-    expect(styles).toMatch(
-      /\.word-entry__actions\s*\{[^}]*margin-top: 0\.35rem;/s,
-    );
+    expect(styles).toMatch(/\.word-entry__actions\s*\{[^}]*margin-top: 0;/s);
   });
 });

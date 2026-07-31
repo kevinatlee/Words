@@ -2239,7 +2239,7 @@ describe('Stage 4B display and player room routes', () => {
     expect(
       screen.getByRole('button', { name: 'Start Next Round' }),
     ).toBeEnabled();
-    expect(screen.getByText('Round complete')).toBeInTheDocument();
+    expect(screen.getByText('Round Complete')).toBeInTheDocument();
     expect(screen.getByRole('timer')).toHaveAttribute('aria-live', 'polite');
   });
 

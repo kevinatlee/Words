@@ -1,4 +1,5 @@
 import { productConfig, type RoomSettings } from '@words/shared';
+import { useEffect, useRef, useState } from 'react';
 
 type GameSettingsProps = {
   settings: RoomSettings;
@@ -13,6 +14,27 @@ export function GameSettings({
   pending,
   onChange,
 }: GameSettingsProps) {
+  const [draftDuration, setDraftDuration] = useState(
+    settings.roundDurationSeconds,
+  );
+  const dragging = useRef(false);
+  const lastRequestedDuration = useRef(settings.roundDurationSeconds);
+  useEffect(() => {
+    if (!dragging.current) {
+      lastRequestedDuration.current = settings.roundDurationSeconds;
+      setDraftDuration(settings.roundDurationSeconds);
+    }
+  }, [settings.roundDurationSeconds]);
+  const commitDuration = () => {
+    dragging.current = false;
+    if (
+      draftDuration !== settings.roundDurationSeconds &&
+      draftDuration !== lastRequestedDuration.current
+    ) {
+      lastRequestedDuration.current = draftDuration;
+      onChange({ ...settings, roundDurationSeconds: draftDuration });
+    }
+  };
   return (
     <section
       className="panel settings-panel"
@@ -39,43 +61,58 @@ export function GameSettings({
       <fieldset className="choice-group">
         <legend className="visually-hidden">Round Duration</legend>
         <div className="duration-slider">
-          <output className="duration-slider__value" htmlFor="round-duration">
-            {settings.roundDurationSeconds} seconds
-          </output>
           <input
             id="round-duration"
             type="range"
             min="30"
             max="180"
             step="30"
-            value={settings.roundDurationSeconds}
+            value={draftDuration}
             aria-label="Round Duration"
-            aria-valuetext={`${settings.roundDurationSeconds} seconds`}
+            aria-valuetext={`${draftDuration} seconds`}
             disabled={disabled}
+            onPointerDown={() => {
+              dragging.current = true;
+            }}
+            onPointerUp={commitDuration}
+            onPointerCancel={commitDuration}
+            onTouchEnd={commitDuration}
+            onBlur={commitDuration}
+            onInput={(event) =>
+              setDraftDuration(
+                Number(
+                  event.currentTarget.value,
+                ) as RoomSettings['roundDurationSeconds'],
+              )
+            }
             onChange={(event) => {
-              const seconds = Number(event.currentTarget.value);
+              setDraftDuration(
+                Number(
+                  event.currentTarget.value,
+                ) as RoomSettings['roundDurationSeconds'],
+              );
               if (
-                seconds !== settings.roundDurationSeconds &&
-                productConfig.supportedRoundDurationsSeconds.includes(
-                  seconds as (typeof productConfig.supportedRoundDurationsSeconds)[number],
-                )
+                !dragging.current &&
+                Number(event.currentTarget.value) !==
+                  settings.roundDurationSeconds &&
+                Number(event.currentTarget.value) !==
+                  lastRequestedDuration.current
               ) {
+                lastRequestedDuration.current = Number(
+                  event.currentTarget.value,
+                ) as RoomSettings['roundDurationSeconds'];
                 onChange({
                   ...settings,
-                  roundDurationSeconds:
-                    seconds as RoomSettings['roundDurationSeconds'],
+                  roundDurationSeconds: Number(
+                    event.currentTarget.value,
+                  ) as RoomSettings['roundDurationSeconds'],
                 });
               }
             }}
           />
-          <div className="duration-slider__ticks" aria-hidden="true">
-            {productConfig.supportedRoundDurationsSeconds.map((seconds) => (
-              <span key={seconds}>{seconds}</span>
-            ))}
-          </div>
-          <span className="duration-slider__unit" aria-hidden="true">
-            seconds
-          </span>
+          <output className="duration-slider__value" htmlFor="round-duration">
+            {draftDuration}s
+          </output>
         </div>
       </fieldset>
     </section>

@@ -61,12 +61,13 @@ contract.
 - The display presents the public participant word review after submissions
   close; phones direct players to the TV rather than duplicating results.
 - Phone puzzle bubbles use semantic labels without a visible puzzle heading.
-  During active play, Tap/Trace is a separate control bubble and phones do not
-  show provisional scores or accepted-word counts. Any active-TV word-count
-  presentation remains deferred to the future TV redesign.
-- Between rounds, controller settings use an accessible 30–180-second slider
-  and distinct settings and host-control bubbles; ordinary player phones retain
-  only the puzzle preview.
+  The compact Tap/Trace control stays centred in the phone header throughout
+  lobby, active, and ended phases; phones do not show provisional scores or
+  accepted-word counts. Any active-TV word-count presentation remains deferred
+  to the future TV redesign.
+- Between rounds, controller settings use an accessible local-draft
+  30–180-second slider with a compact seconds readout and distinct settings and
+  host-control bubbles; ordinary player phones retain only the puzzle preview.
 - Display and player tabs use separate, temporary reconnect credentials.
 - A display or controller disconnect does not immediately close the room.
 - Rooms and credentials live only in bounded server memory.

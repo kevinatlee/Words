@@ -16,6 +16,10 @@
 - Final physical review replaced duration choices with an accessible native
   30–180-second slider, removed former host-header spacing, and reserved
   word-entry feedback space above Submit to prevent puzzle-height movement.
+- The approved finishing pass centres the persistent Tap/Trace control in the
+  symmetric phone header, keeps the compact `120s` slider readout, and gives
+  the no-alternative-host fallback a balanced, dedicated presentation. It does
+  not change display behavior, server contracts, scoring, or lifecycle state.
 
 ## 2026-07-31 — Integer letter-count scoring (draft)
 

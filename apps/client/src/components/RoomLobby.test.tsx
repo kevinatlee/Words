@@ -115,6 +115,9 @@ function renderLobby(
     currentPlayerId?: string | null;
   } = {},
 ) {
+  const slot = document.createElement('div');
+  slot.id = 'phone-entry-mode-slot';
+  document.body.append(slot);
   return render(
     <RoomLobby
       room={room}
@@ -164,17 +167,20 @@ async function selectFirstThree(user: ReturnType<typeof userEvent.setup>) {
 
 afterEach(() => {
   window.localStorage.clear();
+  document.querySelectorAll('#phone-entry-mode-slot').forEach((slot) => {
+    slot.remove();
+  });
   vi.restoreAllMocks();
 });
 
 describe('RoomLobby word entry', () => {
-  it('keeps active phone play in a headingless puzzle bubble and separate mode bubble', () => {
+  it('keeps active phone play in a headingless puzzle bubble and header mode control', () => {
     const { container } = renderLobby();
 
     const preview = container.querySelector('.room-dashboard__preview');
     expect(preview?.firstElementChild).toHaveClass('board-panel');
     const puzzle = screen.getByRole('region', { name: 'Puzzle' });
-    const modePanel = screen.getByRole('region', { name: 'Word entry mode' });
+    const modePanel = screen.getByRole('group', { name: 'Word entry mode' });
     expect(puzzle).toBeVisible();
     expect(screen.queryByRole('heading', { name: 'Puzzle' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Leave room' })).toBeNull();
@@ -225,10 +231,10 @@ describe('RoomLobby word entry', () => {
     );
   });
 
-  it('shows the mode bubble only to active round participants', () => {
+  it('keeps the header mode control available through every player room phase', () => {
     const activeView = renderLobby();
     expect(
-      screen.getByRole('region', { name: 'Word entry mode' }),
+      screen.getByRole('group', { name: 'Word entry mode' }),
     ).toBeVisible();
     activeView.unmount();
 
@@ -236,8 +242,8 @@ describe('RoomLobby word entry', () => {
       room: createRoom({ phase: 'LOBBY', round: null }),
     });
     expect(
-      screen.queryByRole('region', { name: 'Word entry mode' }),
-    ).toBeNull();
+      screen.getByRole('group', { name: 'Word entry mode' }),
+    ).toBeVisible();
     lobbyView.unmount();
 
     const latePlayerId = '00000000-0000-4000-8000-000000000002';
@@ -257,8 +263,8 @@ describe('RoomLobby word entry', () => {
       currentPlayerId: latePlayerId,
     });
     expect(
-      screen.queryByRole('region', { name: 'Word entry mode' }),
-    ).toBeNull();
+      screen.getByRole('group', { name: 'Word entry mode' }),
+    ).toBeVisible();
   });
 
   it('keeps display timer wording separate from prominent phone timer labels', () => {
@@ -353,8 +359,9 @@ describe('RoomLobby word entry', () => {
     expect(duration).toHaveAttribute('max', '180');
     expect(duration).toHaveAttribute('step', '30');
     expect(duration).toHaveAttribute('aria-valuetext', '60 seconds');
-    expect(screen.getByText('30', { exact: true })).toBeVisible();
-    expect(screen.getByText('180', { exact: true })).toBeVisible();
+    expect(screen.getByText('60s')).toBeVisible();
+    expect(screen.queryByText('30', { exact: true })).toBeNull();
+    expect(screen.queryByText('180', { exact: true })).toBeNull();
     lobbyView.unmount();
 
     renderLobby(undefined, {
@@ -461,9 +468,9 @@ describe('RoomLobby word entry', () => {
     renderLobby(undefined, { room, currentPlayerId: ordinaryPlayerId });
 
     expect(screen.getByRole('region', { name: 'Puzzle' })).toBeVisible();
-    expect(screen.getByText('Round complete')).toBeVisible();
+    expect(screen.getByText('Round Complete')).toBeVisible();
     expect(
-      screen.getByText('Round complete').closest('.round-clock'),
+      screen.getByText('Round Complete').closest('.round-clock'),
     ).toHaveClass('round-clock--phone');
     expect(
       screen.queryByText('Round complete — results are on the TV.'),
@@ -536,7 +543,7 @@ describe('RoomLobby word entry', () => {
     ).toBeVisible();
   });
 
-  it('stacks the submit action and feedback below the selected word', async () => {
+  it('keeps the permanent compact feedback line between the candidate and Submit', async () => {
     const user = userEvent.setup();
     renderLobby(async () => ({
       ok: false,
@@ -550,18 +557,24 @@ describe('RoomLobby word entry', () => {
       .closest('.word-entry');
     const submit = screen.getByRole('button', { name: 'Submit' });
     const wordContent = wordEntry?.querySelector('.word-entry__content');
+    const feedback = screen.getByRole('status');
     expect(wordContent).toContainElement(
       screen.getByRole('heading', { name: 'ABC' }),
     );
     expect(wordEntry?.querySelector('.word-entry__actions')).toContainElement(
       submit,
     );
+    expect(feedback).toBeEmptyDOMElement();
     expect(wordContent).not.toBeNull();
     if (!wordContent) {
       throw new Error('Word entry content was not rendered.');
     }
     expect(
-      wordContent.compareDocumentPosition(submit) &
+      wordContent.compareDocumentPosition(feedback) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    expect(
+      feedback.compareDocumentPosition(submit) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);
     await user.click(submit);

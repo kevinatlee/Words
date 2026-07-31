@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import {
   buildJoinUrl,
@@ -300,6 +301,34 @@ export function RoomLobby({
           {actionError.message}
         </p>
       )}
+      {!isDisplay &&
+        sessionRole === 'player' &&
+        document.getElementById('phone-entry-mode-slot') &&
+        createPortal(
+          <div
+            className="word-entry__mode"
+            role="group"
+            aria-label="Word entry mode"
+          >
+            <button
+              className="button button--secondary"
+              type="button"
+              aria-pressed={entryMode === 'touch'}
+              onClick={() => selectEntryMode('touch')}
+            >
+              Tap
+            </button>
+            <button
+              className="button button--secondary"
+              type="button"
+              aria-pressed={entryMode === 'trace'}
+              onClick={() => selectEntryMode('trace')}
+            >
+              Trace
+            </button>
+          </div>,
+          document.getElementById('phone-entry-mode-slot')!,
+        )}
 
       <div
         className={`room-dashboard${isDisplay ? '' : ' room-dashboard--phone'}`}
@@ -402,7 +431,7 @@ export function RoomLobby({
                     ? isDisplay
                       ? 'Authoritative time remaining'
                       : 'Timer'
-                    : 'Round complete'}
+                    : 'Round Complete'}
                 </small>
                 <strong>{Math.ceil((countdownMs ?? 0) / 1_000)} seconds</strong>
               </div>
@@ -507,35 +536,6 @@ export function RoomLobby({
               </div>
             )}
           </section>
-          {!isDisplay && roundIsActive && isRoundParticipant && (
-            <section
-              className="panel word-entry-mode-panel"
-              aria-label="Word entry mode"
-            >
-              <div
-                className="word-entry__mode"
-                role="group"
-                aria-label="Word entry mode"
-              >
-                <button
-                  className="button button--secondary"
-                  type="button"
-                  aria-pressed={entryMode === 'touch'}
-                  onClick={() => selectEntryMode('touch')}
-                >
-                  Tap
-                </button>
-                <button
-                  className="button button--secondary"
-                  type="button"
-                  aria-pressed={entryMode === 'trace'}
-                  onClick={() => selectEntryMode('trace')}
-                >
-                  Trace
-                </button>
-              </div>
-            </section>
-          )}
           {!isDisplay && showControllerAdministration && (
             <GameSettings
               settings={room.settings}

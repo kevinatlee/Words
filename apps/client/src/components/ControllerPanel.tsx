@@ -90,8 +90,8 @@ export function ControllerPanel({
               </div>
             </>
           ) : (
-            <p className="field-note">
-              A connected phone player is required before control can move.
+            <p className="controller-actions__empty">
+              No alternative hosts available.
             </p>
           )}
         </div>
