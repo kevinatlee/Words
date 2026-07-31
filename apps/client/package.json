@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@words/shared": "*",
+    "qrcode.react": "4.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "socket.io-client": "^4.8.1"

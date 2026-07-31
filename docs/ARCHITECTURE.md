@@ -1,14 +1,15 @@
 # Architecture
 
 This document describes the completed lobby, engine, CI, production game data,
-authoritative rounds, merged Stage 4C private submissions, and Stage 4D final
-results now in draft review.
+authoritative rounds, private submissions, and Stage 4D final results, plus the
+Stage 4E display-only QR joining change now in draft review.
 
 ## Runtime pieces
 
 **React browser client (`apps/client`):** Provides display, player join,
 live-lobby, and retained static preview screens. It renders server state but is
-never the source of truth for membership or controller authority.
+never the source of truth for membership or controller authority. The display
+locally renders the already-built public join URL as a QR SVG.
 
 **Node.js server (`apps/server`):** Runs Express and Socket.IO in one process.
 It owns active rooms, display sessions, players, `controllerPlayerId`,
@@ -302,6 +303,19 @@ the current browser origin. `/join/:roomCode` locks the prefilled code while
 `/join` remains the manual-entry fallback. `/display` and `/host` canonicalize
 to `/`.
 
+Stage 4E passes that same completed URL to one display-only `JoinQrCode`
+component. It adds no field to room state and no display request. The component
+renders synchronously with `qrcode.react` 4.2.0, uses a black-on-white SVG,
+level-M error correction, and a four-module quiet zone, and keeps the exact URL
+and room code as accessible text. Lobby and ended states use a prominent
+presentation; active rounds use a compact presentation in the normal layout
+rather than overlaying the board.
+
+The QR is not rendered on player, join, demo, error, or reconnect-failure
+routes. An unexpected SVG-renderer exception is contained around only the
+visual encoding, so the textual URL, code, room, and reconnect flow remain
+available. See [`QR_JOINING.md`](QR_JOINING.md).
+
 If a valid token is presented while the previous socket still exists—for
 example, during a fast refresh—the new socket replaces the old socket binding.
 The old tab receives `RECONNECT_FAILED`. When that tab clears its stale browser
@@ -373,6 +387,11 @@ excludes accepted timestamps, paths, private sequence/version data, sockets,
 credentials, dictionary internals, rejected attempts, and limiter state. The
 owner's private state remains available on reconnect and is replaced only when
 the controller starts the next round.
+
+That replacement is the intended product model, not missing match storage.
+Each round is the complete competitive unit for casual drop-in play. The
+application deliberately keeps no cumulative score, session total, match
+series, persistent standing, or previous-round result history.
 
 ## Server-authority boundary
 
@@ -492,8 +511,11 @@ The eventual production topology is one public HTTPS origin forwarding to one
 Words process on port `6532`. That process will serve the built client, health
 API, Socket.IO, game engine, and an openly licensed dictionary.
 
-Stage 5 will add production hardening, static-client serving from the Node
-process, one-container packaging, production image publishing, server
-configuration, health and graceful shutdown, Unraid-oriented installation,
-and reverse-proxy/tunnel documentation. Those concerns are not implemented by
-Stage 4D.
+Stage 4F will add natural continuous touch/pointer tracing while retaining
+tap/click and keyboard fallbacks. Stage 4G will perform focused real-party and
+release-candidate testing without feature expansion. Stage 5 will add
+production hardening, static-client serving from the Node process,
+one-container packaging, production image publishing, server configuration,
+health and graceful shutdown, Unraid-oriented installation, and
+reverse-proxy/tunnel documentation. Stage 4E implements none of those later
+concerns.

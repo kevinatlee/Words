@@ -1,8 +1,8 @@
 # Production game data
 
 Stage 3.1 CI, Stage 4A production data, Stage 4B authoritative rounds, and Stage
-4C private submissions are complete. Stage 4D final results are in draft
-review.
+4C private submissions and Stage 4D final results are complete. Stage 4E
+display QR joining does not change the server-only data boundary.
 Stage 4A supplies reproducible server-only assets and pure defaults. Stage 4B
 now loads and privately retains the verified dictionary before listening and
 uses the documented board generator for authoritative rounds and authorized

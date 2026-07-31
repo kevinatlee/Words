@@ -1,9 +1,9 @@
 # Game rules
 
-This document separates current prototype behavior from planned rules and open
-decisions.
+This document describes the implemented round-local rules and the remaining
+interaction boundary.
 
-## Implemented through Stage 4D draft review
+## Implemented through Stage 4D
 
 - The controller can set authoritative 4 × 4, 5 × 5, and 6 × 6 layouts.
 - The default preview is 4 × 4.
@@ -49,6 +49,10 @@ decisions.
 Stage 4D completes a single-round gameplay loop while retaining the existing
 three phases. There is no separate results phase, cumulative score, match
 series, previous-round history, custom shared-word rule, or persistence.
+Those multi-round concepts are intentional product non-goals: each round is a
+complete casual competitive unit, and continuing or leaving creates no
+commitment or penalty. Stage 4E adds a display-only QR join convenience without
+changing these rules.
 
 ## Planned board and word rules
 

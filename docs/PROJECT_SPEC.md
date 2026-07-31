@@ -23,13 +23,19 @@ restart and do not need a database in the current architecture. The server is
 authoritative for shared state; browser-provided claims are requests, never
 trusted facts.
 
+Each round is the complete competitive unit. Words supports casual drop-in
+play: a person can join without an account, play one round, see that round's
+winner, continue into another independent round, or leave without penalty.
+Starting another round replaces the previous result rather than extending a
+match, series, or campaign.
+
 ## Product roles
 
 Words has three related but separate concepts:
 
 - The **display session** is the TV or shared-screen browser. It creates or
-  presents a room and will eventually show the QR code, lobby, board, timer,
-  standings, and results. It is not a player.
+  presents a room and shows the QR code, lobby, board, timer, standings, and
+  results. It is not a player.
 - A **player session** belongs to one participating phone. Players count toward
   room capacity and will eventually submit words.
 - The **controller** or **game host** is one player with lobby-control
@@ -40,7 +46,7 @@ Creating the room does not grant the display player membership or controller
 authority. The display never selects or approves a controller. Changing the
 controller must never change the display session.
 
-## Current scope: Stage 4C complete, Stage 4D results in draft review
+## Current scope: Stage 4D complete, Stage 4E QR joining in draft review
 
 Stage 2.5 is complete. It extends the secure, server-backed lobby with explicit
 game-host delegation and deterministic automatic succession:
@@ -118,6 +124,13 @@ result projection in `ROUND_ENDED`. It adds competition ranks, tied positive
 winners, no-winner handling when nobody scored, display/player result
 presentation, reconnect-safe results, and the controller-driven next round.
 See `SUBMISSIONS.md` and `RESULTS.md`.
+
+Stage 4E renders the exact existing public join URL as a locally generated SVG
+QR code on the display. It uses the current browser origin and normalized room
+code, remains prominent in the lobby and after results, becomes compact during
+an active round, and retains the visible URL and manual room-code fallback. It
+adds no server field, endpoint, event, credential, gameplay state, score, or
+lifecycle transition. See `QR_JOINING.md`.
 
 ## Current room model
 
@@ -206,7 +219,9 @@ reconnects the existing role instead of duplicating rooms, players, or sockets.
 
 The display shows an exact `/join/<CODE>` URL built from the current browser
 origin, which naturally becomes `https://words.atlee.io/join/<CODE>` at the
-intended public origin. The code is normalized before the link is built.
+intended public origin. The code is normalized before the link is built. Stage
+4E renders that exact string as a display-only QR SVG; neither representation
+contains a reconnect credential or private room state.
 
 Each successful reconnect rotates the credential. Tokens are scoped to one
 role and room, do not appear in URLs or logs, and become unusable after the
@@ -217,7 +232,7 @@ disconnect grace period.
 Stage 4B lets the controller choose supported settings and start an
 authoritative countdown and round. The display remains the shared presentation
 surface. Stages 4C and 4D add player submissions, server-calculated validation,
-and final scoring.
+and final scoring. Stage 4E adds only the supplemental display QR.
 
 Planned rules remain:
 
@@ -230,16 +245,25 @@ Planned rules remain:
 - Adjacency: horizontal, vertical, and diagonal; no tile reuse within a word
 
 Traditional scoring gives 1 point for 3–4 letters, 2 for 5, 3 for 6, 5 for 7,
-and 11 for 8 or more. These scoring rules remain documentation-only through
-Stage 4B.
+and 11 for 8 or more. Stage 4C applies the base values and Stage 4D applies the
+unique-word bonus and final rankings.
 
-## Non-goals through Stage 4A
+## Intentional product non-goals
 
-Stages through 4A do not include touch tracing, a live board, gameplay network
-events, room game state, scoring, duplicate handling, timers, synchronized
-rounds, scannable QR images, arbitrary or random controller election,
-persistence, deployment automation, production container packaging, image
-publishing, server installation, or tunnel configuration.
+Words does not accumulate multi-round scores or imply that players have joined
+a longer match. Cumulative scoring, session totals, match scores, best-of
+series, persistent standings, previous-round score history, streaks, lifetime
+statistics, profiles, progression, achievements, rematch voting, ready-up
+commitments, penalties for leaving, and requirements to remain are permanent
+non-goals unless a future explicitly reviewed product-direction change
+reverses this principle.
+
+## Current technical non-goals
+
+Stage 4E does not include continuous touch tracing, QR scanning, camera
+permissions, native or installable applications, persistence, deployment
+automation, production container packaging, image publishing, server
+installation, or tunnel configuration.
 
 The product also has no database, Redis, accounts, external authentication,
 microservices, paid APIs, analytics, advertisements, payments, unlocks, or
@@ -284,11 +308,19 @@ details are future deployment work, not a claim about Stage 2.
 8. **Stage 4C — complete:** player-only submissions, server-owned path and
    dictionary validation, private accepted-word recovery, and traditional
    provisional scoring.
-9. **Stage 4D — in draft review:** automatic shared-word reconciliation, final
+9. **Stage 4D — complete:** automatic shared-word reconciliation, final
    per-player scores, deterministic competition ranking, tied/no-winner state,
    public ended-round results, and controller-driven next rounds.
-10. **Stage 5:** production hardening, one-container build, image publishing,
-    server configuration, and tunnel documentation.
+10. **Stage 4E — in draft review:** display-only local SVG QR joining,
+    accessible manual fallbacks, and formal round-local casual play.
+11. **Stage 4F:** natural continuous touch/pointer tracing while preserving
+    tap/click and keyboard fallbacks.
+12. **Stage 4G:** structured real-party, narrow-phone, display, and
+    release-candidate testing with focused defect correction and interaction
+    polish—not feature expansion or cumulative scoring.
+13. **Stage 5:** production hardening, one-container build, Node serving the
+    client, graceful shutdown, image publishing, Unraid guidance, and
+    reverse-proxy/tunnel documentation.
 
 Each stage should remain independently reviewable and must not imply that later
 stages are ready.
@@ -312,7 +344,8 @@ The eventual MVP must allow:
 Stage 2.5 completes the room-code and authority portions of items 1–3 and 10.
 Stage 3 supplies the isolated engine foundation, Stage 4A supplies verified
 production inputs, Stage 4B completes items 4–6, Stage 4C completes submission
-validation, and Stage 4D completes items 8–10 for one temporary round.
+validation, Stage 4D completes items 8–10 for one temporary round, and Stage
+4E completes the QR portion of item 2.
 
 ## Decisions deferred to later stages
 

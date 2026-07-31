@@ -1,6 +1,78 @@
 # Development log
 
-## 2026-07-30 — Stage 4D final round results (draft)
+## 2026-07-30 — Stage 4E QR joining (draft)
+
+- Added one display-only `JoinQrCode` component that receives the completed
+  public join URL, renders it locally as a conservative black-on-white SVG,
+  and keeps the exact link and six-character room code available as accessible
+  fallbacks.
+- Used prominent lobby and ended-round presentations plus a compact
+  active-round presentation. Phone players, join routes, the demo, and error
+  views never render the shared-display QR.
+- Reused and strengthened the shared `buildJoinUrl()` boundary so the visible
+  link and QR payload are identical, retain the current origin and optional
+  port, normalize the public code, replace stale paths, and remove URL
+  userinfo, queries, and fragments.
+- Added `qrcode.react` 4.2.0 as the client workspace's one QR dependency. The
+  exact ISC notice is recorded in `THIRD_PARTY_NOTICES.md`; the published
+  package has no runtime or optional dependency and performs no remote
+  generation.
+- Formalized round-local casual play as a product principle. Cumulative scores,
+  match or session totals, result history, standings, profiles, progression,
+  streaks, commitments, and leaving penalties are intentional non-goals rather
+  than unfinished roadmap items.
+- Corrected the roadmap to put continuous touch/pointer tracing in Stage 4F,
+  focused casual-play release-candidate testing in Stage 4G, and production
+  packaging and deployment in Stage 5.
+- Added no server route, wire event, room field, fourth phase, scoring or result
+  change, participant change, persistence, camera behavior, scanner, or
+  continuous tracing.
+
+### Verification
+
+- `npm ci` — passed; 408 packages installed from the committed lockfile.
+- `npm run data:verify` — passed for the exact 79,370-word dictionary and
+  server-only source boundary.
+- `npm run data:dictionary:audit` — passed with deterministic report SHA-256
+  `454efff74f68e3b2e3989a567eb03b4949e04955f2c76a99e62ca608a296a7b8`.
+- `npm run data:boards:audit` — passed with 10,000 accepted boards per grid
+  size, zero generation failures, and deterministic report SHA-256
+  `2b55a682eab2207020ae639e7b5b6b771758822f3a20f6fe91187fd4f0eda789`.
+- `npm run format:check`, `npm run lint`, and `npm run typecheck` — passed.
+- `npm test` — passed; 574 tests across 30 files:
+  - client: 88 tests across 6 files
+  - server: 189 tests across 6 files
+  - game data: 49 tests across 6 files
+  - game engine: 171 tests across 7 files
+  - shared: 77 tests across 5 files
+- `npm run build` — passed; Vite transformed 162 modules and all package builds
+  completed. The final client JavaScript is 373.09 kB minified (112.74 kB
+  gzip).
+- `npm run data:verify -- --client-build` — passed; production game data
+  remained absent from the browser bundle.
+- `npm audit --audit-level=high` — passed with 0 vulnerabilities.
+- LAN browser verification passed through a private LAN-reachable Vite origin:
+  the payload contained only the current origin, join path, and public code;
+  the prominent/compact/prominent phase presentations appeared; a mid-round
+  player waited and was excluded from the completed result; the next round
+  included that connected player; display reconnect and controller transfer
+  did not change the URL; manual lowercase code entry normalized correctly;
+  and an expired code remained a normal rejected player join.
+- The shared display and five route/phone tabs reported no browser warnings or
+  errors. Observed page assets were local to the LAN development origin, with
+  the QR present as one inline SVG and no external image.
+- The corrected 1280 × 720 display layout had no horizontal overflow, retained
+  a square 281.59 CSS-pixel prominent QR, wrapped the URL safely, and kept
+  results reachable. The compact active QR remained square at 153.59 CSS
+  pixels and did not overlay the board or timer.
+- A physical native-iPhone Camera scan, a physical compact-QR scan, true
+  1920 × 1080 and 3840 × 2160 display runs, and a genuine browser 200% zoom
+  run remain explicitly pending for draft review; they are not claimed as
+  passed.
+- `npm run dev` reached clean client and server readiness, then shut down
+  without leaving listeners on ports `5173` or `6532`.
+
+## 2026-07-30 — Stage 4D final round results (merged)
 
 - Retained exactly `LOBBY`, `ROUND_ACTIVE`, and `ROUND_ENDED`; ended rounds now
   require one strictly validated public result inside the existing
@@ -79,8 +151,10 @@
   Bravo, and no cumulative history.
 - Browser console review found no warnings or errors. Development shutdown was
   clean and released ports `5173` and `6532`.
-- Hosted CI results will be recorded after the draft pull request runs on the
-  final pushed commit.
+- PR #12 was squash-merged as
+  `c8bbc33f2b150c9c04c047b0bb2f64091cecb0b2`. Push-to-main CI run
+  `30592953408` passed Quality and Dependency audit with all 553 tests and zero
+  vulnerabilities.
 
 ## 2026-07-30 — Stage 4C final focused review
 
