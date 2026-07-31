@@ -7,15 +7,6 @@ type GameSettingsProps = {
   onChange: (settings: RoomSettings) => void;
 };
 
-const durationLabels = {
-  30: { visible: '30s', accessible: '30 seconds' },
-  60: { visible: '1m', accessible: '1 minute' },
-  90: { visible: '1.5m', accessible: '1.5 minutes' },
-  120: { visible: '2m', accessible: '2 minutes' },
-  150: { visible: '2.5m', accessible: '2.5 minutes' },
-  180: { visible: '3m', accessible: '3 minutes' },
-} as const;
-
 export function GameSettings({
   settings,
   disabled,
@@ -47,21 +38,44 @@ export function GameSettings({
 
       <fieldset className="choice-group">
         <legend className="visually-hidden">Round Duration</legend>
-        <div className="duration-grid">
-          {productConfig.supportedRoundDurationsSeconds.map((seconds) => (
-            <button
-              type="button"
-              aria-label={durationLabels[seconds].accessible}
-              aria-pressed={settings.roundDurationSeconds === seconds}
-              disabled={disabled}
-              onClick={() =>
-                onChange({ ...settings, roundDurationSeconds: seconds })
+        <div className="duration-slider">
+          <output className="duration-slider__value" htmlFor="round-duration">
+            {settings.roundDurationSeconds} seconds
+          </output>
+          <input
+            id="round-duration"
+            type="range"
+            min="30"
+            max="180"
+            step="30"
+            value={settings.roundDurationSeconds}
+            aria-label="Round Duration"
+            aria-valuetext={`${settings.roundDurationSeconds} seconds`}
+            disabled={disabled}
+            onChange={(event) => {
+              const seconds = Number(event.currentTarget.value);
+              if (
+                seconds !== settings.roundDurationSeconds &&
+                productConfig.supportedRoundDurationsSeconds.includes(
+                  seconds as (typeof productConfig.supportedRoundDurationsSeconds)[number],
+                )
+              ) {
+                onChange({
+                  ...settings,
+                  roundDurationSeconds:
+                    seconds as RoomSettings['roundDurationSeconds'],
+                });
               }
-              key={seconds}
-            >
-              {durationLabels[seconds].visible}
-            </button>
-          ))}
+            }}
+          />
+          <div className="duration-slider__ticks" aria-hidden="true">
+            {productConfig.supportedRoundDurationsSeconds.map((seconds) => (
+              <span key={seconds}>{seconds}</span>
+            ))}
+          </div>
+          <span className="duration-slider__unit" aria-hidden="true">
+            seconds
+          </span>
         </div>
       </fieldset>
     </section>

@@ -34,9 +34,9 @@ describe('tile typography', () => {
     );
   });
 
-  it('keeps duration choices in a three-column grid with compact control gaps', () => {
+  it('keeps slider ticks and compact control gaps', () => {
     expect(styles).toMatch(
-      /\.duration-grid\s*\{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/s,
+      /\.duration-slider__ticks\s*\{[^}]*grid-template-columns: repeat\(6, minmax\(0, 1fr\)\);/s,
     );
     expect(styles).toMatch(
       /\.choice-group \+ \.choice-group\s*\{[^}]*margin-top: 0\.8rem;/s,

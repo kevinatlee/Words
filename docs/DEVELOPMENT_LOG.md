@@ -12,7 +12,10 @@
   existing submission, transfer, reconnect, and display behavior.
 - Follow-up physical review removed all in-app room navigation, visible
   controller-panel chrome, and visible settings legends while retaining their
-  accessible names; duration choices remain a 3 × 2 grid.
+  accessible names; duration choices initially used a 3 × 2 grid.
+- Final physical review replaced duration choices with an accessible native
+  30–180-second slider, removed former host-header spacing, and reserved
+  word-entry feedback space above Submit to prevent puzzle-height movement.
 
 ## 2026-07-31 — Integer letter-count scoring (draft)
 

@@ -64,8 +64,8 @@ contract.
   During active play, Tap/Trace is a separate control bubble and phones do not
   show provisional scores or accepted-word counts. Any active-TV word-count
   presentation remains deferred to the future TV redesign.
-- Between rounds, controller settings use compact duration labels and distinct
-  accessible settings and host-control bubbles; ordinary player phones retain
+- Between rounds, controller settings use an accessible 30–180-second slider
+  and distinct settings and host-control bubbles; ordinary player phones retain
   only the puzzle preview.
 - Display and player tabs use separate, temporary reconnect credentials.
 - A display or controller disconnect does not immediately close the room.

@@ -448,6 +448,13 @@ export function RoomLobby({
                       {candidateWord || 'Select adjacent tiles'}
                     </h3>
                   </div>
+                  <p
+                    className="word-entry__message"
+                    role="status"
+                    aria-live={submissionMessage ? 'polite' : 'off'}
+                  >
+                    {submissionMessage}
+                  </p>
                   <div className="word-entry__actions">
                     <button
                       className="button button--primary"
@@ -462,11 +469,6 @@ export function RoomLobby({
                       {submissionPending ? 'Checking…' : 'Submit'}
                     </button>
                   </div>
-                  {submissionMessage && (
-                    <p className="word-entry__message" role="status">
-                      {submissionMessage}
-                    </p>
-                  )}
                 </section>
               )}
             {isDisplay && roundIsEnded && room.round?.results && (

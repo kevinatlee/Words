@@ -84,8 +84,8 @@ This is planned, not implemented by Stage 4F:
 - The production UI does not display a development-stage identifier.
 - Phone connection status includes safe-area-aware right-side breathing room.
   The settings and host-control bubbles use non-visible accessible labels with
-  compact three-column controls. Active word entry stacks the selected word,
-  Submit action, and feedback vertically.
+  an accessible seconds slider. Active word entry keeps a reserved feedback
+  area between the selected word and Submit action to prevent layout movement.
 
 ## Current boundary
 

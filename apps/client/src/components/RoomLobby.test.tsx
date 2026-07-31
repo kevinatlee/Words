@@ -348,15 +348,13 @@ describe('RoomLobby word entry', () => {
     expect(screen.queryByText('Game Host online')).toBeNull();
     expect(screen.getByRole('group', { name: 'Grid Size' })).toBeVisible();
     expect(screen.getByRole('group', { name: 'Round Duration' })).toBeVisible();
-    expect(
-      screen
-        .getAllByRole('button')
-        .filter((button) =>
-          ['30s', '1m', '1.5m', '2m', '2.5m', '3m'].includes(
-            button.textContent ?? '',
-          ),
-        ),
-    ).toHaveLength(6);
+    const duration = screen.getByRole('slider', { name: 'Round Duration' });
+    expect(duration).toHaveAttribute('min', '30');
+    expect(duration).toHaveAttribute('max', '180');
+    expect(duration).toHaveAttribute('step', '30');
+    expect(duration).toHaveAttribute('aria-valuetext', '60 seconds');
+    expect(screen.getByText('30', { exact: true })).toBeVisible();
+    expect(screen.getByText('180', { exact: true })).toBeVisible();
     lobbyView.unmount();
 
     renderLobby(undefined, {
@@ -571,7 +569,7 @@ describe('RoomLobby word entry', () => {
       'Not in dictionary.',
     );
     expect(
-      submit.compareDocumentPosition(screen.getByRole('status')) &
+      screen.getByRole('status').compareDocumentPosition(submit) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);
   });

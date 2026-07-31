@@ -745,7 +745,7 @@ button:disabled {
 }
 
 .controller-actions {
-  margin-top: 1.25rem;
+  margin: 0;
 }
 
 .controller-actions label {
@@ -794,12 +794,7 @@ button:disabled {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.duration-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.segmented-control button,
-.duration-grid button {
+.segmented-control button {
   min-height: 3rem;
   padding: 0.6rem;
   border: 1px solid var(--line-strong);
@@ -812,12 +807,12 @@ button:disabled {
 }
 
 .segmented-control button:hover,
-.duration-grid button:hover {
+.segmented-control button:hover {
   border-color: var(--paper-muted);
 }
 
 .segmented-control button[aria-pressed='true'],
-.duration-grid button[aria-pressed='true'] {
+.segmented-control button[aria-pressed='true'] {
   border-color: var(--mint-strong);
   background: var(--mint-strong);
   color: var(--ink-950);
@@ -1137,9 +1132,41 @@ button:disabled {
 }
 
 .word-entry__message {
-  flex-basis: 100%;
   margin: 0;
   color: var(--sun);
+  font-size: 0.86rem;
+  line-height: 1.35;
+  min-height: 2.7em;
+}
+
+.duration-slider {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.duration-slider__value {
+  color: var(--paper);
+  font-size: 1.35rem;
+  font-weight: 850;
+}
+
+.duration-slider input {
+  width: 100%;
+  accent-color: var(--mint-strong);
+}
+
+.duration-slider__ticks {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  color: var(--paper-muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  text-align: center;
+}
+
+.duration-slider__unit {
+  color: var(--paper-muted);
+  font-size: 0.78rem;
 }
 
 .accepted-word-list {
