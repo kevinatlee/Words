@@ -157,6 +157,262 @@ export const roundBoardSchema = z
 
 const roundSettingsSchema = roomSettingsSchema.readonly();
 
+export const traditionalPointsSchema = z.union([
+  z.literal(1),
+  z.literal(2),
+  z.literal(3),
+  z.literal(5),
+  z.literal(11),
+]);
+
+export const uniqueBonusPointsSchema = z
+  .union([
+    z.literal(0),
+    z.literal(0.25),
+    z.literal(0.5),
+    z.literal(0.75),
+    z.literal(1.25),
+    z.literal(2.75),
+  ])
+  .refine((points) => !Object.is(points, -0), {
+    message: 'A uniqueness bonus cannot be negative zero.',
+  });
+
+export const finalWordPointsSchema = z.union([
+  z.literal(1),
+  z.literal(1.25),
+  z.literal(2),
+  z.literal(2.5),
+  z.literal(3),
+  z.literal(3.75),
+  z.literal(5),
+  z.literal(6.25),
+  z.literal(11),
+  z.literal(13.75),
+]);
+
+const maximumBaseScore =
+  productConfig.maximumAcceptedWordsPerPlayerPerRound * 11;
+const maximumUniqueBonusScore =
+  productConfig.maximumAcceptedWordsPerPlayerPerRound * 2.75;
+const maximumFinalScore = maximumBaseScore + maximumUniqueBonusScore;
+const quarterPointScoreSchema = (maximum: number) =>
+  z
+    .number()
+    .finite()
+    .nonnegative()
+    .multipleOf(0.25)
+    .max(maximum)
+    .refine((score) => !Object.is(score, -0), {
+      message: 'A score cannot be negative zero.',
+    });
+
+export const roundResultWordSchema = z
+  .object({
+    word: z
+      .string()
+      .min(3)
+      .max(productConfig.maximumSubmittedWordLength)
+      .regex(/^[A-Z]+$/),
+    basePoints: traditionalPointsSchema,
+    shared: z.boolean(),
+    uniqueBonusPoints: uniqueBonusPointsSchema,
+    finalPoints: finalWordPointsSchema,
+  })
+  .strict()
+  .superRefine((word, context) => {
+    const expectedBasePoints =
+      word.word.length <= 4
+        ? 1
+        : word.word.length === 5
+          ? 2
+          : word.word.length === 6
+            ? 3
+            : word.word.length === 7
+              ? 5
+              : 11;
+    if (word.basePoints !== expectedBasePoints) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Base points must match traditional scoring for the word.',
+        path: ['basePoints'],
+      });
+    }
+    const expectedBonus = word.shared ? 0 : word.basePoints * 0.25;
+    const expectedFinal = word.basePoints + expectedBonus;
+    if (word.uniqueBonusPoints !== expectedBonus) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'The uniqueness bonus must be zero for shared words and 25% for unique words.',
+        path: ['uniqueBonusPoints'],
+      });
+    }
+    if (word.finalPoints !== expectedFinal) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Final word points must equal base points plus the uniqueness bonus.',
+        path: ['finalPoints'],
+      });
+    }
+  })
+  .readonly();
+
+export const roundPlayerResultSchema = z
+  .object({
+    playerId: playerIdSchema,
+    displayName: serializedDisplayNameSchema,
+    rank: z.number().int().positive().safe(),
+    baseScore: quarterPointScoreSchema(maximumBaseScore),
+    uniqueBonusScore: quarterPointScoreSchema(maximumUniqueBonusScore),
+    finalScore: quarterPointScoreSchema(maximumFinalScore),
+    words: z
+      .array(roundResultWordSchema)
+      .max(productConfig.maximumAcceptedWordsPerPlayerPerRound)
+      .readonly(),
+  })
+  .strict()
+  .superRefine((player, context) => {
+    const words = new Set<string>();
+    let baseScore = 0;
+    let uniqueBonusScore = 0;
+    let finalScore = 0;
+    player.words.forEach((word, index) => {
+      if (words.has(word.word)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'A player result cannot contain duplicate words.',
+          path: ['words', index, 'word'],
+        });
+      }
+      words.add(word.word);
+      baseScore += word.basePoints;
+      uniqueBonusScore += word.uniqueBonusPoints;
+      finalScore += word.finalPoints;
+    });
+    if (player.baseScore !== baseScore) {
+      context.addIssue({
+        code: 'custom',
+        message: 'The base score must equal the base word-point total.',
+        path: ['baseScore'],
+      });
+    }
+    if (player.uniqueBonusScore !== uniqueBonusScore) {
+      context.addIssue({
+        code: 'custom',
+        message: 'The uniqueness bonus score must equal the word-bonus total.',
+        path: ['uniqueBonusScore'],
+      });
+    }
+    if (player.finalScore !== finalScore) {
+      context.addIssue({
+        code: 'custom',
+        message: 'The final score must equal the final word-point total.',
+        path: ['finalScore'],
+      });
+    }
+    if (player.finalScore !== player.baseScore + player.uniqueBonusScore) {
+      context.addIssue({
+        code: 'custom',
+        message: 'The final score must equal base score plus bonus score.',
+        path: ['finalScore'],
+      });
+    }
+  })
+  .readonly();
+
+export const roundResultsSchema = z
+  .object({
+    players: z
+      .array(roundPlayerResultSchema)
+      .min(1)
+      .max(productConfig.maxPlayers)
+      .readonly(),
+    winnerPlayerIds: z
+      .array(playerIdSchema)
+      .max(productConfig.maxPlayers)
+      .readonly(),
+  })
+  .strict()
+  .superRefine((results, context) => {
+    const playerIds = new Set<string>();
+    const wordPlayerCounts = new Map<string, number>();
+
+    results.players.forEach((player, playerIndex) => {
+      if (playerIds.has(player.playerId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Result players must have unique player IDs.',
+          path: ['players', playerIndex, 'playerId'],
+        });
+      }
+      playerIds.add(player.playerId);
+      if (
+        playerIndex > 0 &&
+        player.finalScore > (results.players[playerIndex - 1]?.finalScore ?? 0)
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Result players must be ordered by final score.',
+          path: ['players', playerIndex, 'finalScore'],
+        });
+      }
+      for (const word of player.words) {
+        wordPlayerCounts.set(
+          word.word,
+          (wordPlayerCounts.get(word.word) ?? 0) + 1,
+        );
+      }
+    });
+
+    results.players.forEach((player, playerIndex) => {
+      const expectedRank =
+        1 +
+        results.players.filter((other) => other.finalScore > player.finalScore)
+          .length;
+      if (player.rank !== expectedRank) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Result players must use competition ranking.',
+          path: ['players', playerIndex, 'rank'],
+        });
+      }
+      player.words.forEach((word, wordIndex) => {
+        const expectedShared = (wordPlayerCounts.get(word.word) ?? 0) >= 2;
+        if (word.shared !== expectedShared) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Word sharing must reflect distinct result participants.',
+            path: ['players', playerIndex, 'words', wordIndex, 'shared'],
+          });
+        }
+      });
+    });
+
+    const highestScore = results.players[0]?.finalScore ?? 0;
+    const expectedWinners =
+      highestScore === 0
+        ? []
+        : results.players
+            .filter((player) => player.finalScore === highestScore)
+            .map((player) => player.playerId);
+    if (
+      results.winnerPlayerIds.length !== expectedWinners.length ||
+      results.winnerPlayerIds.some(
+        (playerId, index) => playerId !== expectedWinners[index],
+      )
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Winner IDs must contain every tied positive top scorer in result order.',
+        path: ['winnerPlayerIds'],
+      });
+    }
+  })
+  .readonly();
+
 export const roundStateSchema = z
   .object({
     id: z.string().uuid(),
@@ -171,6 +427,7 @@ export const roundStateSchema = z
     startedAt: z.string().datetime(),
     deadlineAt: z.string().datetime(),
     endedAt: z.string().datetime().nullable(),
+    results: roundResultsSchema.nullable(),
     generationAttempts: z
       .number()
       .int()
@@ -208,6 +465,21 @@ export const roundStateSchema = z
       });
     }
 
+    if (round.endedAt === null && round.results !== null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An active round cannot contain finalized results.',
+        path: ['results'],
+      });
+    }
+    if (round.endedAt !== null && round.results === null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An ended round must contain finalized results.',
+        path: ['results'],
+      });
+    }
+
     const participantIds = new Set(
       round.participants.map((participant) => participant.playerId),
     );
@@ -217,6 +489,57 @@ export const roundStateSchema = z
         message: 'Round participants must have unique player IDs.',
         path: ['participants'],
       });
+    }
+
+    if (round.results !== null) {
+      const participantIndex = new Map(
+        round.participants.map((participant, index) => [
+          participant.playerId,
+          index,
+        ]),
+      );
+      if (round.results.players.length !== round.participants.length) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'Final results must contain every round participant exactly once.',
+          path: ['results', 'players'],
+        });
+      }
+      round.results.players.forEach((player, index) => {
+        const participant = round.participants.find(
+          (candidate) => candidate.playerId === player.playerId,
+        );
+        if (!participant || participant.displayName !== player.displayName) {
+          context.addIssue({
+            code: 'custom',
+            message:
+              'Result identity must match the immutable participant snapshot.',
+            path: ['results', 'players', index],
+          });
+        }
+      });
+      const expectedOrder = [...round.results.players].sort((left, right) => {
+        const scoreDifference = right.finalScore - left.finalScore;
+        return (
+          scoreDifference ||
+          (participantIndex.get(left.playerId) ?? Number.MAX_SAFE_INTEGER) -
+            (participantIndex.get(right.playerId) ?? Number.MAX_SAFE_INTEGER)
+        );
+      });
+      if (
+        expectedOrder.some(
+          (player, index) =>
+            player.playerId !== round.results?.players[index]?.playerId,
+        )
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'Tied result players must retain participant-snapshot order.',
+          path: ['results', 'players'],
+        });
+      }
     }
   })
   .readonly();
@@ -345,13 +668,7 @@ export const acceptedWordSchema = z
       .min(3)
       .max(64)
       .regex(/^[A-Z]+$/),
-    points: z.union([
-      z.literal(1),
-      z.literal(2),
-      z.literal(3),
-      z.literal(5),
-      z.literal(11),
-    ]),
+    points: traditionalPointsSchema,
     acceptedAt: z.string().datetime(),
   })
   .strict()
@@ -579,6 +896,11 @@ export type RoomSettings = z.infer<typeof roomSettingsSchema>;
 export type RoomPhase = z.infer<typeof roomPhaseSchema>;
 export type RoundParticipant = z.infer<typeof roundParticipantSchema>;
 export type RoundBoard = z.infer<typeof roundBoardSchema>;
+export type UniqueBonusPoints = z.infer<typeof uniqueBonusPointsSchema>;
+export type FinalWordPoints = z.infer<typeof finalWordPointsSchema>;
+export type RoundResultWord = z.infer<typeof roundResultWordSchema>;
+export type RoundPlayerResult = z.infer<typeof roundPlayerResultSchema>;
+export type RoundResults = z.infer<typeof roundResultsSchema>;
 export type RoundState = z.infer<typeof roundStateSchema>;
 export type DisplayState = z.infer<typeof displayStateSchema>;
 export type PlayerState = z.infer<typeof playerStateSchema>;

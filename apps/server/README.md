@@ -1,10 +1,11 @@
 # Words server
 
 Words uses one trusted Node.js process for the health API, temporary Socket.IO
-rooms, authoritative rounds, and Stage 4C private submissions. Each room has a separate
-shared-display session, zero to eight phone players, and explicit `none` or
-`assigned` controller state. Display and player reconnect credentials exist
-only in memory and disappear when the process restarts.
+rooms, authoritative rounds, Stage 4C private submissions, and Stage 4D final
+results. Each room has a separate shared-display session, zero to eight phone
+players, and explicit `none` or `assigned` controller state. Display and player
+reconnect credentials exist only in memory and disappear when the process
+restarts.
 
 The current connected controller can use `controller:transfer` to name another
 connected player. If the controller explicitly leaves or reconnect grace
@@ -33,6 +34,15 @@ visible and terminate the combined command.
 
 Current participants may submit one bounded path through the official board,
 private production dictionary, and traditional scorer. Personal accepted words
-and provisional points are reconnect-safe but never broadcast. Shared-word
-cancellation, final results, persistence, packaging, and deployment are not
-included. See [`../../docs/SUBMISSIONS.md`](../../docs/SUBMISSIONS.md).
+and provisional points are reconnect-safe and never broadcast while active. At
+the exact deadline, the room store atomically reconciles the immutable
+participant snapshot, retains every accepted word's base points, awards an
+exact 25% bonus only to unique words, ranks final scores, and publishes the
+detached result only through `room:state`. No accepted timestamp, path, private
+version, credential, or dictionary data enters the result. Repeated
+finalization is a no-op and the controller may start the next round from
+`ROUND_ENDED`.
+
+Persistence, packaging, and deployment are not included. See
+[`../../docs/SUBMISSIONS.md`](../../docs/SUBMISSIONS.md) and
+[`../../docs/RESULTS.md`](../../docs/RESULTS.md).

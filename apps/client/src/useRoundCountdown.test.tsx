@@ -46,6 +46,7 @@ function createRoom(overrides: Partial<RoomState> = {}): RoomState {
       startedAt: '2026-07-29T20:00:00.000Z',
       deadlineAt: '2026-07-29T20:00:30.000Z',
       endedAt: null,
+      results: null,
       generationAttempts: 1,
     },
     ...overrides,
@@ -124,6 +125,17 @@ describe('authoritative round countdown', () => {
         ? {
             ...active.round,
             endedAt: active.round.deadlineAt,
+            results: {
+              players: active.round.participants.map((participant) => ({
+                ...participant,
+                rank: 1,
+                baseScore: 0,
+                uniqueBonusScore: 0,
+                finalScore: 0,
+                words: [],
+              })),
+              winnerPlayerIds: [],
+            },
           }
         : null,
     });

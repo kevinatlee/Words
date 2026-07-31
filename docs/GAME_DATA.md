@@ -1,12 +1,14 @@
 # Production game data
 
-Stage 3.1 CI, Stage 4A production data, and Stage 4B authoritative rounds are
-complete. Stage 4C private submissions are in review.
+Stage 3.1 CI, Stage 4A production data, Stage 4B authoritative rounds, and Stage
+4C private submissions are complete. Stage 4D final results are in draft
+review.
 Stage 4A supplies reproducible server-only assets and pure defaults. Stage 4B
 now loads and privately retains the verified dictionary before listening and
 uses the documented board generator for authoritative rounds and authorized
-private word validation. No dictionary data, accepted word, or personal score
-is connected to public room state.
+private word validation. Dictionary data remains private. Accepted words and
+scores enter public room state only as the bounded Stage 4D projection after
+the deadline.
 
 ## Package boundary
 
@@ -281,7 +283,7 @@ holds the file, parsed entries, and the engine Set; the loader retains only the
 Set-backed interface afterward. Stage 4B calls it once during controlled server
 startup rather than repeatedly per room or request.
 
-## Stage 4B integration and Stage 4C boundary
+## Stage 4B through Stage 4D integration
 
 Stage 4B:
 
@@ -295,6 +297,8 @@ Stage 4B:
 7. adds round-aware reconnect behavior and regression tests.
 
 Stage 4C adds server-authoritative current-participant validation against the
-privately retained dictionary plus private provisional scoring. Shared-word
-cancellation, final results, continuous tracing, QR, deployment, container,
-persistence, and moderation remain later work.
+privately retained dictionary plus private provisional scoring. Stage 4D
+reconciles accepted records without another dictionary lookup and exposes only
+the bounded result projection after submissions close. Continuous tracing, QR,
+deployment, container packaging, persistence, and moderation remain later
+work.

@@ -1396,6 +1396,266 @@ describe('Words Stage 4B server', () => {
     expect(clearLifecycleTimer).toHaveBeenCalledWith(fakeTimer);
   });
 
+  it('does not let one corrupt cleanup room suppress another room update', async () => {
+    await server.stop();
+    let now = Date.parse('2026-07-30T20:00:00.000Z');
+    let lifecycleSweep: (() => void) | undefined;
+    server = createWordsServer(
+      {
+        port: 0,
+        reconnectGraceMs: 1_000,
+        cleanupIntervalMs: 1_000,
+      },
+      {
+        ...testDependencies,
+        now: () => now,
+        setInterval: (callback) => {
+          lifecycleSweep = callback;
+          return { unref: vi.fn() } as unknown as ReturnType<
+            typeof setInterval
+          >;
+        },
+        clearInterval: vi.fn(),
+      },
+    );
+    port = await server.start(0);
+
+    const corruptDisplay = await connectClient();
+    const corruptRoom = await emitCreateDisplay(corruptDisplay);
+    if (!corruptRoom.ok) throw new Error('Corrupt-room display setup failed.');
+    const corruptController = await connectClient();
+    const corruptControllerJoin = await emitJoinPlayer(corruptController, {
+      roomCode: corruptRoom.room.code,
+      displayName: 'Silver Owl',
+    });
+    const expiringPlayer = await connectClient();
+    const expiringPlayerJoin = await emitJoinPlayer(expiringPlayer, {
+      roomCode: corruptRoom.room.code,
+      displayName: 'Amber Kite',
+    });
+    const corruptRound = await emitStartRound(corruptController);
+    if (
+      !corruptControllerJoin.ok ||
+      !expiringPlayerJoin.ok ||
+      !corruptRound.ok ||
+      !corruptRound.room.round
+    ) {
+      throw new Error('Corrupt-room round setup failed.');
+    }
+
+    const validDisplay = await connectClient();
+    const validRoom = await emitCreateDisplay(validDisplay);
+    if (!validRoom.ok) throw new Error('Valid-room display setup failed.');
+    const expiringController = await connectClient();
+    const expiringControllerJoin = await emitJoinPlayer(expiringController, {
+      roomCode: validRoom.room.code,
+      displayName: 'Copper Fox',
+    });
+    const successor = await connectClient();
+    const successorJoin = await emitJoinPlayer(successor, {
+      roomCode: validRoom.room.code,
+      displayName: 'Violet Heron',
+    });
+    if (!expiringControllerJoin.ok || !successorJoin.ok) {
+      throw new Error('Valid-room player setup failed.');
+    }
+
+    const corruptDisconnect = nextRoomState(
+      corruptDisplay,
+      (room) =>
+        room.players.find(
+          (player) => player.id === expiringPlayerJoin.session.playerId,
+        )?.connected === false,
+    );
+    expiringPlayer.disconnect();
+    await corruptDisconnect;
+    const validDisconnect = nextRoomState(
+      validDisplay,
+      (room) =>
+        room.players.find(
+          (player) => player.id === expiringControllerJoin.session.playerId,
+        )?.connected === false,
+    );
+    expiringController.disconnect();
+    await validDisconnect;
+
+    const internal = server.roomStore as unknown as {
+      rooms: Map<string, { roundSubmissions: Map<string, unknown> | null }>;
+    };
+    internal.rooms
+      .get(corruptRoom.room.code)
+      ?.roundSubmissions?.delete(corruptControllerJoin.session.playerId);
+
+    const promotedState = nextRoomState(
+      validDisplay,
+      (room) => room.controllerPlayerId === successorJoin.session.playerId,
+    );
+    now = Date.parse(corruptRound.room.round.deadlineAt);
+    lifecycleSweep?.();
+
+    await expect(promotedState).resolves.toMatchObject({
+      controllerPlayerId: successorJoin.session.playerId,
+      players: [
+        expect.objectContaining({
+          id: successorJoin.session.playerId,
+          isController: true,
+        }),
+      ],
+    });
+  });
+
+  it('publishes identical public results through only room:state', async () => {
+    await server.stop();
+    let now = Date.parse('2026-07-30T20:00:00.000Z');
+    let lifecycleSweep: (() => void) | undefined;
+    server = createWordsServer(
+      { port: 0, cleanupIntervalMs: 60_000 },
+      {
+        ...testDependencies,
+        now: () => now,
+        setInterval: (callback) => {
+          lifecycleSweep = callback;
+          return { unref: vi.fn() } as unknown as ReturnType<
+            typeof setInterval
+          >;
+        },
+        clearInterval: vi.fn(),
+      },
+    );
+    port = await server.start(0);
+
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) throw new Error('Display creation failed.');
+    const first = await connectClient();
+    const firstJoin = await emitJoinPlayer(first, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+    const second = await connectClient();
+    const secondJoin = await emitJoinPlayer(second, {
+      roomCode: created.room.code,
+      displayName: 'Amber Kite',
+    });
+    const started = await emitStartRound(first);
+    if (!started.ok || !started.room.round || !firstJoin.ok || !secondJoin.ok) {
+      throw new Error('Round setup failed.');
+    }
+    for (const player of [first, second]) {
+      expect(
+        await emitSubmitWord(player, {
+          roundId: started.room.round.id,
+          word: 'ABC',
+          path: [0, 1, 2],
+        }),
+      ).toMatchObject({ ok: true });
+    }
+
+    const observedEvents = new Set<string>();
+    for (const client of [display, first, second]) {
+      client.onAny((event) => observedEvents.add(event));
+    }
+    const displayEnded = nextRoomState(
+      display,
+      (room) => room.phase === 'ROUND_ENDED',
+    );
+    const firstEnded = nextRoomState(
+      first,
+      (room) => room.phase === 'ROUND_ENDED',
+    );
+    const secondEnded = nextRoomState(
+      second,
+      (room) => room.phase === 'ROUND_ENDED',
+    );
+    now = Date.parse(started.room.round.deadlineAt);
+    lifecycleSweep?.();
+
+    const [displayResult, firstResult, secondResult] = await Promise.all([
+      displayEnded,
+      firstEnded,
+      secondEnded,
+    ]);
+    const participantPlayerIds = started.room.round.participants.map(
+      (participant) => participant.playerId,
+    );
+    expect(firstResult.round?.results).toEqual(displayResult.round?.results);
+    expect(secondResult.round?.results).toEqual(displayResult.round?.results);
+    expect(displayResult.round?.results).toMatchObject({
+      winnerPlayerIds: participantPlayerIds,
+      players: participantPlayerIds.map((playerId) => ({
+        playerId,
+        rank: 1,
+        baseScore: 1,
+        uniqueBonusScore: 0,
+        finalScore: 1,
+        words: [{ word: 'ABC', shared: true, finalPoints: 1 }],
+      })),
+    });
+    expect(observedEvents).toEqual(new Set(['room:state']));
+
+    first.disconnect();
+    const reconnected = await connectClient();
+    const recovered = await emitReconnectPlayer(reconnected, {
+      roomCode: created.room.code,
+      playerReconnectToken: firstJoin.session.playerReconnectToken,
+    });
+    expect(recovered).toMatchObject({
+      ok: true,
+      room: {
+        phase: 'ROUND_ENDED',
+        round: { results: displayResult.round?.results },
+      },
+      submissionState: {
+        playerId: firstJoin.session.playerId,
+        acceptedWords: [{ word: 'ABC' }],
+      },
+    });
+  });
+
+  it('publishes due results before starting exactly one next round', async () => {
+    await server.stop();
+    let now = Date.parse('2026-07-30T20:00:00.000Z');
+    server = createWordsServer(
+      { port: 0, cleanupIntervalMs: 60_000 },
+      { ...testDependencies, now: () => now },
+    );
+    port = await server.start(0);
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) throw new Error('Display creation failed.');
+    const controller = await connectClient();
+    await emitJoinPlayer(controller, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+    const started = await emitStartRound(controller);
+    if (!started.ok || !started.room.round) {
+      throw new Error('Round setup failed.');
+    }
+
+    const observedPhases: string[] = [];
+    display.on('room:state', (room) => {
+      if (
+        room.phase === 'ROUND_ENDED' ||
+        (room.phase === 'ROUND_ACTIVE' && room.round?.number === 2)
+      ) {
+        observedPhases.push(room.phase);
+      }
+    });
+    now = Date.parse(started.room.round.deadlineAt);
+    const next = await emitStartRound(controller);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(next).toMatchObject({
+      ok: true,
+      room: {
+        phase: 'ROUND_ACTIVE',
+        round: { number: 2, results: null },
+      },
+    });
+    expect(observedPhases).toEqual(['ROUND_ENDED', 'ROUND_ACTIVE']);
+  });
+
   it('broadcasts a deadline transition even when the triggering action is rejected', async () => {
     await server.stop();
     let now = Date.parse('2026-07-29T20:00:00.000Z');
@@ -1520,12 +1780,16 @@ describe('Words Stage 4B server', () => {
       roomCode: created.room.code,
       displayName: 'Amber Kite',
     });
+    const activeBroadcast = nextRoomState(
+      display,
+      (room) => room.phase === 'ROUND_ACTIVE',
+    );
     const started = await emitStartRound(first);
     if (!started.ok || !started.room.round || !firstJoin.ok || !secondJoin.ok) {
       throw new Error('Round setup failed.');
     }
+    await activeBroadcast;
     const publicVersion = started.room.stateVersion;
-    await new Promise<void>((resolve) => setImmediate(resolve));
     const publicBroadcasts: RoomState[] = [];
     display.on('room:state', (room) => publicBroadcasts.push(room));
 
@@ -1675,6 +1939,66 @@ describe('Words Stage 4B server', () => {
       ok: false,
       error: { code: 'INVALID_PAYLOAD' },
       state: null,
+    });
+  });
+
+  it('broadcasts exact-deadline results before a socket-rate-limit rejection', async () => {
+    await server.stop();
+    let now = Date.parse('2026-07-30T20:00:00.000Z');
+    server = createWordsServer(
+      { port: 0, cleanupIntervalMs: 60_000 },
+      { ...testDependencies, now: () => now },
+    );
+    port = await server.start(0);
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) throw new Error('Display creation failed.');
+    const player = await connectClient();
+    await emitJoinPlayer(player, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+    const started = await emitStartRound(player);
+    if (!started.ok || !started.room.round) {
+      throw new Error('Round start failed.');
+    }
+    now = Date.parse(started.room.round.deadlineAt) - 1;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      expect(
+        await emitSubmitWord(player, {
+          roundId: 'invalid',
+          word: 'ABC',
+          path: [0, 1, 2],
+        } as never),
+      ).toMatchObject({ ok: false, error: { code: 'INVALID_PAYLOAD' } });
+    }
+
+    const ended = nextRoomState(
+      display,
+      (room) => room.phase === 'ROUND_ENDED',
+    );
+    now += 1;
+    expect(
+      await emitSubmitWord(player, {
+        roundId: started.room.round.id,
+        word: 'ABC',
+        path: [0, 1, 2],
+      }),
+    ).toMatchObject({ ok: false, error: { code: 'RATE_LIMITED' } });
+    expect(await ended).toMatchObject({
+      phase: 'ROUND_ENDED',
+      round: {
+        endedAt: started.room.round.deadlineAt,
+        results: {
+          players: [
+            {
+              displayName: 'Silver Owl',
+              words: [],
+              finalScore: 0,
+            },
+          ],
+        },
+      },
     });
   });
 

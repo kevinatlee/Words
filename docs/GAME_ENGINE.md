@@ -17,7 +17,9 @@ verified dictionary, derived default weights, and a bounded quality predicate.
 Stage 4B connects the server—not the browser—to default board generation and
 retains each official board and deadline. The client imports neither package.
 Stage 4C calls path validation and dictionary lookup from the authoritative
-server and adds pure traditional scoring. Final results remain later work.
+server and adds pure traditional scoring. Stage 4D adds pure bounded
+cross-participant reconciliation while the server retains ranking and room
+lifecycle ownership.
 
 ## Canonical board and path
 
@@ -132,6 +134,26 @@ normalization code. Core lookup performs no filesystem or network work.
 - path validation is linear and Set lookup is effectively constant-time;
 - caller-owned arrays are never mutated.
 
+## Final word reconciliation
+
+`reconcileRoundWords()` accepts one to eight unique participant IDs with at
+most 256 ordered canonical accepted records each. It verifies every stored
+point value through `scoreTraditionalWord()`, rejects duplicate participant IDs
+and duplicate words within one participant, and counts a word once per distinct
+participant ID.
+
+A word accepted by at least two participants is shared. Every accepted word
+retains its traditional base points; a unique word adds exactly 25% of that
+base and a shared word adds no bonus. The result preserves participant and word
+order, contains exact base, uniqueness-bonus, and final totals, and is deeply
+detached and frozen. All values are exact quarter points, so no rounding or
+tolerance comparison is needed. The engine does not receive display names,
+accepted timestamps, paths, room state, clocks, Socket.IO, Zod, controller
+authority, or winner presentation policy.
+
+Malformed arrays, sparse entries, throwing getters, and hostile proxies return
+bounded error objects without caller-provided messages or accepted word text.
+
 These package limits complement, but do not replace, Stage 4B network payload
 size limits, controller authorization, phase checks, and deadline enforcement.
 
@@ -150,4 +172,6 @@ making the engine depend on rooms or sockets.
 `scoreTraditionalWord()` safely rejects malformed or shorter-than-three-letter
 input. Valid canonical lengths score 3–4 as 1 point, 5 as 2, 6 as 3, 7 as 5,
 and 8–64 as 11. It counts letters rather than tiles, so `QU` contributes two.
-Shared-word cancellation and final results remain Stage 4D.
+Stage 4D calls pure reconciliation only after the server deadline. The server
+maps the engine output to snapshotted names, deterministic ranks, winners, and
+the strict public result state.

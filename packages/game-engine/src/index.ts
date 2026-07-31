@@ -43,8 +43,22 @@ export {
 } from './path.js';
 export {
   scoreTraditionalWord,
+  type TraditionalPoints,
   type TraditionalScoringResult,
 } from './scoring.js';
+export {
+  MAX_RECONCILIATION_PARTICIPANTS,
+  MAX_RECONCILIATION_WORDS_PER_PARTICIPANT,
+  reconcileRoundWords,
+  type ReconciledParticipant,
+  type ReconciledWord,
+  type FinalWordPoints,
+  type ReconciliationAcceptedWord,
+  type ReconciliationParticipant,
+  type RoundReconciliationErrorCode,
+  type RoundReconciliationResult,
+  type UniqueBonusPoints,
+} from './results.js';
 export {
   DEFAULT_MINIMUM_WORD_LENGTH,
   validateWordPath,

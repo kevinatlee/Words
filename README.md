@@ -7,11 +7,11 @@ shared-screen browser creates and presents a temporary room. Phone players join
 without accounts, and the first player becomes the initial game host
 (controller).
 
-**Stage 4B is complete. Stage 4C player-private submissions are in review.** The
-secure lobby, isolated game engine, read-only hosted CI, and reproducible
-server-only game data are complete. Stage 4C connects participant phone paths
-to server-authoritative validation and private provisional scoring without
-adding shared-word cancellation or final results.
+**Stage 4C is complete. Stage 4D final round results are in draft review.** The
+secure lobby, isolated game engine, read-only hosted CI, reproducible
+server-only game data, authoritative rounds, and private submissions are
+complete. Stage 4D reconciles accepted participant words automatically at the
+deadline without adding another phase or network event.
 
 ## What works today
 
@@ -45,7 +45,16 @@ adding shared-word cancellation or final results.
 - The server validates against the official board and private dictionary,
   rejects personal duplicates, and calculates traditional provisional points.
 - Accepted words recover only for that player and never enter `RoomState` or a
-  display broadcast.
+  display broadcast while the round is active.
+- At the deadline, the server marks words shared across distinct participants,
+  retains traditional base points for every accepted word, adds an exact 25%
+  bonus to each unique word, and publishes one immutable result snapshot in the
+  existing `ROUND_ENDED` state.
+- Final results show deterministic competition ranks, every tied positive
+  winner, or no winner when no participant submitted a scoring word.
+- Displays and phones receive the same public participant word review only
+  after submissions close; accepted timestamps, paths, and private versions
+  remain private.
 - Display and player tabs use separate, temporary reconnect credentials.
 - A display or controller disconnect does not immediately close the room.
 - Rooms and credentials live only in bounded server memory.
@@ -73,11 +82,11 @@ adding shared-word cancellation or final results.
 
 ## What is not implemented
 
-Stage 4C deliberately stops at personal provisional scoring. There is no
-cross-player duplicate cancellation, final scoring, rankings, winner
-selection, or results phase. Scannable QR codes, persistence, deployment
-workflow, container packaging, image publishing, server installation, and
-tunnel configuration also remain unimplemented.
+There is no cumulative score, match series, previous-round history, saved
+result, custom shared-word rule, continuous drag tracing, or separate results
+phase. Scannable QR codes, persistence, deployment workflow, container
+packaging, image publishing, server installation, and tunnel configuration
+also remain unimplemented.
 
 ## Roles and authority
 
@@ -152,14 +161,19 @@ Try the lobby:
 4. Join from another phone tab and watch the shared display update.
 5. On the controller phone, choose a supported grid and duration, then start a
    round. Confirm every session shows the same official board and deadline.
-6. Transfer Game Host authority to the second player during the round; the
-   display, board, and deadline remain unchanged.
-7. Disconnect the new controller and confirm the room remains visible during
+6. Submit words from both phones. Confirm each phone sees only its own words
+   while the round is active.
+7. At the deadline, confirm every role receives the same shared/unique word
+   review, base points, exact 25% unique bonuses, final scores, ranks, and
+   winner state.
+8. After results appear, transfer Game Host authority to the second player;
+   the display and completed result remain unchanged.
+9. Disconnect the new controller and confirm the room remains visible during
    reconnect grace. After grace expires, confirm the server automatically
    promotes the earliest-joined connected player without display action.
-8. As an isolation check, open `/` in a second browser profile. Confirm it gets a
-   different code, remains empty when players join the first room, and refreshes
-   back into only its own room.
+10. As an isolation check, open `/` in a second browser profile. Confirm it gets a
+    different code, remains empty when players join the first room, and refreshes
+    back into only its own room.
 
 Stop both processes with `Control+C`.
 
@@ -285,7 +299,8 @@ All lobby payloads, state, acknowledgements, and error codes are defined
 centrally in `packages/shared/src/lobby.ts`. See
 [`docs/ROUND_LIFECYCLE.md`](docs/ROUND_LIFECYCLE.md) for the Stage 4B contract,
 [`docs/SUBMISSIONS.md`](docs/SUBMISSIONS.md) for the Stage 4C private
-submission contract,
+submission contract, [`docs/RESULTS.md`](docs/RESULTS.md) for Stage 4D
+deadline reconciliation and public results,
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the complete system flow,
 and [`docs/GAME_DATA.md`](docs/GAME_DATA.md) for Stage 4A provenance and
 derivation.
@@ -331,9 +346,11 @@ cannot recreate the display.
 
 ## Next stage
 
-Stage 4D may reconcile words shared by multiple players and produce final
-round results from accepted server records. It must preserve the Stage 4C
-privacy boundary. See [`docs/SUBMISSIONS.md`](docs/SUBMISSIONS.md).
+Stage 5 will address production hardening, a one-container build, serving the
+built client from Node, production image publishing and configuration, health
+and graceful shutdown, Unraid-oriented installation guidance, and
+reverse-proxy/tunnel documentation. QR rendering, persistence, continuous
+tracing, and additional UX polish remain separately reviewed scope.
 
 ## License
 

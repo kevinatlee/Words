@@ -144,7 +144,51 @@ function createRoundRoom(
       startedAt: '2026-07-27T20:03:00.000Z',
       deadlineAt: '2026-07-27T20:03:30.000Z',
       endedAt: null,
+      results: null,
       generationAttempts: 1,
+    },
+  };
+}
+
+function createEndedRoom(
+  activeRoom: RoomState = createRoundRoom(),
+  stateVersion = activeRoom.stateVersion + 1,
+): RoomState {
+  if (!activeRoom.round) {
+    throw new Error('Ended-room fixture requires a round.');
+  }
+  return {
+    ...activeRoom,
+    phase: 'ROUND_ENDED',
+    stateVersion,
+    serverTime: activeRoom.round.deadlineAt,
+    round: {
+      ...activeRoom.round,
+      endedAt: activeRoom.round.deadlineAt,
+      results: {
+        players: activeRoom.round.participants.map((participant, index) => ({
+          ...participant,
+          rank: index === 0 ? 1 : 2,
+          baseScore: index === 0 ? 1 : 0,
+          uniqueBonusScore: index === 0 ? 0.25 : 0,
+          finalScore: index === 0 ? 1.25 : 0,
+          words:
+            index === 0
+              ? [
+                  {
+                    word: 'CAT',
+                    basePoints: 1,
+                    shared: false,
+                    uniqueBonusPoints: 0.25,
+                    finalPoints: 1.25,
+                  },
+                ]
+              : [],
+        })),
+        winnerPlayerIds: [activeRoom.round.participants[0]?.playerId].filter(
+          (playerId): playerId is string => playerId !== undefined,
+        ),
+      },
     },
   };
 }
@@ -430,7 +474,6 @@ describe('Stage 4B display and player room routes', () => {
       screen.queryByRole('button', { name: 'Assign Game Host' }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start Round' })).toBeDisabled();
-    expect(screen.queryByText('Score zero')).not.toBeInTheDocument();
     expect(screen.queryByText('Scoring mode')).not.toBeInTheDocument();
     expect(screen.queryByText(/traditional scoring/i)).not.toBeInTheDocument();
   });
@@ -1400,6 +1443,159 @@ describe('Stage 4B display and player room routes', () => {
     );
   });
 
+  it('rejects conflicting results at the same state version', async () => {
+    let reportRoomState: ((room: RoomState) => void) | undefined;
+    const endedRoom = createEndedRoom();
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+        ...controllerSuccess,
+        room: endedRoom,
+      })),
+      onRoomState: (listener) => {
+        reportRoomState = listener;
+        return () => undefined;
+      },
+    });
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'r'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+    expect(
+      await screen.findByRole('heading', { name: 'Silver Owl wins' }),
+    ).toBeVisible();
+
+    act(() =>
+      reportRoomState?.({
+        ...endedRoom,
+        serverTime: '2026-07-27T20:04:00.000Z',
+        round: endedRoom.round
+          ? {
+              ...endedRoom.round,
+              results: endedRoom.round.results
+                ? {
+                    ...endedRoom.round.results,
+                    winnerPlayerIds: [],
+                  }
+                : null,
+            }
+          : null,
+      }),
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Silver Owl wins' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('heading', {
+        name: 'No scoring winner this round',
+      }),
+    ).toBeNull();
+  });
+
+  it('does not let an old active snapshot replace finalized results', async () => {
+    let reportRoomState: ((room: RoomState) => void) | undefined;
+    const activeRoom = createRoundRoom();
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+        ...controllerSuccess,
+        room: activeRoom,
+      })),
+      onRoomState: (listener) => {
+        reportRoomState = listener;
+        return () => undefined;
+      },
+    });
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'r'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+    await screen.findByText('Round active');
+    act(() => reportRoomState?.(createEndedRoom(activeRoom)));
+    expect(
+      await screen.findByRole('heading', { name: 'Silver Owl wins' }),
+    ).toBeVisible();
+
+    act(() =>
+      reportRoomState?.({
+        ...activeRoom,
+        serverTime: '2026-07-27T20:04:00.000Z',
+      }),
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Silver Owl wins' }),
+    ).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Submit Word' })).toBeNull();
+  });
+
+  it('does not let old results replace a newer active round', async () => {
+    let reportRoomState: ((room: RoomState) => void) | undefined;
+    const firstRound = createRoundRoom();
+    const endedRoom = createEndedRoom(firstRound);
+    const secondRound: RoomState = {
+      ...createRoundRoom(),
+      stateVersion: endedRoom.stateVersion + 1,
+      serverTime: '2026-07-27T20:04:00.000Z',
+      round: {
+        ...createRoundRoom().round!,
+        id: '00000000-0000-4000-8000-000000000201',
+        number: 2,
+        startedAt: '2026-07-27T20:04:00.000Z',
+        deadlineAt: '2026-07-27T20:04:30.000Z',
+      },
+    };
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+        ...controllerSuccess,
+        room: endedRoom,
+      })),
+      onRoomState: (listener) => {
+        reportRoomState = listener;
+        return () => undefined;
+      },
+    });
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 's'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+    expect(
+      await screen.findByRole('heading', { name: 'Silver Owl wins' }),
+    ).toBeVisible();
+    act(() => reportRoomState?.(secondRound));
+    expect(await screen.findByText('Round active')).toBeVisible();
+    expect(screen.queryByText('Final round results')).toBeNull();
+
+    act(() => reportRoomState?.(endedRoom));
+    expect(screen.getByText('Round active')).toBeVisible();
+    expect(screen.queryByText('Final round results')).toBeNull();
+  });
+
   it('starts an authoritative round and renders the exact server board', async () => {
     const activeRoom = createRoundRoom();
     const client = createFakeClient({
@@ -1510,7 +1706,7 @@ describe('Stage 4B display and player room routes', () => {
     expect(await screen.findByText('QUAB accepted for 1 point.')).toBeVisible();
     expect(screen.getByText('Provisional points: 1')).toBeVisible();
     expect(
-      screen.getByText('Shared-word reconciliation is not implemented yet.'),
+      screen.getByText('Final scoring appears when the round ends.'),
     ).toBeVisible();
   });
 
@@ -1835,6 +2031,17 @@ describe('Stage 4B display and player room routes', () => {
         ? {
             ...activeRoom.round,
             endedAt: activeRoom.round.deadlineAt,
+            results: {
+              players: activeRoom.round.participants.map((participant) => ({
+                ...participant,
+                rank: 1,
+                baseScore: 0,
+                uniqueBonusScore: 0,
+                finalScore: 0,
+                words: [],
+              })),
+              winnerPlayerIds: [],
+            },
           }
         : null,
     };
@@ -1866,6 +2073,62 @@ describe('Stage 4B display and player room routes', () => {
     ).toBeEnabled();
     expect(screen.getByText('Round complete')).toBeInTheDocument();
     expect(screen.getByRole('timer')).toHaveAttribute('aria-live', 'polite');
+  });
+
+  it('shows ended results without a next-round control to the display or an ordinary player', async () => {
+    const endedRoom = createEndedRoom(createRoundRoom());
+    const displayView = render(
+      <App
+        routePath="/"
+        client={createFakeClient({
+          createDisplay: vi.fn(async (): Promise<DisplayActionResponse> => ({
+            ...displaySuccess,
+            room: endedRoom,
+          })),
+        })}
+        sessionStore={createFakeSessionStore()}
+      />,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Silver Owl wins' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Start Next Round' }),
+    ).toBeNull();
+    displayView.unmount();
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={createFakeClient({
+          reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+            ok: true,
+            room: endedRoom,
+            session: {
+              playerId: ordinaryPlayer.id,
+              playerReconnectToken: 'p'.repeat(43),
+            },
+            submissionState: null,
+          })),
+        })}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: ordinaryPlayer.id,
+          playerReconnectToken: 'p'.repeat(43),
+          displayName: ordinaryPlayer.displayName,
+        })}
+      />,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Silver Owl wins' }),
+    ).toBeVisible();
+    expect(screen.getByText('<Bright Fox> (You)')).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Start Next Round' }),
+    ).toBeNull();
   });
 
   it('disables controller actions while disconnected', async () => {

@@ -1,8 +1,10 @@
 import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 
 import {
+  reconcileRoundWords,
   scoreTraditionalWord,
   validateWordPath,
+  type RoundReconciliationResult,
   type TraditionalScoringResult,
   type WordDictionary,
 } from '@words/game-engine';
@@ -27,6 +29,7 @@ import {
   type RoomErrorCode,
   type RoomSettings,
   type RoomState,
+  type RoundResults,
   type RoundState,
   type SubmissionError,
   type SubmitWordInput,
@@ -93,6 +96,7 @@ type InternalRound = {
   startedAt: number;
   deadlineAt: number;
   endedAt: number | null;
+  results: RoundResults | null;
   generationAttempts: number;
 };
 
@@ -203,6 +207,9 @@ export type RoomStoreOptions = {
   reconnectTokenGenerator?: () => string;
   roundBoardGenerator?: (size: GridSize) => RoundBoardGenerationResult;
   scoreWord?: (word: unknown) => TraditionalScoringResult;
+  reconcileWords?: (
+    participants: Parameters<typeof reconcileRoundWords>[0],
+  ) => RoundReconciliationResult;
   canCreateRooms?: () => boolean;
 };
 
@@ -286,6 +293,7 @@ export class RoomStore {
   private readonly roundBoardGenerator:
     ((size: GridSize) => RoundBoardGenerationResult) | undefined;
   private readonly scoreWord: (word: unknown) => TraditionalScoringResult;
+  private readonly reconcileWords: typeof reconcileRoundWords;
 
   constructor(private readonly options: RoomStoreOptions) {
     this.now = createSafeClock(options.now ?? Date.now, () => {
@@ -304,6 +312,7 @@ export class RoomStore {
       options.reconnectTokenGenerator ?? defaultReconnectTokenGenerator;
     this.roundBoardGenerator = options.roundBoardGenerator;
     this.scoreWord = options.scoreWord ?? scoreTraditionalWord;
+    this.reconcileWords = options.reconcileWords ?? reconcileRoundWords;
   }
 
   createDisplay(socketId: string): DisplaySessionResult {
@@ -545,6 +554,7 @@ export class RoomStore {
         startedAt: now,
         deadlineAt: now + settings.roundDurationSeconds * 1_000,
         endedAt: null,
+        results: null,
         generationAttempts: generated.attempts,
       });
 
@@ -978,15 +988,20 @@ export class RoomStore {
     this.pruneExpiredCodeTombstones(now);
 
     for (const room of [...this.rooms.values()]) {
-      if (this.reconcileRound(room, now)) {
-        updatedRoomCodes.add(room.code);
-      }
-
       if (room.expiresAt <= now) {
         deletedRoomCodes.push(room.code);
         updatedRoomCodes.delete(room.code);
         this.deleteRoom(room, now, true);
         continue;
+      }
+
+      try {
+        if (this.reconcileRound(room, now)) {
+          updatedRoomCodes.add(room.code);
+        }
+      } catch {
+        // Keep cleanup bounded and continue with other rooms. Action paths
+        // still return a generic INTERNAL_ERROR for this impossible state.
       }
 
       const display = room.display;
@@ -1058,8 +1073,13 @@ export class RoomStore {
     const updatedRoomCodes: string[] = [];
 
     for (const room of this.rooms.values()) {
-      if (this.reconcileRound(room, now)) {
-        updatedRoomCodes.push(room.code);
+      try {
+        if (this.reconcileRound(room, now)) {
+          updatedRoomCodes.push(room.code);
+        }
+      } catch {
+        // One impossible internal room state must not stop the bounded
+        // lifecycle sweep from finalizing every other due room.
       }
     }
 
@@ -1314,7 +1334,18 @@ export class RoomStore {
       deadlineAt: new Date(round.deadlineAt).toISOString(),
       endedAt:
         round.endedAt === null ? null : new Date(round.endedAt).toISOString(),
+      results: round.results ? this.copyRoundResults(round.results) : null,
       generationAttempts: round.generationAttempts,
+    };
+  }
+
+  private copyRoundResults(results: RoundResults): RoundResults {
+    return {
+      players: results.players.map((player) => ({
+        ...player,
+        words: player.words.map((word) => ({ ...word })),
+      })),
+      winnerPlayerIds: [...results.winnerPlayerIds],
     };
   }
 
@@ -1358,11 +1389,135 @@ export class RoomStore {
       return false;
     }
 
-    room.phase = 'ROUND_ENDED';
-    room.round = Object.freeze({
+    const roundSubmissions = room.roundSubmissions;
+    if (
+      roundSubmissions === null ||
+      roundSubmissions.size !== round.participants.length
+    ) {
+      throw new RoomOperationError(
+        'INTERNAL_ERROR',
+        'The authoritative round could not be finalized.',
+      );
+    }
+
+    const participantIndex = new Map(
+      round.participants.map((participant, index) => [
+        participant.playerId,
+        index,
+      ]),
+    );
+    if (
+      [...roundSubmissions.keys()].some(
+        (playerId) => !participantIndex.has(playerId),
+      )
+    ) {
+      throw new RoomOperationError(
+        'INTERNAL_ERROR',
+        'The authoritative round could not be finalized.',
+      );
+    }
+
+    const reconciliationInput = round.participants.map((participant) => {
+      const state = roundSubmissions.get(participant.playerId);
+      const parsedState = playerRoundSubmissionStateSchema.safeParse(state);
+      if (
+        !state ||
+        !parsedState.success ||
+        parsedState.data.roundId !== round.id ||
+        parsedState.data.playerId !== participant.playerId
+      ) {
+        throw new RoomOperationError(
+          'INTERNAL_ERROR',
+          'The authoritative round could not be finalized.',
+        );
+      }
+      return Object.freeze({
+        playerId: participant.playerId,
+        acceptedWords: Object.freeze(
+          parsedState.data.acceptedWords.map((word) =>
+            Object.freeze({
+              word: word.word,
+              points: word.points,
+            }),
+          ),
+        ),
+      });
+    });
+
+    let reconciled: RoundReconciliationResult;
+    try {
+      reconciled = this.reconcileWords(Object.freeze(reconciliationInput));
+    } catch {
+      throw new RoomOperationError(
+        'INTERNAL_ERROR',
+        'The authoritative round could not be finalized.',
+      );
+    }
+    if (!reconciled.success) {
+      throw new RoomOperationError(
+        'INTERNAL_ERROR',
+        'The authoritative round could not be finalized.',
+      );
+    }
+
+    const displayNames = new Map(
+      round.participants.map((participant) => [
+        participant.playerId,
+        participant.displayName,
+      ]),
+    );
+    const sortedPlayers = [...reconciled.participants]
+      .sort((left, right) => {
+        const scoreDifference = right.finalScore - left.finalScore;
+        return (
+          scoreDifference ||
+          (participantIndex.get(left.playerId) ?? Number.MAX_SAFE_INTEGER) -
+            (participantIndex.get(right.playerId) ?? Number.MAX_SAFE_INTEGER)
+        );
+      })
+      .map((player, _index, players) =>
+        Object.freeze({
+          playerId: player.playerId,
+          displayName: displayNames.get(player.playerId) ?? '',
+          rank:
+            1 +
+            players.filter((other) => other.finalScore > player.finalScore)
+              .length,
+          baseScore: player.baseScore,
+          uniqueBonusScore: player.uniqueBonusScore,
+          finalScore: player.finalScore,
+          words: Object.freeze(
+            player.words.map((word) => Object.freeze({ ...word })),
+          ),
+        }),
+      );
+    const highestScore = sortedPlayers[0]?.finalScore ?? 0;
+    const results: RoundResults = Object.freeze({
+      players: Object.freeze(sortedPlayers),
+      winnerPlayerIds: Object.freeze(
+        highestScore === 0
+          ? []
+          : sortedPlayers
+              .filter((player) => player.finalScore === highestScore)
+              .map((player) => player.playerId),
+      ),
+    });
+    const finalizedRound: InternalRound = Object.freeze({
       ...round,
       endedAt: round.deadlineAt,
+      results,
     });
+    if (
+      !roundStateSchema.safeParse(this.toRoundState(finalizedRound)).success
+    ) {
+      throw new RoomOperationError(
+        'INTERNAL_ERROR',
+        'The authoritative round could not be finalized.',
+      );
+    }
+
+    room.phase = 'ROUND_ENDED';
+    room.round = finalizedRound;
     room.stateVersion += 1;
     return true;
   }

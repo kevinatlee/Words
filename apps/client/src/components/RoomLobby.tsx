@@ -20,6 +20,7 @@ import { LetterGrid } from './LetterGrid';
 import { PlayerList } from './PlayerList';
 import { PrototypeNotice } from './PrototypeNotice';
 import { RoomCode } from './RoomCode';
+import { RoundResults } from './RoundResults';
 
 const placeholderCells = Array.from(
   { length: 49 },
@@ -75,6 +76,7 @@ export function RoomLobby({
     currentPlayer?.connected === true &&
     currentPlayer.id === room.controllerPlayerId;
   const roundIsActive = room.phase === 'ROUND_ACTIVE';
+  const roundIsEnded = room.phase === 'ROUND_ENDED';
   const canChangeSettings = isConnectedController && !roundIsActive;
   const canStartRound = isConnectedController && !roundIsActive;
   const joinUrl = buildJoinUrl(window.location.origin, room.code);
@@ -179,14 +181,18 @@ export function RoomLobby({
   const heading = isDisplay
     ? roundIsActive
       ? `Round ${room.round?.number ?? ''} is live.`
-      : 'Shared display is ready.'
+      : roundIsEnded
+        ? `Round ${room.round?.number ?? ''} results.`
+        : 'Shared display is ready.'
     : currentPlayer?.isController
       ? 'You’re the game host.'
       : 'You’re in the room.';
   const supportingText = isDisplay
     ? roundIsActive
       ? 'The server owns this board and the official round deadline.'
-      : 'Share the code and keep this screen visible while phone players join.'
+      : roundIsEnded
+        ? 'Final results are shared with everyone in this room.'
+        : 'Share the code and keep this screen visible while phone players join.'
     : currentPlayer?.isController
       ? roundIsActive
         ? 'Play normally. Settings and another start unlock after the official deadline.'
@@ -443,7 +449,15 @@ export function RoomLobby({
                   )}
                 </section>
               )}
-            {sessionRole === 'player' && submissionState && (
+            {roundIsEnded && room.round?.results && (
+              <RoundResults
+                roundNumber={room.round.number}
+                results={room.round.results}
+                currentPlayerId={currentPlayerId}
+                isDisplay={isDisplay}
+              />
+            )}
+            {sessionRole === 'player' && roundIsActive && submissionState && (
               <section
                 className="personal-score"
                 aria-labelledby="personal-score-title"
@@ -469,9 +483,7 @@ export function RoomLobby({
                     ))}
                   </ol>
                 )}
-                <small>
-                  Shared-word reconciliation is not implemented yet.
-                </small>
+                <small>Final scoring appears when the round ends.</small>
               </section>
             )}
             <div className="round-action">
@@ -480,18 +492,20 @@ export function RoomLobby({
                   ? `${room.round?.participants.length ?? 0} players were present when this round started.`
                   : `Next round: ${room.settings.roundDurationSeconds} seconds with a server-owned board.`}
               </p>
-              <button
-                className="button button--primary"
-                type="button"
-                disabled={!canStartRound || actionPending}
-                onClick={() => void runStartRound()}
-              >
-                {actionPending
-                  ? 'Working…'
-                  : room.phase === 'ROUND_ENDED'
-                    ? 'Start Next Round'
-                    : 'Start Round'}
-              </button>
+              {(!roundIsEnded || isConnectedController) && (
+                <button
+                  className="button button--primary"
+                  type="button"
+                  disabled={!canStartRound || actionPending}
+                  onClick={() => void runStartRound()}
+                >
+                  {actionPending
+                    ? 'Working…'
+                    : room.phase === 'ROUND_ENDED'
+                      ? 'Start Next Round'
+                      : 'Start Round'}
+                </button>
+              )}
             </div>
           </section>
         </div>

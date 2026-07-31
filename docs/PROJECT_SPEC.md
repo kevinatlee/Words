@@ -40,7 +40,7 @@ Creating the room does not grant the display player membership or controller
 authority. The display never selects or approves a controller. Changing the
 controller must never change the display session.
 
-## Current scope: Stage 4B complete, Stage 4C submissions in review
+## Current scope: Stage 4C complete, Stage 4D results in draft review
 
 Stage 2.5 is complete. It extends the secure, server-backed lobby with explicit
 game-host delegation and deterministic automatic succession:
@@ -109,10 +109,17 @@ deadline, phase, and automatic ending. Every session reconnects to the same
 current round.
 
 Stage 4C adds private current-participant word/path validation and traditional
-provisional scoring. Cross-player duplicate handling, final results, rankings,
-winners, persistence, and deployment remain later work. See `SUBMISSIONS.md`.
+provisional scoring.
 
-## Stage 4B room model
+Stage 4D automatically reconciles every immutable participant at the deadline,
+retains traditional base points for every accepted word, adds an exact 25%
+bonus to words found by only one distinct player, and publishes one strict
+result projection in `ROUND_ENDED`. It adds competition ranks, tied positive
+winners, no-winner handling when nobody scored, display/player result
+presentation, reconnect-safe results, and the controller-driven next round.
+See `SUBMISSIONS.md` and `RESULTS.md`.
+
+## Current room model
 
 A room contains:
 
@@ -127,6 +134,7 @@ A room contains:
 - connection status for the display and players
 - an exact `LOBBY`, `ROUND_ACTIVE`, or `ROUND_ENDED` phase
 - authoritative settings and at most one current round snapshot
+- nullable finalized results inside the current round
 - a server state version and serialization-time clock snapshot
 - controller-configured grid and duration plus traditional scoring mode
 - creation, last-activity, and expiration timestamps
@@ -141,7 +149,8 @@ submission event, and only a current participant can use it.
 
 Only the connected controller can atomically update complete settings in the
 lobby or after a round, and only that controller can start a round. The display
-and ordinary players render those values read-only.
+and ordinary players render those values read-only. Final results arrive only
+through the existing `room:state`; no client can request or supply them.
 
 ## Disconnect and room-lifetime policy
 
@@ -207,16 +216,16 @@ disconnect grace period.
 
 Stage 4B lets the controller choose supported settings and start an
 authoritative countdown and round. The display remains the shared presentation
-surface. Later stages will let players trace and submit words and receive
-server-calculated validation and scoring.
+surface. Stages 4C and 4D add player submissions, server-calculated validation,
+and final scoring.
 
 Planned rules remain:
 
 - Board sizes: 4 × 4, 5 × 5, and 6 × 6; default 4 × 4
 - Durations: 30, 60, 90, 120, 150, and 180 seconds; default 180 seconds
 - Default scoring: Traditional
-- Default duplicate handling: a shared word scores zero for everyone who
-  submitted it
+- Default shared-word handling: every accepted word keeps its base points; a
+  unique word receives an exact 25% bonus and a shared word receives no bonus
 - Default minimum word length: 3 letters
 - Adjacency: horizontal, vertical, and diagonal; no tile reuse within a word
 
@@ -272,12 +281,14 @@ details are future deployment work, not a claim about Stage 2.
 7. **Stage 4B — complete:** controlled dictionary startup, cryptographic board
    generation, controller-owned settings, authoritative boards, participant
    snapshots, deadlines, automatic ending, and round-aware reconnection.
-8. **Stage 4C — in review:** player-only submissions, server-owned path and
+8. **Stage 4C — complete:** player-only submissions, server-owned path and
    dictionary validation, private accepted-word recovery, and traditional
-   provisional scoring. Cross-player duplicate handling and final results
-   remain Stage 4D.
-9. **Stage 5:** production hardening, one-container build, image publishing,
-   server configuration, and tunnel documentation.
+   provisional scoring.
+9. **Stage 4D — in draft review:** automatic shared-word reconciliation, final
+   per-player scores, deterministic competition ranking, tied/no-winner state,
+   public ended-round results, and controller-driven next rounds.
+10. **Stage 5:** production hardening, one-container build, image publishing,
+    server configuration, and tunnel documentation.
 
 Each stage should remain independently reviewable and must not imply that later
 stages are ready.
@@ -300,8 +311,8 @@ The eventual MVP must allow:
 
 Stage 2.5 completes the room-code and authority portions of items 1–3 and 10.
 Stage 3 supplies the isolated engine foundation, Stage 4A supplies verified
-production inputs, and Stage 4B completes items 4–6 without beginning
-submissions or scoring.
+production inputs, Stage 4B completes items 4–6, Stage 4C completes submission
+validation, and Stage 4D completes items 8–10 for one temporary round.
 
 ## Decisions deferred to later stages
 

@@ -100,6 +100,17 @@ button:disabled {
   opacity: 0.56;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .app-shell {
   display: flex;
   min-height: 100vh;
@@ -1094,6 +1105,129 @@ button:disabled {
 
 .accepted-word-list li strong {
   color: var(--mint);
+}
+
+.round-results {
+  display: grid;
+  margin-top: 1.25rem;
+  gap: 1rem;
+}
+
+.round-results__hero,
+.round-results__ranking,
+.round-results__reviews {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(6, 16, 27, 0.32);
+}
+
+.round-results__hero {
+  border-color: rgba(112, 231, 162, 0.5);
+  background:
+    linear-gradient(135deg, rgba(112, 231, 162, 0.12), transparent 65%),
+    rgba(6, 16, 27, 0.32);
+}
+
+.round-results__hero h2,
+.round-results__ranking h3,
+.round-results__reviews h3 {
+  margin-bottom: 0.55rem;
+}
+
+.round-results__hero p {
+  margin-bottom: 0;
+  color: var(--paper-muted);
+}
+
+.result-table-wrap {
+  overflow-x: auto;
+}
+
+.round-results table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.round-results th,
+.round-results td {
+  padding: 0.7rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.round-results thead th {
+  color: var(--paper-muted);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.round-results tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.round-results__current-player {
+  background: rgba(122, 199, 255, 0.1);
+}
+
+.round-results__you {
+  color: var(--blue);
+  font-size: 0.78rem;
+}
+
+.result-review {
+  border-top: 1px solid var(--line);
+}
+
+.result-review:first-of-type {
+  border-top: 0;
+}
+
+.result-review summary {
+  display: flex;
+  min-height: 3.25rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block: 0.7rem;
+  cursor: pointer;
+}
+
+.result-review summary:focus-visible {
+  outline: 3px solid var(--sun);
+  outline-offset: 3px;
+}
+
+.result-review__body {
+  padding-bottom: 0.9rem;
+}
+
+.result-review__body > p {
+  color: var(--paper-muted);
+}
+
+.result-review__body ol {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  gap: 0.45rem;
+  list-style: none;
+}
+
+.result-review__body li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.result-review__body li span {
+  color: var(--paper-muted);
+  text-align: right;
 }
 
 .word-entry > div {

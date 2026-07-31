@@ -532,6 +532,22 @@ export function createWordsServer(
         try {
           receivedAt = now();
           if (!submissionSocketRateLimiter.allow(socket.id, receivedAt)) {
+            const session = socket.data.session;
+            if (session) {
+              try {
+                broadcastDueRound(session.roomCode, receivedAt);
+              } catch {
+                sendAcknowledgement({
+                  ok: false,
+                  error: {
+                    code: 'INTERNAL_ERROR',
+                    message: 'That word could not be checked.',
+                  },
+                  state: null,
+                });
+                return;
+              }
+            }
             sendAcknowledgement({
               ok: false,
               error: {
@@ -923,9 +939,14 @@ export function createWordsServer(
     }
 
     for (const roomCode of updatedRoomCodes) {
-      const room = roomStore.getRoomState(roomCode);
-      if (room) {
-        io.to(roomCode).emit('room:state', room);
+      try {
+        const room = roomStore.getRoomState(roomCode);
+        if (room) {
+          io.to(roomCode).emit('room:state', room);
+        }
+      } catch {
+        // One impossible room state must not suppress cleanup or deadline
+        // broadcasts already committed for other rooms in this sweep.
       }
     }
   };

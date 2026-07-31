@@ -43,6 +43,7 @@ path copy.
 - Words: `normalizeWord`, `validateWordPath`,
   `DEFAULT_MINIMUM_WORD_LENGTH`, and `MAX_CANDIDATE_WORD_LENGTH`
 - Scoring: `scoreTraditionalWord`
+- Results: `reconcileRoundWords`, with bounded participant and word constants
 - Dictionaries: `WordDictionary` and `createWordDictionary`
 
 All exports come from `src/index.ts`.
@@ -133,7 +134,15 @@ See
 pinned Stage 4 dictionary recommendation and licence conditions, and
 [`docs/GAME_ENGINE.md`](../../docs/GAME_ENGINE.md) for the complete boundary.
 
-Stage 4C calls validation and scoring only on the authoritative server.
+Stage 4C calls validation and scoring only on the authoritative server. Stage
+4D calls pure `reconcileRoundWords()` at the deadline. The engine identifies
+shared canonical words across distinct participant IDs, retains traditional
+base points for all accepted words, adds an exact 25% bonus to unique words,
+and returns detached immutable participant results. Display names, rankings,
+winners, rooms, clocks, and publication stay server-owned.
+
+Malformed or hostile in-process inputs, including throwing property access,
+return a bounded `INVALID_INPUT` result without exposing caller text.
 
 ## Commands
 
