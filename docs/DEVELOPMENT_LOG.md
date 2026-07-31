@@ -1184,3 +1184,22 @@ player are separate roles, and neither socket alone owns room lifetime.
   and `/play/demo`.
 - Responsive checks passed at desktop and phone sizes without horizontal
   overflow.
+
+## 2026-07-31 — Phone room-interface cleanup (draft)
+
+### Work completed
+
+- Made the phone room view puzzle-first, with compact connection state and a
+  Leave room action instead of duplicate display-room administration.
+- Kept room codes, QR joining, player lists, phase labels, and detailed results
+  on the shared display.
+- Kept controller settings, start controls, and delegation between rounds only;
+  active gameplay hides them for every phone.
+- Replaced phone detailed results with a concise direction to the TV and moved
+  the late-join waiting notice after the puzzle.
+- Updated focused App and RoomLobby coverage for player and display behavior.
+
+### Boundaries retained
+
+- No TV redesign, results timeout, lifecycle transition, server contract,
+  scoring, persistence, or later-stage work was added.

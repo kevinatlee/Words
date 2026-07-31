@@ -1,8 +1,8 @@
 # Playtest decisions
 
-This document records the product decisions locked after Stage 4E playtesting.
-It distinguishes the current Stage 4F scope from later work so that a small
-interaction improvement does not quietly broaden the product.
+This document records the product decisions locked through Stage 4F playtesting
+and the phone-interface cleanup. It distinguishes that focused work from later
+product changes.
 
 ## General layout
 
@@ -56,22 +56,21 @@ This is planned, not implemented by Stage 4F:
 - After 20 seconds, the server will authoritatively return to `LOBBY`, using
   the existing `ROUND_ENDED` lifecycle rather than adding a fourth phase.
 
-## Planned information architecture
+## Implemented phone information architecture
 
-This cleanup is agreed future work and is not implemented by Stage 4F:
+- Phone rooms lead with the puzzle and retain only compact connection state and
+  Leave room beside it; room codes, QR, player lists, display details, and
+  phase labels stay on the shared display.
+- Ordinary players see a concise waiting message between rounds and never see
+  settings or controller delegation.
+- The controller sees the puzzle before Game Settings, Start Round, and
+  controller delegation in the lobby and after results. Those administration
+  controls are absent during active gameplay for every phone.
+- Phones show a concise TV-results message after a round instead of rankings,
+  scores, winner copy, or detailed word review. The shared display retains its
+  existing results presentation.
 
-- The game-host phone will remove temporary-room detail from its primary view,
-  lead with the puzzle, and group controls in the order: puzzle, settings,
-  controls, then game-host authority.
-- Ordinary players will remove nonessential room sections, lead with the
-  puzzle, and keep the active task in focus.
-- The shared display will keep a compact header with the title at left and
-  player count plus game-host crown at right. Its QR and puzzle presentation
-  will remain concise, with selected settings visible without becoming a
-  separate control surface.
+## Current boundary
 
-## Current scoring migration boundary
-
-This draft implements integer scoring only. It does not implement the TV result
-lifecycle, phone or display information architecture cleanup, a new phase, or a
-new network event.
+The phone cleanup does not implement the TV results lifecycle, a display
+redesign, a new phase, or a new network event.

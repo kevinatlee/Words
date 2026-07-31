@@ -169,6 +169,26 @@ afterEach(() => {
 });
 
 describe('RoomLobby word entry', () => {
+  it('keeps the active phone focused on the puzzle and private play state', () => {
+    const { container } = renderLobby();
+
+    const preview = container.querySelector('.room-dashboard__preview');
+    expect(preview?.firstElementChild).toHaveClass('board-panel');
+    expect(screen.getByRole('heading', { name: 'Puzzle' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Leave room' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Touch' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Trace' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Submit' })).toBeVisible();
+    expect(screen.getByRole('timer')).toBeVisible();
+    expect(screen.getByText('0 points')).toBeVisible();
+    expect(screen.getByText('0 accepted')).toBeVisible();
+    expect(screen.queryByText('Live temporary room')).toBeNull();
+    expect(screen.queryByLabelText('Room code ABC234')).toBeNull();
+    expect(screen.queryByText('Shared screen')).toBeNull();
+    expect(screen.queryByText('Round active')).toBeNull();
+    expect(screen.queryByRole('region', { name: /scan to join/i })).toBeNull();
+  });
+
   it('defaults to Touch, remembers Trace locally, and exposes an accessible selector', async () => {
     const user = userEvent.setup();
     const first = renderLobby();
@@ -205,21 +225,25 @@ describe('RoomLobby word entry', () => {
     renderLobby();
 
     expect(screen.queryByRole('heading', { name: 'Game Host' })).toBeNull();
-    expect(screen.queryByRole('heading', { name: 'Round setup' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Game Settings' })).toBeNull();
   });
 
   it('shows controller administration only to the connected controller between rounds', () => {
     const lobby = createRoom({ phase: 'LOBBY', round: null });
     const lobbyView = renderLobby(undefined, { room: lobby });
     expect(screen.getByRole('heading', { name: 'Game Host' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Round setup' })).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Game Settings' }),
+    ).toBeVisible();
     lobbyView.unmount();
 
     renderLobby(undefined, {
       room: createRoom({ phase: 'ROUND_ENDED' }),
     });
     expect(screen.getByRole('heading', { name: 'Game Host' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Round setup' })).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Game Settings' }),
+    ).toBeVisible();
   });
 
   it('never shows controller administration to ordinary players or the display', () => {
@@ -247,7 +271,9 @@ describe('RoomLobby word entry', () => {
         currentPlayerId: ordinaryPlayerId,
       });
       expect(screen.queryByRole('heading', { name: 'Game Host' })).toBeNull();
-      expect(screen.queryByRole('heading', { name: 'Round setup' })).toBeNull();
+      expect(
+        screen.queryByRole('heading', { name: 'Game Settings' }),
+      ).toBeNull();
       view.unmount();
     }
 
@@ -257,7 +283,52 @@ describe('RoomLobby word entry', () => {
       currentPlayerId: null,
     });
     expect(screen.queryByRole('heading', { name: 'Game Host' })).toBeNull();
-    expect(screen.queryByRole('heading', { name: 'Round setup' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Game Settings' })).toBeNull();
+  });
+
+  it('keeps room details and finalized results on the display', () => {
+    const activeRoom = createRoom();
+    const endedRoom: RoomState = {
+      ...activeRoom,
+      phase: 'ROUND_ENDED',
+      round: activeRoom.round
+        ? {
+            ...activeRoom.round,
+            endedAt: new Date().toISOString(),
+            results: {
+              players: [
+                {
+                  playerId,
+                  displayName: 'Bright Fox',
+                  rank: 1,
+                  baseScore: 3,
+                  uniqueBonusScore: 1,
+                  finalScore: 4,
+                  words: [],
+                },
+              ],
+              winnerPlayerIds: [playerId],
+            },
+          }
+        : null,
+    };
+
+    renderLobby(undefined, {
+      room: endedRoom,
+      sessionRole: 'display',
+      currentPlayerId: null,
+    });
+
+    expect(screen.getByText('Live temporary room')).toBeVisible();
+    expect(screen.getByLabelText('Room code ABC234')).toBeVisible();
+    expect(screen.getByText('Shared screen')).toBeVisible();
+    expect(screen.getByRole('rowheader', { name: 'Bright Fox' })).toBeVisible();
+    expect(
+      screen.getByRole('region', { name: 'Join the next round' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Bright Fox wins' }),
+    ).toBeVisible();
   });
 
   it('uses Touch backtracking without leaving disconnected paths', async () => {

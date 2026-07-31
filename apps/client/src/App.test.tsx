@@ -590,11 +590,17 @@ describe('Stage 4B display and player room routes', () => {
     });
     expect(
       await screen.findByRole('heading', {
-        name: 'You’re the game host.',
+        name: 'Puzzle',
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Silver Owl (you)')).toBeInTheDocument();
-    expect(screen.getAllByText('Game Host').length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole('heading', { name: 'Game Settings' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start Round' })).toBeEnabled();
+    expect(screen.queryByText('Live temporary room')).toBeNull();
+    expect(screen.queryByLabelText('Room code ABC234')).toBeNull();
+    expect(screen.queryByText('Shared screen')).toBeNull();
+    expect(screen.queryByText('Silver Owl (you)')).toBeNull();
     expect(
       screen.queryByRole('region', {
         name: /scan to join|join the next round/i,
@@ -624,14 +630,19 @@ describe('Stage 4B display and player room routes', () => {
     await user.click(screen.getByRole('button', { name: 'Join Room' }));
 
     expect(
-      await screen.findByRole('heading', { name: 'You’re in the room.' }),
+      await screen.findByRole('heading', { name: 'Puzzle' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('<Bright Fox> (you)')).toBeInTheDocument();
-    expect(screen.getByText('Silver Owl')).toBeInTheDocument();
+    expect(
+      screen.getByText('Waiting for the game host to start the round.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('<Bright Fox> (you)')).toBeNull();
+    expect(screen.queryByText('Silver Owl')).toBeNull();
     expect(container.querySelector('b')).toBeNull();
     expect(
       screen.queryByRole('button', { name: 'Make Game Host' }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Game Settings' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Start Round' })).toBeNull();
     expect(
       screen.queryByRole('region', {
         name: /scan to join|join the next round/i,
@@ -663,7 +674,7 @@ describe('Stage 4B display and player room routes', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: 'You’re the game host.',
+        name: 'Puzzle',
       }),
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Make Game Host' }));
@@ -672,12 +683,12 @@ describe('Stage 4B display and player room routes', () => {
       targetPlayerId: ordinaryPlayer.id,
     });
     expect(
-      await screen.findByRole('heading', { name: 'You’re in the room.' }),
+      await screen.findByRole('heading', { name: 'Puzzle' }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Make Game Host' }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start Round' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Start Round' })).toBeNull();
   });
 
   it('shows transfer errors without changing controller controls', async () => {
@@ -872,7 +883,7 @@ describe('Stage 4B display and player room routes', () => {
     );
 
     expect(
-      await screen.findByRole('heading', { name: 'You’re in the room.' }),
+      await screen.findByRole('heading', { name: 'Puzzle' }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Make Game Host' }),
@@ -884,7 +895,7 @@ describe('Stage 4B display and player room routes', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: 'You’re the game host.',
+        name: 'Puzzle',
       }),
     ).toBeInTheDocument();
     expect(
@@ -1059,7 +1070,7 @@ describe('Stage 4B display and player room routes', () => {
       });
     });
     expect(
-      await screen.findByRole('heading', { name: 'You’re in the room.' }),
+      await screen.findByRole('heading', { name: 'Puzzle' }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('region', {
@@ -1117,8 +1128,10 @@ describe('Stage 4B display and player room routes', () => {
 
     await waitFor(() => expect(reconnectPlayer).toHaveBeenCalledTimes(2));
     expect(client.leavePlayer).toHaveBeenCalledTimes(1);
-    expect(await screen.findByText('DEF567')).toBeInTheDocument();
-    expect(screen.getByText('Violet Heron (you)')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Puzzle' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start Round' })).toBeEnabled();
   });
 
   it('renders live player updates on the shared display', async () => {
@@ -1185,11 +1198,14 @@ describe('Stage 4B display and player room routes', () => {
       />,
     );
 
-    expect(await screen.findByText('Display offline')).toBeInTheDocument();
-    expect(screen.getAllByText('Game Host offline')).toHaveLength(1);
     expect(
-      screen.getByRole('heading', { name: 'You’re in the room.' }),
+      await screen.findByRole('heading', { name: 'Puzzle' }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText('Waiting for the game host to start the round.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Display offline')).toBeNull();
+    expect(screen.queryByText('Game Host offline')).toBeNull();
   });
 
   it('clears stale browser credentials without automatically replacing a live display elsewhere', async () => {
@@ -1454,16 +1470,20 @@ describe('Stage 4B display and player room routes', () => {
         otherRoomController.displayName,
       );
       await user.click(screen.getByRole('button', { name: 'Join Room' }));
-      expect(await screen.findByText('DEF567')).toBeInTheDocument();
-      expect(screen.getByText('Violet Heron (you)')).toBeInTheDocument();
+      expect(
+        await screen.findByRole('heading', { name: 'Puzzle' }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Start Round' })).toBeEnabled();
 
       await act(async () => {
         pendingAction.resolve({ ok: true, room: oldRoom });
         await Promise.resolve();
       });
 
-      expect(screen.getByText('DEF567')).toBeInTheDocument();
-      expect(screen.getByText('Violet Heron (you)')).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'Puzzle' }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Start Round' })).toBeEnabled();
     },
   );
 
@@ -1550,7 +1570,7 @@ describe('Stage 4B display and player room routes', () => {
       />,
     );
     expect(
-      await screen.findByRole('heading', { name: 'Silver Owl wins' }),
+      await screen.findByText('Round complete — results are on the TV.'),
     ).toBeVisible();
 
     act(() =>
@@ -1572,13 +1592,12 @@ describe('Stage 4B display and player room routes', () => {
     );
 
     expect(
-      screen.getByRole('heading', { name: 'Silver Owl wins' }),
+      screen.getByText('Round complete — results are on the TV.'),
     ).toBeVisible();
     expect(
-      screen.queryByRole('heading', {
-        name: 'No scoring winner this round',
-      }),
+      screen.queryByRole('heading', { name: 'Silver Owl wins' }),
     ).toBeNull();
+    expect(screen.queryByRole('table')).toBeNull();
   });
 
   it('does not let an old active snapshot replace finalized results', async () => {
@@ -1607,10 +1626,10 @@ describe('Stage 4B display and player room routes', () => {
         })}
       />,
     );
-    await screen.findByText('Round active');
+    await screen.findByRole('button', { name: 'Submit' });
     act(() => reportRoomState?.(createEndedRoom(activeRoom)));
     expect(
-      await screen.findByRole('heading', { name: 'Silver Owl wins' }),
+      await screen.findByText('Round complete — results are on the TV.'),
     ).toBeVisible();
 
     act(() =>
@@ -1620,7 +1639,7 @@ describe('Stage 4B display and player room routes', () => {
       }),
     );
     expect(
-      screen.getByRole('heading', { name: 'Silver Owl wins' }),
+      screen.getByText('Round complete — results are on the TV.'),
     ).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Submit' })).toBeNull();
   });
@@ -1665,15 +1684,19 @@ describe('Stage 4B display and player room routes', () => {
       />,
     );
     expect(
-      await screen.findByRole('heading', { name: 'Silver Owl wins' }),
+      await screen.findByText('Round complete — results are on the TV.'),
     ).toBeVisible();
     act(() => reportRoomState?.(secondRound));
-    expect(await screen.findByText('Round active')).toBeVisible();
-    expect(screen.queryByText('Final round results')).toBeNull();
+    expect(await screen.findByRole('button', { name: 'Submit' })).toBeVisible();
+    expect(
+      screen.queryByText('Round complete — results are on the TV.'),
+    ).toBeNull();
 
     act(() => reportRoomState?.(endedRoom));
-    expect(screen.getByText('Round active')).toBeVisible();
-    expect(screen.queryByText('Final round results')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Submit' })).toBeVisible();
+    expect(
+      screen.queryByText('Round complete — results are on the TV.'),
+    ).toBeNull();
   });
 
   it('starts an authoritative round and renders the exact server board', async () => {
@@ -1707,7 +1730,9 @@ describe('Stage 4B display and player room routes', () => {
     );
 
     expect(client.startRound).toHaveBeenCalledWith();
-    expect(await screen.findByText('Official board')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Puzzle' }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'QU, tile 1' }),
     ).toBeInTheDocument();
@@ -1784,10 +1809,11 @@ describe('Stage 4B display and player room routes', () => {
       path: [0, 1, 2],
     });
     expect(await screen.findByText('QUAB accepted for 1 point.')).toBeVisible();
-    expect(screen.getByText('Provisional points: 1')).toBeVisible();
+    expect(screen.getByRole('heading', { name: '1 points' })).toBeVisible();
+    expect(screen.getByText('1 accepted')).toBeVisible();
     expect(
-      screen.getByText('Final scoring appears when the round ends.'),
-    ).toBeVisible();
+      screen.queryByText('Final scoring appears when the round ends.'),
+    ).toBeNull();
   });
 
   it('restores submission controls and retains the path after an unexpected client rejection', async () => {
@@ -1889,13 +1915,15 @@ describe('Stage 4B display and player room routes', () => {
       />,
     );
 
-    expect(await screen.findByText('Provisional points: 1')).toBeVisible();
-    expect(screen.getByText('QUAB')).toBeVisible();
+    expect(
+      await screen.findByRole('heading', { name: '1 points' }),
+    ).toBeVisible();
+    expect(screen.getByText('1 accepted')).toBeVisible();
 
     act(() => reportRoomState?.(staleRoom));
 
-    expect(screen.getByText('Provisional points: 1')).toBeVisible();
-    expect(screen.getByText('QUAB')).toBeVisible();
+    expect(screen.getByRole('heading', { name: '1 points' })).toBeVisible();
+    expect(screen.getByText('1 accepted')).toBeVisible();
   });
 
   it('prevents client-side non-adjacent selection and supports Undo and Clear', async () => {
@@ -2181,7 +2209,9 @@ describe('Stage 4B display and player room routes', () => {
       />,
     );
 
-    expect(await screen.findByText('Official board')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Puzzle' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('gridcell', { name: 'QU' })).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Start Next Round' }),
@@ -2243,9 +2273,12 @@ describe('Stage 4B display and player room routes', () => {
     );
 
     expect(
-      await screen.findByRole('heading', { name: 'Silver Owl wins' }),
+      await screen.findByText('Round complete — results are on the TV.'),
     ).toBeVisible();
-    expect(screen.getByText('<Bright Fox> (You)')).toBeVisible();
+    expect(
+      screen.queryByRole('heading', { name: 'Silver Owl wins' }),
+    ).toBeNull();
+    expect(screen.queryByText('<Bright Fox> (You)')).toBeNull();
     expect(
       screen.queryByRole('button', { name: 'Start Next Round' }),
     ).toBeNull();
@@ -2277,8 +2310,9 @@ describe('Stage 4B display and player room routes', () => {
     );
 
     expect(
-      await screen.findByRole('button', { name: 'Start Round' }),
-    ).toBeDisabled();
+      await screen.findByRole('heading', { name: 'Puzzle' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start Round' })).toBeNull();
     expect(screen.queryByRole('button', { name: '5 × 5' })).toBeNull();
   });
 
@@ -2351,7 +2385,7 @@ describe('Stage 4B display and player room routes', () => {
     expect(
       await screen.findByText(/joined after this round began/i),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start Round' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Start Round' })).toBeNull();
   });
 
   it('renders a useful not-found page', () => {

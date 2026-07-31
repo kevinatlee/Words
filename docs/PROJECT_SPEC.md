@@ -46,7 +46,7 @@ Creating the room does not grant the display player membership or controller
 authority. The display never selects or approves a controller. Changing the
 controller must never change the display session.
 
-## Current scope: Stage 4F complete, integer scoring in draft
+## Current scope: Stage 4F and integer scoring complete, phone interface in draft
 
 Stage 2.5 is complete. It extends the secure, server-backed lobby with explicit
 game-host delegation and deterministic automatic succession:

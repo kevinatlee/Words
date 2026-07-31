@@ -23,8 +23,8 @@ export function GameSettings({
     <section className="panel settings-panel" aria-labelledby="settings-title">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">Authoritative room settings</span>
-          <h2 id="settings-title">Round setup</h2>
+          <span className="eyebrow">Game settings</span>
+          <h2 id="settings-title">Game Settings</h2>
         </div>
         <span className="status-label">
           {pending ? 'Saving…' : canEdit ? 'Game Host controls' : 'Read only'}
