@@ -1,9 +1,13 @@
-# Stage 2.5 does not include a Dockerfile. This list is ready for a future,
-# documented container build without implying that deployment works today.
 node_modules
 dist
 coverage
 .git
 .github
+.DS_Store
+.env
+.env.*
+!.env.example
 *.log
-.env*
+npm-debug.log*
+.vscode
+.idea

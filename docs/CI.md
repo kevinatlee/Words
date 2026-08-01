@@ -1,8 +1,9 @@
 # Continuous integration
 
-Stage 3.1 provides independent GitHub-hosted verification for the Words repository.
-The workflow supplements local review; it does not replace running the
-repository checks before requesting review.
+Stage 5A extends the independent GitHub-hosted verification with a production
+container smoke test and guarded GHCR publishing. The workflow supplements
+local review; it does not replace running repository checks before requesting
+review.
 
 ## Workflow and triggers
 
@@ -21,6 +22,7 @@ The expected GitHub check names are stable:
 
 - `CI / Quality`
 - `CI / Dependency audit`
+- `CI / Container build and smoke`
 
 These names should not be casually changed because they are the recommended
 future branch-protection checks.
@@ -65,6 +67,33 @@ High and critical findings fail the job. Low and moderate findings remain
 visible in the log but do not fail this specified threshold. Audit failures are
 not ignored or converted into success.
 
+## Container build and smoke job
+
+`Container build and smoke` waits for both Quality and Dependency audit. It
+installs the locked dependencies needed by the smoke client, then runs
+`npm run smoke:container`. The script builds the multi-stage Node 24 image,
+checks that the final image has only the production artifact, inspects its
+architecture, size, non-root user, exposed port, and health check, and starts
+it read-only.
+
+The smoke then proves health readiness, supported deep links, immutable hashed
+assets, an existing-path Socket.IO display/player exchange, and graceful
+SIGTERM. It is an image/runtime test, not browser gameplay or a Cloudflare
+Tunnel test.
+
+## Main-only GHCR publishing
+
+`Publish GHCR image` runs only for a successful push to `main`, after all three
+verification jobs. It re-builds and re-smokes the exact image tagged
+`ghcr.io/kevinatlee/words:sha-<full-commit-sha>` before authenticating with the
+ephemeral GitHub token. Only then does it publish that exact SHA tag and
+`ghcr.io/kevinatlee/words:latest`.
+
+Pull-request runs never authenticate to GHCR and never publish an image. The
+workflow does not use `latest` before the exact SHA image has passed its smoke
+test. Package visibility is configured outside this repository; no long-lived
+registry credential is stored in source, an image, or documentation examples.
+
 ## Reproducibility and action pinning
 
 Hosted jobs use Node.js 24. Dependencies are installed with `npm ci`, so the
@@ -84,17 +113,19 @@ marketplace action or downloaded shell installer is used.
 
 ## Permissions and security boundary
 
-The workflow grants only:
+The workflow default is read-only:
 
 ```yaml
 permissions:
   contents: read
 ```
 
-It has no secrets, write token, persisted checkout credential, artifact upload,
-package publishing, release, deployment, or external-service step. It cannot
-push commits, modify pull requests, approve reviews, or change repository
-settings.
+Pull-request jobs retain that permission and use no registry authentication.
+The main-only publish job narrowly adds `packages: write` and uses the
+short-lived `GITHUB_TOKEN` only after Quality, Dependency audit, and Container
+build and smoke complete. No job persists checkout credentials. The workflow
+cannot push commits, modify pull requests, approve reviews, or change
+repository settings.
 
 `pull_request_target` is deliberately excluded. That event can combine
 privileged base-repository context with untrusted pull-request input. The
@@ -137,13 +168,14 @@ do not bypass, ignore, or hide the failure.
 
 ## Branch protection
 
-Stage 3.1 does not modify branch protection, repository rulesets, Actions
+Stage 5A does not modify branch protection, repository rulesets, Actions
 permissions, merge settings, or administrator bypass settings. After this
 workflow is merged and both names have appeared successfully on a real pull
 request or `main` run, a separate reviewed settings task should require:
 
 - `CI / Quality`
 - `CI / Dependency audit`
+- `CI / Container build and smoke`
 
 Waiting for real successful check names avoids configuring a required context
 that GitHub has never observed.
@@ -156,8 +188,8 @@ that GitHub has never observed.
 - `ubuntu-latest` is a GitHub-managed image label; logged tool versions help
   diagnose image changes.
 - This workflow does not run the long-lived development servers, perform
-  browser end-to-end testing, publish artifacts, deploy software, build
-  containers, or change repository settings.
+  browser end-to-end gameplay testing, configure package visibility, deploy to
+  a private host, configure Cloudflare Tunnel, or change repository settings.
 - Stage 4A data verification does not rebuild ESDB in CI. The pinned source
   reproduction command remains an explicit reviewed maintenance operation.
 - Browser end-to-end gameplay, physical QR scanning, and production deployment

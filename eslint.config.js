@@ -9,10 +9,13 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['packages/game-data/scripts/**/*.mjs'],
+    files: ['packages/game-data/scripts/**/*.mjs', 'scripts/**/*.mjs'],
     languageOptions: {
       ecmaVersion: 2022,
-      globals: globals.node,
+      globals: {
+        ...globals.node,
+        ...globals.browser,
+      },
     },
   },
   {

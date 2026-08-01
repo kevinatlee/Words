@@ -57,6 +57,7 @@ import {
   type RoomPresenceResult,
 } from './room-store.js';
 import { createSafeClock } from './safe-clock.js';
+import { configureProductionStaticFiles } from './production-static.js';
 
 type SocketData = {
   session?: BoundSession;
@@ -88,6 +89,7 @@ export type WordsServerDependencies = {
     httpServer: ReturnType<typeof createHttpServer>,
     port: number,
   ) => Promise<number>;
+  staticClientDirectory?: string;
 };
 
 type WordsServerStartupErrorCode =
@@ -310,6 +312,12 @@ export function createWordsServer(
       gameDataReady: gameDataRuntime !== null,
     });
   });
+  if (dependencies.staticClientDirectory) {
+    app.use('/api', (_request, response) => {
+      response.status(404).json({ error: 'Not found' });
+    });
+    configureProductionStaticFiles(app, dependencies.staticClientDirectory);
+  }
 
   io.on('connection', (socket: WordsSocket) => {
     const checkRateLimit = (acknowledge: FailureAcknowledgement): boolean => {
@@ -978,7 +986,7 @@ export function createWordsServer(
       };
       httpServer.once('error', onError);
       httpServer.once('listening', onListening);
-      httpServer.listen(port);
+      httpServer.listen({ host: '0.0.0.0', port });
     });
   const listen = dependencies.listen ?? ((_, port) => listenHttpServer(port));
 
