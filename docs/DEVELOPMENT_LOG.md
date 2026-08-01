@@ -1,5 +1,67 @@
 # Development log
 
+## 2026-07-31 — Centered TV Highlights timer (draft)
+
+- Changed the active display Room Highlights timer to a balanced three-column
+  grid so its integer countdown stays geometrically centered while the Timer
+  label remains at the left edge.
+- Increased the timer-label hierarchy without changing countdown authority,
+  active-board sizing, or phone timer presentation.
+
+## 2026-07-31 — Scoring highlights and TV summary refinement (draft)
+
+- Preserved the previous Last Round highlight through a zero-score
+  finalization, while successful scoring rounds continue to replace it and the
+  all-time Room Record rule remains unchanged.
+- Refined the active display Highlights timer into a full-width, readable
+  label/value row and standardized the finished-display heading as
+  `Round Results`.
+
+## 2026-07-31 — TV results recap and timer placement (draft)
+
+- Split display result-card word statistics into compact semantic rows and
+  order each unique-word preview longest first without changing results data.
+- Moved the active display Timer into Room Highlights, leaving the Puzzle
+  bubble to the official board.
+
+## 2026-07-31 — TV round timer simplification (draft)
+
+- Restored the active display board to the normal display-panel width and
+  placed its compact, authoritative Timer above the board without a timer
+  bubble.
+- Preserved the shared LetterGrid, lobby QR board, and all phone timer markup.
+
+## 2026-07-31 — Accepted-word tile feedback (draft)
+
+- Added short, client-only accepted tile feedback after the server confirms a
+  submitted word, without changing submission authority or payloads.
+- Refined the TV footer link and removed the display Room Record round label.
+
+## 2026-07-31 — TV tile sizing and footer simplification (draft)
+
+- Shared the gameplay tile font-size token and gap expression with the lobby
+  demonstration board so its perimeter letters match official boards.
+- Simplified the green display join link to inherited body weight with an
+  underline and accessible focus outline, removing filled hover treatment.
+
+## 2026-07-31 — TV tile and join styling correction (draft)
+
+- Removed the positional green tint so ordinary, official, and demonstration
+  letter tiles share one unselected paper tone.
+- Restored the display footer join URL as a compact green external link with
+  safe wrapping and keyboard focus treatment.
+- Matched the embedded QR backing to the letter-tile tone while retaining its
+  dark modules, four-module quiet zone, rounded clipping, and fallback.
+
+## 2026-07-31 — TV header and embedded QR physical refinement (draft)
+
+- Split the shared-display header into four equally spaced regions for the
+  Words logo, authoritative Game Host, settings summary, and connection state.
+- Rounded and clipped the merged lobby QR tile to match ordinary letter tiles
+  while preserving its white quiet zone and exact fallback text.
+- Kept phone header structure, active boards, server behavior, and lifecycle
+  state unchanged.
+
 ## 2026-07-31 — Phone information architecture refinement (draft)
 
 - Reduced phone visual density while preserving the authoritative lobby and

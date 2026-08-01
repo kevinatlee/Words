@@ -761,6 +761,10 @@ export function App({
       phoneConnectionStatus={
         room && session?.role === 'player' ? connectionStatus : null
       }
+      displayRoom={room && session?.role === 'display' ? room : null}
+      displayConnectionStatus={
+        room && session?.role === 'display' ? connectionStatus : null
+      }
     >
       {page}
     </AppShell>

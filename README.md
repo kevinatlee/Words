@@ -8,7 +8,7 @@ without accounts, and the first player becomes the initial game host
 (controller).
 
 **Stage 4F Touch/Trace entry and integer letter-count scoring are complete and
-merged. The phone room-interface cleanup is the current draft work.**
+merged. The current interface uses the authoritative three-phase lifecycle.**
 The secure lobby, isolated game engine, read-only hosted CI, reproducible
 server-only game data, authoritative rounds, private submissions, and final
 round results and display-only QR joining are complete. Stage 4F adds local
@@ -23,9 +23,10 @@ contract.
   player.
 - Zero to eight phone players can join through the room-specific
   `/join/:roomCode` link or enter a six-character code manually at `/join`.
-- The shared display renders that exact public join link as a high-contrast
-  local SVG QR code: prominent between rounds and compact while a round is
-  active.
+- In `LOBBY`, the shared display uses four equal header regions (Words, Game
+  Host, settings, and connection), Players and Room Highlights bubbles, a
+  centered demonstration board with its rounded QR tile merged into the
+  middle 3 × 3 region, and the exact join URL in the footer.
 - The first player becomes the server-assigned controller; later players join
   without gaining controller authority.
 - The connected game host can explicitly transfer authority to another
@@ -42,8 +43,9 @@ contract.
 - The server loads and verifies the 79,370-word production dictionary before
   listening, then uses cryptographic randomness for bounded board generation.
 - A single 250 ms server lifecycle sweep ends due rounds at their exact
-  deadline. Disconnects, reconnects, and controller transfers do not pause or
-  extend it.
+  deadline, keeps final results for one server-owned 20-second window, then
+  resets the room to `LOBBY`. Disconnects, reconnects, and controller
+  transfers do not pause or extend it.
 - Browser countdowns use `serverTime` plus a monotonic elapsed clock; only the
   server changes the phase.
 - Current participants can tap/click adjacent unused tiles and privately submit
@@ -58,8 +60,11 @@ contract.
   snapshot in the existing `ROUND_ENDED` state.
 - Final results show deterministic competition ranks, every tied positive
   winner, or no winner when no participant submitted a scoring word.
-- The display presents the public participant word review after submissions
-  close; phones direct players to the TV rather than duplicating results.
+- In `ROUND_ACTIVE`, the display keeps its Players and Room Highlights bubbles
+  beside the complete official board, with compact Timer in Room Highlights; it has no QR or
+  submission totals. In `ROUND_ENDED`, it shows only redesigned result cards
+  and the footer. Phones keep their completed board, Round Complete, Tap/Trace,
+  and connection state without administration or detailed results.
 - Phone puzzle bubbles use semantic labels without a visible puzzle heading.
   The compact Tap/Trace control stays centred in the phone header throughout
   lobby, active, and ended phases; phones do not show provisional scores or
@@ -96,9 +101,10 @@ contract.
 ## Round-local casual play
 
 Each round stands alone. Words is designed for casual drop-in play rather than
-a committed match or campaign. Players can join, play a round, see that
-round's result, continue, or leave. Starting the next round replaces the
-previous result.
+a committed match or campaign. The server destroys detailed results and private
+submissions after its 20-second results window, retaining only bounded room
+highlights. Players can join, play a round, see that round's result, continue,
+or leave. Starting the next round does not restore a previous result.
 
 Cumulative scores, session totals, match series, persistent standings,
 previous-round score history, streaks, profiles, progression, achievements,
@@ -180,15 +186,15 @@ Try the lobby:
    `/join/:roomCode` link, or enter the code manually at `/join`. For a real
    phone scan during development, open the display through the computer's
    LAN-reachable origin rather than `localhost`.
-3. Enter a temporary display name. This first player becomes the controller.
+3. Enter a temporary player display name. This first player becomes the
+   controller.
 4. Join from another phone tab and watch the shared display update.
 5. On the controller phone, choose a supported grid and duration, then start a
    round. Confirm every session shows the same official board and deadline.
 6. Submit words from both phones. Confirm each phone sees only its own words
    while the round is active.
-7. At the deadline, confirm the display shows the shared/unique word review,
-   integer scores, ranks, and winner state while phones direct players to the
-   TV for results.
+7. At the deadline, confirm the display shows its result cards, integer scores,
+   ranks, and winner state while phones keep only their completed board.
 8. After results appear, transfer Game Host authority to the second player;
    the display and completed result remain unchanged.
 9. Disconnect the new controller and confirm the room remains visible during

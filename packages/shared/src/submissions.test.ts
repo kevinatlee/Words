@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   acceptedWordSchema,
+  createEmptyRoomHighlights,
   displayActionResponseSchema,
   maximumAcceptedWordsPerPlayerPerRound,
   playerActionResponseSchema,
@@ -162,6 +163,7 @@ describe('private submission contracts', () => {
       lastActivityAt: '2026-07-30T20:00:00.000Z',
       expiresAt: '2026-07-30T22:00:00.000Z',
       maxPlayers: 8,
+      highlights: createEmptyRoomHighlights(),
       display: {
         connected: true,
         createdAt: '2026-07-30T20:00:00.000Z',
@@ -224,6 +226,7 @@ describe('private submission contracts', () => {
       lastActivityAt: '2026-07-30T20:00:00.000Z',
       expiresAt: '2026-07-30T22:00:00.000Z',
       maxPlayers: 8,
+      highlights: createEmptyRoomHighlights(),
       display: {
         connected: true,
         createdAt: '2026-07-30T20:00:00.000Z',

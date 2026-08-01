@@ -12,7 +12,8 @@ type LetterGridProps = {
   letters: string[];
   size: number;
   label: string;
-  selectedIndices?: number[];
+  selectedIndices?: readonly number[];
+  acceptedIndices?: readonly number[];
   compact?: boolean;
   interactive?: boolean;
   disabled?: boolean;
@@ -30,6 +31,7 @@ export function LetterGrid({
   size,
   label,
   selectedIndices = [],
+  acceptedIndices = [],
   compact = false,
   interactive = false,
   disabled = false,
@@ -49,6 +51,7 @@ export function LetterGrid({
   const selectedOrder = new Map(
     selectedIndices.map((tileIndex, order) => [tileIndex, order + 1]),
   );
+  const acceptedTileIndexes = new Set(acceptedIndices);
   const traceEnabled = interactive && !disabled && entryMode === 'trace';
 
   const indexFromElement = (element: Element | null): number | null => {
@@ -217,6 +220,7 @@ export function LetterGrid({
     >
       {letters.map((letter, index) => {
         const order = selectedOrder.get(index);
+        const isAccepted = acceptedTileIndexes.has(index);
 
         const content = (
           <>
@@ -228,7 +232,7 @@ export function LetterGrid({
             )}
           </>
         );
-        const className = `letter-tile${order ? ' letter-tile--selected' : ''}`;
+        const className = `letter-tile${order ? ' letter-tile--selected' : ''}${isAccepted ? ' letter-tile--accepted' : ''}`;
         const ariaLabel = order
           ? `${letter}, selection number ${order}`
           : interactive

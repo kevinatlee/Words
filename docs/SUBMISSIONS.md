@@ -68,8 +68,9 @@ words for only the current round.
 Only a connected current participant receives interactive board buttons during
 an active round. Taps/clicks add an adjacent unused tile, preserve complete
 tokens such as `QU`, and show selection order. Undo removes the latest tile;
-Clear removes the path. Success clears the selection, while rejection retains
-it consistently for revision or retry. Native buttons remain inside accessible
+Clear removes the path. Success clears the selection and briefly marks the
+accepted path, while rejection retains it consistently for revision or retry.
+Native buttons remain inside accessible
 grid cells for keyboard activation, and selection stops with local feedback
 before the derived candidate exceeds the 64-letter wire bound.
 

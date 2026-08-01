@@ -27,11 +27,9 @@ are not ordinary deferred enhancements.
 buildJoinUrl(window.location.origin, room.code);
 ```
 
-The completed string is passed to `JoinQrCode`. The QR component does not
-parse, normalize, or rebuild it. The same string is both:
-
-- the QR payload; and
-- the visible, keyboard-focusable join link.
+The completed string is passed to `DisplayJoinBoard`. The component does not
+parse, normalize, or rebuild it. The same authoritative string is the QR
+payload and the display footer URL.
 
 The shared helper normalizes the public room code, replaces any stale path with
 `/join/<ROOM_CODE>`, removes query parameters and fragments, and removes URL
@@ -94,24 +92,26 @@ gzip) to 23.45 kB (5.41 kB gzip), an approximate delta of 0.72 kB minified and
 - no logo, image, overlay, gradient, transparency, animation, rotation,
   inversion, or decorative module styling.
 
-The SVG has a scalable `viewBox`, stays square through CSS, cannot intercept
-pointer input, and is hidden from the accessibility tree. The surrounding
-semantic region provides the accessible heading, instructions, exact URL, and
-room-code fallback. The URL wraps safely and retains a visible keyboard-focus
-outline. No live region or automatic focus movement is used.
+The SVG has a scalable `viewBox`, stays square through CSS, and is hidden from
+the accessibility tree. The embedded display QR sits in one merged
+letter-tile-tone 3 × 3 center region of a noninteractive 5 × 5 demonstration
+board; the five top tiles spell `WORDS`. Its four-module quiet zone remains
+inside the rounded clipped tile surface.
+The exact URL appears in the display footer. No live region or automatic focus
+movement is used.
 
 A small React error boundary contains an unexpected QR-renderer exception. It
-does not retry. The room code, textual URL, gameplay, and reconnect behavior
-remain available outside that visual boundary.
+does not retry and renders the exact fallback `QR unavailable`. The footer URL,
+gameplay, and reconnect behavior remain available outside that visual boundary.
 
 ## Phase presentation
 
-- **Lobby:** a prominent 220–320 CSS-pixel QR card headed “Scan to join.”
-- **Active round:** a compact 128–176 CSS-pixel card headed “Join the next
-  round.” The normal grid layout keeps the board and timer primary; the QR is
-  never an overlay.
-- **Ended round:** the prominent “Join the next round” card returns while the
-  completed result remains the primary gameplay content.
+- **Lobby:** the QR is merged into the centered demonstration board, with
+  Players and Room Highlights side bubbles and the join URL footer.
+- **Active round:** the QR is absent; the official board and Time Remaining are
+  primary beside the same side bubbles.
+- **Ended round:** the QR, board, timer, and side bubbles are absent; only
+  result cards and the footer remain.
 
 The QR appears only for the display role. Controller phones, ordinary phones,
 mid-round joining phones, `/join`, `/join/:roomCode`, `/play/demo`, errors, and
@@ -198,7 +198,5 @@ limitations before Stage 4E merged. No production deployment was tested.
 - Rooms remain temporary and are lost on a server restart.
 - There is no result history or cumulative score by deliberate product design.
 
-Stage 4F is the current draft work. It adds Touch and Trace word entry over the
-existing board while preserving tap/click and keyboard fallbacks, server-owned
-path validation, and all current privacy and authority boundaries. It does not
-expand QR behavior, add cumulative scoring, or begin release packaging.
+Stage 4F Touch and Trace entry is complete. QR behavior remains display-only
+and does not add cumulative scoring, persistence, or release packaging.
