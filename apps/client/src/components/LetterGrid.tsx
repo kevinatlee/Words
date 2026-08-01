@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   type CSSProperties,
@@ -6,7 +7,11 @@ import {
 } from 'react';
 
 import type { WordEntryMode } from '../utils/word-entry';
-import { resolveTraceSegment, type TracePoint } from '../utils/trace-resolver';
+import {
+  resolveTraceSegment,
+  type TracePoint,
+  type TraceRect,
+} from '../utils/trace-resolver';
 
 type LetterGridProps = {
   letters: string[];
@@ -44,15 +49,25 @@ export function LetterGrid({
   onTraceCancel,
 }: LetterGridProps) {
   const gridRef = useRef<HTMLDivElement>(null);
+  const tileElementsRef = useRef<Array<HTMLButtonElement | null>>([]);
   const activePointerIdRef = useRef<number | null>(null);
-  const lastTraceTileIndexRef = useRef<number | null>(null);
   const previousTracePointRef = useRef<TracePoint | null>(null);
   const tracePathRef = useRef<number[]>([]);
+  const traceRectCacheRef = useRef<Map<number, TraceRect>>(new Map());
+  const pendingTracePointsRef = useRef<TracePoint[]>([]);
+  const traceAnimationFrameRef = useRef<number | null>(null);
+  const onTraceMoveRef = useRef(onTraceMove);
+  const onTraceCancelRef = useRef(onTraceCancel);
   const selectedOrder = new Map(
     selectedIndices.map((tileIndex, order) => [tileIndex, order + 1]),
   );
   const acceptedTileIndexes = new Set(acceptedIndices);
   const traceEnabled = interactive && !disabled && entryMode === 'trace';
+
+  useEffect(() => {
+    onTraceMoveRef.current = onTraceMove;
+    onTraceCancelRef.current = onTraceCancel;
+  }, [onTraceCancel, onTraceMove]);
 
   const indexFromElement = (element: Element | null): number | null => {
     const tile = element?.closest<HTMLButtonElement>('[data-tile-index]');
@@ -73,35 +88,74 @@ export function LetterGrid({
     );
   };
 
-  const cancelTrace = () => {
-    const pointerId = activePointerIdRef.current;
-    if (pointerId === null) {
-      return;
+  const cancelTraceAnimationFrame = useCallback(() => {
+    if (traceAnimationFrameRef.current !== null) {
+      window.cancelAnimationFrame(traceAnimationFrameRef.current);
+      traceAnimationFrameRef.current = null;
     }
+  }, []);
+
+  const cancelTrace = useCallback(() => {
+    const pointerId = activePointerIdRef.current;
+    cancelTraceAnimationFrame();
+    pendingTracePointsRef.current = [];
     activePointerIdRef.current = null;
-    lastTraceTileIndexRef.current = null;
     previousTracePointRef.current = null;
     tracePathRef.current = [];
-    if (gridRef.current?.hasPointerCapture?.(pointerId)) {
+    traceRectCacheRef.current.clear();
+    if (pointerId !== null && gridRef.current?.hasPointerCapture?.(pointerId)) {
       gridRef.current.releasePointerCapture(pointerId);
     }
-    onTraceCancel?.();
-  };
+    if (pointerId !== null) {
+      onTraceCancelRef.current?.();
+    }
+  }, [cancelTraceAnimationFrame]);
 
   useEffect(() => {
     cancelTrace();
-    // traceResetKey changes only when the parent invalidates input.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [traceResetKey]);
+  }, [cancelTrace, traceResetKey]);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    if (!traceEnabled) {
       cancelTrace();
-    },
-    // The cleanup intentionally reads the callback from this render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
+      return;
+    }
+    const invalidateTraceGeometry = () => {
+      traceRectCacheRef.current.clear();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        cancelTrace();
+      }
+    };
+    window.addEventListener('resize', invalidateTraceGeometry);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      cancelTrace();
+      window.removeEventListener('resize', invalidateTraceGeometry);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [cancelTrace, traceEnabled]);
+
+  const traceRectForIndex = (index: number): TraceRect | null => {
+    const cached = traceRectCacheRef.current.get(index);
+    if (cached) {
+      return cached;
+    }
+    const tile = tileElementsRef.current[index];
+    if (!tile) {
+      return null;
+    }
+    const rect = tile.getBoundingClientRect();
+    const traceRect = {
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+    };
+    traceRectCacheRef.current.set(index, traceRect);
+    return traceRect;
+  };
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (
@@ -115,15 +169,16 @@ export function LetterGrid({
       return;
     }
     event.preventDefault();
+    cancelTraceAnimationFrame();
+    pendingTracePointsRef.current = [];
+    traceRectCacheRef.current.clear();
     activePointerIdRef.current = event.pointerId;
-    lastTraceTileIndexRef.current = tileIndex;
     previousTracePointRef.current = { x: event.clientX, y: event.clientY };
     event.currentTarget.setPointerCapture?.(event.pointerId);
     tracePathRef.current = [...(onTraceStart?.(tileIndex) ?? [])];
   };
 
-  const processTraceSegment = (event: PointerEvent<HTMLDivElement>) => {
-    const currentPoint = { x: event.clientX, y: event.clientY };
+  const processTracePoint = (currentPoint: TracePoint) => {
     const previousPoint = previousTracePointRef.current;
     previousTracePointRef.current = currentPoint;
     if (!previousPoint || tracePathRef.current.length === 0) {
@@ -134,21 +189,7 @@ export function LetterGrid({
       previousPoint,
       currentPoint,
       size,
-      (index) => {
-        const tile = gridRef.current?.querySelector<HTMLElement>(
-          `[data-tile-index="${index}"]`,
-        );
-        if (!tile) {
-          return null;
-        }
-        const rect = tile.getBoundingClientRect();
-        return {
-          left: rect.left,
-          top: rect.top,
-          width: rect.width,
-          height: rect.height,
-        };
-      },
+      traceRectForIndex,
     );
     if (
       resolvedPath.length === tracePathRef.current.length &&
@@ -177,9 +218,42 @@ export function LetterGrid({
       if (index === undefined) {
         continue;
       }
-      tracePathRef.current = [...(onTraceMove?.(index) ?? resolvedPath)];
+      tracePathRef.current = [
+        ...(onTraceMoveRef.current?.(index) ?? resolvedPath),
+      ];
     }
-    lastTraceTileIndexRef.current = tracePathRef.current.at(-1) ?? null;
+  };
+
+  const flushPendingTracePoints = () => {
+    const points = pendingTracePointsRef.current;
+    pendingTracePointsRef.current = [];
+    for (const point of points) {
+      processTracePoint(point);
+    }
+  };
+
+  const queueTracePoints = (event: PointerEvent<HTMLDivElement>) => {
+    const coalescedEvents = event.nativeEvent.getCoalescedEvents?.() ?? [];
+    const appendPoint = (point: { clientX: number; clientY: number }) => {
+      const previousPendingPoint = pendingTracePointsRef.current.at(-1);
+      if (
+        previousPendingPoint?.x === point.clientX &&
+        previousPendingPoint.y === point.clientY
+      ) {
+        return;
+      }
+      pendingTracePointsRef.current.push({
+        x: point.clientX,
+        y: point.clientY,
+      });
+    };
+    for (const point of coalescedEvents) {
+      appendPoint(point);
+    }
+    // A browser normally includes the dispatched event in its coalesced list,
+    // but appending it defensively guarantees that the newest coordinate is
+    // always processed. Duplicate coordinates are discarded above.
+    appendPoint(event);
   };
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -187,7 +261,13 @@ export function LetterGrid({
       return;
     }
     event.preventDefault();
-    processTraceSegment(event);
+    queueTracePoints(event);
+    if (traceAnimationFrameRef.current === null) {
+      traceAnimationFrameRef.current = window.requestAnimationFrame(() => {
+        traceAnimationFrameRef.current = null;
+        flushPendingTracePoints();
+      });
+    }
   };
 
   const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
@@ -195,11 +275,13 @@ export function LetterGrid({
       return;
     }
     event.preventDefault();
-    processTraceSegment(event);
+    cancelTraceAnimationFrame();
+    flushPendingTracePoints();
+    processTracePoint({ x: event.clientX, y: event.clientY });
     activePointerIdRef.current = null;
-    lastTraceTileIndexRef.current = null;
     previousTracePointRef.current = null;
     tracePathRef.current = [];
+    traceRectCacheRef.current.clear();
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -252,6 +334,9 @@ export function LetterGrid({
               aria-pressed={order !== undefined}
               disabled={disabled}
               data-tile-index={index}
+              ref={(tile) => {
+                tileElementsRef.current[index] = tile;
+              }}
               onClick={(event) => {
                 if (entryMode === 'trace' && event.detail !== 0) {
                   return;

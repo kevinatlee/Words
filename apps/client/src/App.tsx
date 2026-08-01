@@ -80,17 +80,159 @@ function isSameSession(
         left.playerId === right.playerId;
 }
 
-function submissionStatesMatch(
-  left: PlayerRoundSubmissionState,
-  right: PlayerRoundSubmissionState,
+function arraysMatch<T>(
+  left: readonly T[],
+  right: readonly T[],
+  itemMatches: (leftItem: T, rightItem: T) => boolean,
 ): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return (
+    left.length === right.length &&
+    left.every((item, index) =>
+      right[index] === undefined ? false : itemMatches(item, right[index]),
+    )
+  );
+}
+
+function settingsMatch(
+  left: RoomState['settings'],
+  right: RoomState['settings'],
+): boolean {
+  return (
+    left.gridSize === right.gridSize &&
+    left.roundDurationSeconds === right.roundDurationSeconds &&
+    left.scoringMode === right.scoringMode
+  );
+}
+
+function resultWordsMatch(
+  left: NonNullable<
+    NonNullable<RoomState['round']>['results']
+  >['players'][number]['words'][number],
+  right: NonNullable<
+    NonNullable<RoomState['round']>['results']
+  >['players'][number]['words'][number],
+): boolean {
+  return (
+    left.word === right.word &&
+    left.basePoints === right.basePoints &&
+    left.shared === right.shared &&
+    left.uniqueBonusPoints === right.uniqueBonusPoints &&
+    left.finalPoints === right.finalPoints
+  );
 }
 
 function finalizedResultsMatch(left: RoomState, right: RoomState): boolean {
+  const leftResults = left.round?.results ?? null;
+  const rightResults = right.round?.results ?? null;
+  if (leftResults === null || rightResults === null) {
+    return leftResults === rightResults;
+  }
   return (
-    JSON.stringify(left.round?.results ?? null) ===
-    JSON.stringify(right.round?.results ?? null)
+    arraysMatch(
+      leftResults.winnerPlayerIds,
+      rightResults.winnerPlayerIds,
+      (leftId, rightId) => leftId === rightId,
+    ) &&
+    arraysMatch(
+      leftResults.players,
+      rightResults.players,
+      (leftPlayer, rightPlayer) =>
+        leftPlayer.playerId === rightPlayer.playerId &&
+        leftPlayer.displayName === rightPlayer.displayName &&
+        leftPlayer.rank === rightPlayer.rank &&
+        leftPlayer.baseScore === rightPlayer.baseScore &&
+        leftPlayer.uniqueBonusScore === rightPlayer.uniqueBonusScore &&
+        leftPlayer.finalScore === rightPlayer.finalScore &&
+        arraysMatch(leftPlayer.words, rightPlayer.words, resultWordsMatch),
+    )
+  );
+}
+
+function roomSnapshotsMatch(left: RoomState, right: RoomState): boolean {
+  const playersMatch = arraysMatch(
+    left.players,
+    right.players,
+    (leftPlayer, rightPlayer) =>
+      leftPlayer.id === rightPlayer.id &&
+      leftPlayer.displayName === rightPlayer.displayName &&
+      leftPlayer.connected === rightPlayer.connected &&
+      leftPlayer.joinedAt === rightPlayer.joinedAt &&
+      leftPlayer.isController === rightPlayer.isController,
+  );
+  const peopleMatch = (
+    leftPeople: readonly { playerId: string; displayName: string }[],
+    rightPeople: readonly { playerId: string; displayName: string }[],
+  ) =>
+    arraysMatch(
+      leftPeople,
+      rightPeople,
+      (leftPerson, rightPerson) =>
+        leftPerson.playerId === rightPerson.playerId &&
+        leftPerson.displayName === rightPerson.displayName,
+    );
+  const lastRoundMatches =
+    left.highlights.lastRound === null || right.highlights.lastRound === null
+      ? left.highlights.lastRound === right.highlights.lastRound
+      : left.highlights.lastRound.roundNumber ===
+          right.highlights.lastRound.roundNumber &&
+        left.highlights.lastRound.winningScore ===
+          right.highlights.lastRound.winningScore &&
+        peopleMatch(
+          left.highlights.lastRound.winners,
+          right.highlights.lastRound.winners,
+        );
+  const roomRecordMatches =
+    left.highlights.roomRecord === null || right.highlights.roomRecord === null
+      ? left.highlights.roomRecord === right.highlights.roomRecord
+      : left.highlights.roomRecord.roundNumber ===
+          right.highlights.roomRecord.roundNumber &&
+        left.highlights.roomRecord.score ===
+          right.highlights.roomRecord.score &&
+        peopleMatch(
+          left.highlights.roomRecord.holders,
+          right.highlights.roomRecord.holders,
+        );
+  const roundsMatch = (() => {
+    if (left.round === null || right.round === null) {
+      return left.round === right.round;
+    }
+    return (
+      left.round.id === right.round.id &&
+      left.round.number === right.round.number &&
+      settingsMatch(left.round.settings, right.round.settings) &&
+      left.round.board.size === right.round.board.size &&
+      arraysMatch(
+        left.round.board.tiles,
+        right.round.board.tiles,
+        (leftTile, rightTile) => leftTile === rightTile,
+      ) &&
+      peopleMatch(left.round.participants, right.round.participants) &&
+      left.round.startedAt === right.round.startedAt &&
+      left.round.deadlineAt === right.round.deadlineAt &&
+      left.round.endedAt === right.round.endedAt &&
+      left.round.generationAttempts === right.round.generationAttempts &&
+      finalizedResultsMatch(left, right)
+    );
+  })();
+
+  return (
+    left.code === right.code &&
+    left.phase === right.phase &&
+    left.stateVersion === right.stateVersion &&
+    left.serverTime === right.serverTime &&
+    left.createdAt === right.createdAt &&
+    left.lastActivityAt === right.lastActivityAt &&
+    left.expiresAt === right.expiresAt &&
+    left.maxPlayers === right.maxPlayers &&
+    left.display.connected === right.display.connected &&
+    left.display.createdAt === right.display.createdAt &&
+    left.controllerStatus === right.controllerStatus &&
+    left.controllerPlayerId === right.controllerPlayerId &&
+    playersMatch &&
+    settingsMatch(left.settings, right.settings) &&
+    lastRoundMatches &&
+    roomRecordMatches &&
+    roundsMatch
   );
 }
 
@@ -132,15 +274,29 @@ export function App({
       }
 
       const currentRoom = roomRef.current;
-      if (
-        currentRoom?.code === nextRoom.code &&
-        (nextRoom.stateVersion < currentRoom.stateVersion ||
-          (nextRoom.stateVersion === currentRoom.stateVersion &&
-            (Date.parse(nextRoom.serverTime) <
-              Date.parse(currentRoom.serverTime) ||
-              !finalizedResultsMatch(currentRoom, nextRoom))))
-      ) {
-        return;
+      if (currentRoom?.code === nextRoom.code) {
+        if (nextRoom.stateVersion < currentRoom.stateVersion) {
+          return;
+        }
+        if (nextRoom.stateVersion === currentRoom.stateVersion) {
+          const currentServerTime = Date.parse(currentRoom.serverTime);
+          const nextServerTime = Date.parse(nextRoom.serverTime);
+          if (
+            nextServerTime < currentServerTime ||
+            !finalizedResultsMatch(currentRoom, nextRoom)
+          ) {
+            return;
+          }
+          // Action acknowledgements can be followed by the exact same
+          // authoritative broadcast. Compare every bounded room field so a
+          // meaningful same-version correction is never discarded.
+          if (
+            nextServerTime === currentServerTime &&
+            roomSnapshotsMatch(currentRoom, nextRoom)
+          ) {
+            return;
+          }
+        }
       }
 
       roomRef.current = nextRoom;
@@ -248,10 +404,11 @@ export function App({
         if (nextState.submissionVersion < current.submissionVersion) {
           return current;
         }
-        if (
-          nextState.submissionVersion === current.submissionVersion &&
-          !submissionStatesMatch(current, nextState)
-        ) {
+        // A submission version identifies one immutable private response.
+        // Preserve the current object for both exact duplicates and conflicting
+        // same-version payloads, matching the existing conflict protection
+        // without serializing the accepted-word list.
+        if (nextState.submissionVersion === current.submissionVersion) {
           return current;
         }
         return nextState;

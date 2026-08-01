@@ -1,5 +1,24 @@
 # Development log
 
+## 2026-07-31 — Phone runtime optimization (draft)
+
+- Isolated the visible countdown in a small leaf, replaced 250 ms polling with
+  deadline-aligned timeouts, and added a separate one-shot phone input gate so
+  the puzzle does no per-second countdown rendering while late submissions
+  remain locally disabled and server-enforced.
+- Paused visual scheduling while hidden and restored immediately from the
+  authoritative time anchor without disconnecting Socket.IO.
+- Coalesced Trace processing to one animation-frame callback while retaining
+  every queued segment, cached tile geometry per gesture, and strengthened
+  cancellation, resize, visibility, pointer-capture, and unmount cleanup.
+- Skipped only exact duplicate authoritative ACK/broadcast snapshots with an
+  explicit comparator; meaningful same-version corrections, later versions,
+  reconnect state, and finalized results remain protected.
+- Added deterministic work-count, render-isolation, visibility, lifecycle,
+  Trace-accuracy, geometry-read, snapshot, and subscription regression tests.
+  Full methodology, counts, bundle impact, limitations, and the single final
+  phone validation procedure are recorded in `PERFORMANCE.md`.
+
 ## 2026-07-31 — Centered TV Highlights timer (draft)
 
 - Changed the active display Room Highlights timer to a balanced three-column

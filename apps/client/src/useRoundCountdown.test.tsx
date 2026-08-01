@@ -1,11 +1,14 @@
 import { act, renderHook } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createEmptyRoomHighlights, type RoomState } from '@words/shared';
 
 import {
   calculateRemainingRoundMs,
-  useRoundCountdown,
+  calculateVisibleRoundSeconds,
+  millisecondsUntilVisibleSecondChange,
+  useRoundDeadlineReached,
+  useVisibleRoundCountdown,
 } from './useRoundCountdown';
 
 function createRoom(overrides: Partial<RoomState> = {}): RoomState {
@@ -28,7 +31,7 @@ function createRoom(overrides: Partial<RoomState> = {}): RoomState {
     players: [],
     settings: {
       gridSize: 4,
-      roundDurationSeconds: 30,
+      roundDurationSeconds: 120,
       scoringMode: 'length-plus-unique',
     },
     round: {
@@ -36,7 +39,7 @@ function createRoom(overrides: Partial<RoomState> = {}): RoomState {
       number: 1,
       settings: {
         gridSize: 4,
-        roundDurationSeconds: 30,
+        roundDurationSeconds: 120,
         scoringMode: 'length-plus-unique',
       },
       board: {
@@ -45,7 +48,7 @@ function createRoom(overrides: Partial<RoomState> = {}): RoomState {
       },
       participants: [],
       startedAt: '2026-07-29T20:00:00.000Z',
-      deadlineAt: '2026-07-29T20:00:30.000Z',
+      deadlineAt: '2026-07-29T20:02:00.000Z',
       endedAt: null,
       results: null,
       generationAttempts: 1,
@@ -54,13 +57,54 @@ function createRoom(overrides: Partial<RoomState> = {}): RoomState {
   };
 }
 
-describe('authoritative round countdown', () => {
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.restoreAllMocks();
-  });
+function endedRoom(active = createRoom()): RoomState {
+  return {
+    ...active,
+    phase: 'ROUND_ENDED',
+    stateVersion: active.stateVersion + 1,
+    serverTime: active.round?.deadlineAt ?? active.serverTime,
+    round: active.round
+      ? {
+          ...active.round,
+          endedAt: active.round.deadlineAt,
+          results: { players: [], winnerPlayerIds: [] },
+        }
+      : null,
+  };
+}
 
-  it('derives remaining time from serverTime rather than the browser clock', () => {
+let visibility: DocumentVisibilityState;
+let originalVisibilityDescriptor: PropertyDescriptor | undefined;
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  visibility = 'visible';
+  originalVisibilityDescriptor = Object.getOwnPropertyDescriptor(
+    document,
+    'visibilityState',
+  );
+  Object.defineProperty(document, 'visibilityState', {
+    configurable: true,
+    get: () => visibility,
+  });
+});
+
+afterEach(() => {
+  if (originalVisibilityDescriptor) {
+    Object.defineProperty(
+      document,
+      'visibilityState',
+      originalVisibilityDescriptor,
+    );
+  } else {
+    Reflect.deleteProperty(document, 'visibilityState');
+  }
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
+describe('authoritative round countdown calculations', () => {
+  it('uses server time plus monotonic elapsed time and clamps at zero', () => {
     vi.setSystemTime('2040-01-01T00:00:00.000Z');
     expect(
       calculateRemainingRoundMs(
@@ -69,9 +113,6 @@ describe('authoritative round countdown', () => {
         5_000,
       ),
     ).toBe(25_000);
-  });
-
-  it('never returns negative remaining time', () => {
     expect(
       calculateRemainingRoundMs(
         '2026-07-29T20:00:00.000Z',
@@ -81,33 +122,60 @@ describe('authoritative round countdown', () => {
     ).toBe(0);
   });
 
-  it('uses monotonic elapsed time between server snapshots', () => {
-    vi.useFakeTimers();
-    let monotonicTime = 100;
-    vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
-    const { result } = renderHook(() => useRoundCountdown(createRoom()));
-    expect(result.current).toBe(30_000);
+  it('keeps whole-second display semantics and schedules the next true boundary', () => {
+    expect(calculateVisibleRoundSeconds(120_000)).toBe(120);
+    expect(calculateVisibleRoundSeconds(119_001)).toBe(120);
+    expect(calculateVisibleRoundSeconds(119_000)).toBe(119);
+    expect(millisecondsUntilVisibleSecondChange(120_000)).toBe(1_000);
+    expect(millisecondsUntilVisibleSecondChange(119_425)).toBe(425);
+    expect(millisecondsUntilVisibleSecondChange(0.2)).toBe(1);
+    expect(millisecondsUntilVisibleSecondChange(0)).toBe(0);
+  });
+});
 
-    act(() => {
-      monotonicTime += 5_000;
-      vi.advanceTimersByTime(250);
-    });
-    expect(result.current).toBe(25_000);
+describe('visible round countdown scheduling', () => {
+  it('updates only at visible-second transitions across 120 → 119, 100 → 99, 10 → 9, and 1 → 0', () => {
+    let monotonicTime = 0;
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
+    const setTimeoutSpy = vi.spyOn(window, 'setTimeout');
+    const { result } = renderHook(() => useVisibleRoundCountdown(createRoom()));
+    expect(result.current).toBe(120);
+
+    const advanceSeconds = (seconds: number) => {
+      for (let index = 0; index < seconds; index += 1) {
+        act(() => {
+          monotonicTime += 1_000;
+          vi.advanceTimersByTime(1_000);
+        });
+      }
+    };
+
+    advanceSeconds(1);
+    expect(result.current).toBe(119);
+    advanceSeconds(20);
+    expect(result.current).toBe(99);
+    advanceSeconds(90);
+    expect(result.current).toBe(9);
+    advanceSeconds(8);
+    expect(result.current).toBe(1);
+    advanceSeconds(1);
+    expect(result.current).toBe(0);
+    expect(setTimeoutSpy).toHaveBeenCalledTimes(120);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('re-anchors from a reconnect snapshot without using wall-clock skew', () => {
-    vi.useFakeTimers();
+  it('re-anchors from a newer authoritative snapshot without browser wall-clock time', () => {
     let monotonicTime = 1_000;
     vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
     const { result, rerender } = renderHook(
-      ({ room }) => useRoundCountdown(room),
+      ({ room }) => useVisibleRoundCountdown(room),
       { initialProps: { room: createRoom() } },
     );
     act(() => {
       monotonicTime += 10_000;
-      vi.advanceTimersByTime(250);
+      vi.advanceTimersByTime(10_000);
     });
-    expect(result.current).toBe(20_000);
+    expect(result.current).toBe(110);
 
     rerender({
       room: createRoom({
@@ -115,63 +183,178 @@ describe('authoritative round countdown', () => {
         serverTime: '2026-07-29T20:00:12.000Z',
       }),
     });
-    expect(result.current).toBe(18_000);
+    expect(result.current).toBe(108);
   });
 
-  it('shows zero for server-ended state without inventing a phase change', () => {
+  it('does no recurring visual work while hidden and recomputes immediately on return', () => {
+    visibility = 'hidden';
+    let monotonicTime = 100;
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
+    const setTimeoutSpy = vi.spyOn(window, 'setTimeout');
+    const { result } = renderHook(() => useVisibleRoundCountdown(createRoom()));
+    expect(result.current).toBe(120);
+    expect(setTimeoutSpy).not.toHaveBeenCalled();
+
+    monotonicTime += 21_000;
+    visibility = 'visible';
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    expect(result.current).toBe(99);
+    expect(setTimeoutSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('cannot let an old round timeout update a replacement round', () => {
+    let monotonicTime = 0;
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
+    const first = createRoom();
+    const second: RoomState = {
+      ...createRoom({ stateVersion: 3 }),
+      round: first.round
+        ? {
+            ...first.round,
+            id: '00000000-0000-4000-8000-000000000200',
+          }
+        : null,
+    };
+    const { result, rerender } = renderHook(
+      ({ room }) => useVisibleRoundCountdown(room),
+      { initialProps: { room: first } },
+    );
+    rerender({ room: second });
+    act(() => {
+      monotonicTime += 1_000;
+      vi.advanceTimersByTime(1_000);
+    });
+    expect(result.current).toBe(119);
+  });
+
+  it('shows zero for server-ended state and cleans up timeout and visibility work', () => {
+    const removeListener = vi.spyOn(document, 'removeEventListener');
+    const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout');
     const active = createRoom();
-    const ended = createRoom({
-      phase: 'ROUND_ENDED',
+    const { result, rerender, unmount } = renderHook(
+      ({ room }) => useVisibleRoundCountdown(room),
+      { initialProps: { room: active } },
+    );
+    rerender({ room: endedRoom(active) });
+    expect(result.current).toBe(0);
+    unmount();
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+    expect(removeListener).toHaveBeenCalledWith(
+      'visibilitychange',
+      expect.any(Function),
+    );
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe('deadline-safe phone input gate', () => {
+  it('changes once at the local authoritative deadline', () => {
+    let monotonicTime = 0;
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
+    const { result } = renderHook(() => useRoundDeadlineReached(createRoom()));
+    expect(result.current).toBe(false);
+    act(() => {
+      monotonicTime += 120_000;
+      vi.advanceTimersByTime(120_000);
+    });
+    expect(result.current).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('enforces the deadline while hidden and on visibility restoration after suspended timers', () => {
+    visibility = 'hidden';
+    let monotonicTime = 0;
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
+    const first = renderHook(() => useRoundDeadlineReached(createRoom()));
+    act(() => {
+      monotonicTime += 120_000;
+      vi.advanceTimersByTime(120_000);
+    });
+    expect(first.result.current).toBe(true);
+    first.unmount();
+
+    monotonicTime = 0;
+    const second = renderHook(() => useRoundDeadlineReached(createRoom()));
+    monotonicTime += 120_000;
+    visibility = 'visible';
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    expect(second.result.current).toBe(true);
+  });
+
+  it('accepts an authoritative end before the gate and resets safely for a new round', () => {
+    const monotonicTime = 0;
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
+    const active = createRoom();
+    const replacement: RoomState = {
+      ...createRoom({ stateVersion: 4 }),
       round: active.round
         ? {
             ...active.round,
-            endedAt: active.round.deadlineAt,
-            results: {
-              players: active.round.participants.map((participant) => ({
-                ...participant,
-                rank: 1,
-                baseScore: 0,
-                uniqueBonusScore: 0,
-                finalScore: 0,
-                words: [],
-              })),
-              winnerPlayerIds: [],
-            },
+            id: '00000000-0000-4000-8000-000000000300',
           }
         : null,
-    });
-    const { result } = renderHook(() => useRoundCountdown(ended));
-    expect(result.current).toBe(0);
-    expect(ended.phase).toBe('ROUND_ENDED');
+    };
+    const { result, rerender } = renderHook(
+      ({ room }) => useRoundDeadlineReached(room),
+      { initialProps: { room: active } },
+    );
+    rerender({ room: endedRoom(active) });
+    expect(result.current).toBe(true);
+    rerender({ room: replacement });
+    expect(result.current).toBe(false);
   });
 
-  it('cleans up its browser interval when the view unmounts', () => {
-    vi.useFakeTimers();
-    const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
-    const { unmount } = renderHook(() => useRoundCountdown(createRoom()));
+  it('cleans up its one-shot timeout and visibility listener on unmount', () => {
+    const removeListener = vi.spyOn(document, 'removeEventListener');
+    const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout');
+    const { unmount } = renderHook(() => useRoundDeadlineReached(createRoom()));
     unmount();
-    expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+    expect(clearTimeoutSpy).toHaveBeenCalledTimes(1);
+    expect(removeListener).toHaveBeenCalledWith(
+      'visibilitychange',
+      expect.any(Function),
+    );
+    expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('stops its browser interval after the local countdown reaches zero', () => {
-    vi.useFakeTimers();
-    let monotonicTime = 100;
-    vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
-    const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
-    const room = createRoom();
-    const { result } = renderHook(() => useRoundCountdown(room));
+  it('does not accumulate timers or visibility listeners across repeated round cycles', () => {
+    const addListener = vi.spyOn(document, 'addEventListener');
+    const removeListener = vi.spyOn(document, 'removeEventListener');
+    const lobby = createRoom({ phase: 'LOBBY', round: null });
+    const first = createRoom();
+    const second: RoomState = {
+      ...createRoom({ stateVersion: 5 }),
+      round: first.round
+        ? {
+            ...first.round,
+            id: '00000000-0000-4000-8000-000000000500',
+            number: 2,
+          }
+        : null,
+    };
+    const { rerender, unmount } = renderHook(
+      ({ room }) => ({
+        deadline: useRoundDeadlineReached(room),
+        seconds: useVisibleRoundCountdown(room),
+      }),
+      { initialProps: { room: first } },
+    );
+    expect(vi.getTimerCount()).toBe(2);
+    rerender({ room: endedRoom(first) });
+    expect(vi.getTimerCount()).toBe(0);
+    rerender({ room: lobby });
+    expect(vi.getTimerCount()).toBe(0);
+    rerender({ room: second });
+    expect(vi.getTimerCount()).toBe(2);
+    unmount();
+    expect(vi.getTimerCount()).toBe(0);
 
-    act(() => {
-      monotonicTime += 30_000;
-      vi.advanceTimersByTime(250);
-    });
-
-    expect(result.current).toBe(0);
-    expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
-    act(() => {
-      monotonicTime += 10_000;
-      vi.advanceTimersByTime(10_000);
-    });
-    expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+    const visibilityAdds = addListener.mock.calls.filter(
+      ([eventName]) => eventName === 'visibilitychange',
+    ).length;
+    const visibilityRemovals = removeListener.mock.calls.filter(
+      ([eventName]) => eventName === 'visibilitychange',
+    ).length;
+    expect(visibilityAdds).toBe(visibilityRemovals);
   });
 });

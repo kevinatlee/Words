@@ -136,27 +136,27 @@ export function resolveTraceSegment(
       break;
     }
     const tailCenter = centerOf(tailRect);
-    const candidates = adjacentIndexes(tailIndex, size);
-    const matches = candidates.flatMap((index) => {
+    let next: { index: number; progress: number } | undefined;
+    for (const index of adjacentIndexes(tailIndex, size)) {
       const rect = rectForIndex(index);
       if (!rect) {
-        return [];
+        continue;
       }
       const progress = segmentEntry(from, to, rect);
       if (progress === null || progress <= progressFloor) {
-        return [];
+        continue;
       }
       const activation = {
         x: from.x + (to.x - from.x) * progress,
         y: from.y + (to.y - from.y) * progress,
       };
-      return alignsWithCandidate(tailCenter, activation, centerOf(rect))
-        ? [{ index, progress }]
-        : [];
-    });
-    const next = matches.sort(
-      (left, right) => left.progress - right.progress,
-    )[0];
+      if (
+        alignsWithCandidate(tailCenter, activation, centerOf(rect)) &&
+        (!next || progress < next.progress)
+      ) {
+        next = { index, progress };
+      }
+    }
     if (!next) {
       break;
     }

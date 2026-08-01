@@ -1,4 +1,4 @@
-import { StrictMode } from 'react';
+import { Profiler, StrictMode } from 'react';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -404,6 +404,36 @@ describe('Stage 4B display and player room routes', () => {
 
     expect(await screen.findByLabelText('Puzzle')).toBeInTheDocument();
     expect(client.createDisplay).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps one socket subscription set through rerenders and cleans it on unmount', async () => {
+    const stopRoomState = vi.fn();
+    const stopRoomError = vi.fn();
+    const stopConnectionStatus = vi.fn();
+    const onRoomState = vi.fn(() => stopRoomState);
+    const onRoomError = vi.fn(() => stopRoomError);
+    const onConnectionStatus = vi.fn(() => stopConnectionStatus);
+    const client = createFakeClient({
+      onRoomState,
+      onRoomError,
+      onConnectionStatus,
+    });
+    const sessionStore = createFakeSessionStore();
+    const view = render(
+      <App routePath="/" client={client} sessionStore={sessionStore} />,
+    );
+    await screen.findByLabelText('Puzzle');
+    view.rerender(
+      <App routePath="/" client={client} sessionStore={sessionStore} />,
+    );
+
+    expect(onRoomState).toHaveBeenCalledTimes(1);
+    expect(onRoomError).toHaveBeenCalledTimes(1);
+    expect(onConnectionStatus).toHaveBeenCalledTimes(1);
+    view.unmount();
+    expect(stopRoomState).toHaveBeenCalledTimes(1);
+    expect(stopRoomError).toHaveBeenCalledTimes(1);
+    expect(stopConnectionStatus).toHaveBeenCalledTimes(1);
   });
 
   it('keeps two root display profiles attached to distinct rooms after refresh', async () => {
@@ -1520,6 +1550,123 @@ describe('Stage 4B display and player room routes', () => {
         'true',
       ),
     );
+  });
+
+  it('skips an exact acknowledgement/broadcast duplicate without a React commit', async () => {
+    let reportRoomState: ((room: RoomState) => void) | undefined;
+    let commits = 0;
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(
+        async (): Promise<PlayerActionResponse> => controllerWithPlayersSuccess,
+      ),
+      onRoomState: (listener) => {
+        reportRoomState = listener;
+        return () => undefined;
+      },
+    });
+    render(
+      <Profiler id="app" onRender={() => (commits += 1)}>
+        <App
+          routePath="/room/ABC234"
+          client={client}
+          sessionStore={createFakeSessionStore({
+            role: 'player',
+            roomCode: 'ABC234',
+            playerId: controllerPlayer.id,
+            playerReconnectToken: 'r'.repeat(43),
+            displayName: controllerPlayer.displayName,
+          })}
+        />
+      </Profiler>,
+    );
+    await screen.findByRole('button', { name: 'Start Round' });
+    const commitsBeforeDuplicate = commits;
+
+    act(() => reportRoomState?.(controllerWithPlayersSuccess.room));
+
+    expect(commits).toBe(commitsBeforeDuplicate);
+  });
+
+  it('still accepts a meaningful same-version snapshot with the same server time', async () => {
+    let reportRoomState: ((room: RoomState) => void) | undefined;
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(
+        async (): Promise<PlayerActionResponse> => controllerWithPlayersSuccess,
+      ),
+      onRoomState: (listener) => {
+        reportRoomState = listener;
+        return () => undefined;
+      },
+    });
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'r'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+    await screen.findByRole('button', { name: '5 × 5' });
+
+    act(() =>
+      reportRoomState?.({
+        ...controllerWithPlayersSuccess.room,
+        settings: {
+          ...controllerWithPlayersSuccess.room.settings,
+          gridSize: 6,
+        },
+      }),
+    );
+
+    expect(screen.getByRole('button', { name: '6 × 6' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('preserves a newer same-version server-time correction', async () => {
+    let reportRoomState: ((room: RoomState) => void) | undefined;
+    let commits = 0;
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(
+        async (): Promise<PlayerActionResponse> => controllerWithPlayersSuccess,
+      ),
+      onRoomState: (listener) => {
+        reportRoomState = listener;
+        return () => undefined;
+      },
+    });
+    render(
+      <Profiler id="app" onRender={() => (commits += 1)}>
+        <App
+          routePath="/room/ABC234"
+          client={client}
+          sessionStore={createFakeSessionStore({
+            role: 'player',
+            roomCode: 'ABC234',
+            playerId: controllerPlayer.id,
+            playerReconnectToken: 'r'.repeat(43),
+            displayName: controllerPlayer.displayName,
+          })}
+        />
+      </Profiler>,
+    );
+    await screen.findByRole('button', { name: 'Start Round' });
+    const commitsBeforeCorrection = commits;
+
+    act(() =>
+      reportRoomState?.({
+        ...controllerWithPlayersSuccess.room,
+        serverTime: '2026-07-27T20:03:00.000Z',
+      }),
+    );
+
+    expect(commits).toBeGreaterThan(commitsBeforeCorrection);
   });
 
   it('rejects conflicting results at the same state version', async () => {
