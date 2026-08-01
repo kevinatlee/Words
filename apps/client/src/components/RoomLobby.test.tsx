@@ -198,6 +198,10 @@ function mockTileGeometry() {
 }
 
 async function selectFirstThree(user: ReturnType<typeof userEvent.setup>) {
+  const tap = screen.getByRole('button', { name: 'Tap' });
+  if (tap.getAttribute('aria-pressed') !== 'true') {
+    await user.click(tap);
+  }
   const tiles = tileButtons();
   await user.click(tiles[0]!);
   await user.click(tiles[1]!);
@@ -247,23 +251,35 @@ describe('RoomLobby word entry', () => {
     expect(screen.queryByRole('region', { name: /scan to join/i })).toBeNull();
   });
 
-  it('defaults to Tap, remembers Trace locally, and exposes an accessible selector', async () => {
+  it('defaults to Trace, persists an explicit Tap choice, and restores Trace when cleared', async () => {
     const user = userEvent.setup();
     const first = renderLobby();
 
     const mode = screen.getByRole('group', { name: 'Word entry mode' });
     expect(within(mode).getByRole('button', { name: 'Tap' })).toHaveAttribute(
       'aria-pressed',
-      'true',
+      'false',
     );
     expect(within(mode).getByRole('button', { name: 'Trace' })).toHaveAttribute(
       'aria-pressed',
-      'false',
+      'true',
     );
-    await user.click(within(mode).getByRole('button', { name: 'Trace' }));
-    expect(window.localStorage.getItem('words:word-entry-mode')).toBe('trace');
+    await user.click(within(mode).getByRole('button', { name: 'Tap' }));
+    expect(window.localStorage.getItem('words:word-entry-mode')).toBe('touch');
+    expect(within(mode).getByRole('button', { name: 'Tap' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     first.unmount();
 
+    const rememberedTap = renderLobby();
+    expect(screen.getByRole('button', { name: 'Tap' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    rememberedTap.unmount();
+
+    window.localStorage.clear();
     renderLobby();
     expect(screen.getByRole('button', { name: 'Trace' })).toHaveAttribute(
       'aria-pressed',
@@ -271,7 +287,7 @@ describe('RoomLobby word entry', () => {
     );
   });
 
-  it('keeps the header mode control available through every player room phase', () => {
+  it('keeps the header mode control available through active and lobby player phases', () => {
     const activeView = renderLobby();
     expect(
       screen.getByRole('group', { name: 'Word entry mode' }),
@@ -285,26 +301,6 @@ describe('RoomLobby word entry', () => {
       screen.getByRole('group', { name: 'Word entry mode' }),
     ).toBeVisible();
     lobbyView.unmount();
-
-    const latePlayerId = '00000000-0000-4000-8000-000000000002';
-    renderLobby(undefined, {
-      room: createRoom({
-        players: [
-          ...createRoom().players,
-          {
-            id: latePlayerId,
-            displayName: 'Calm Otter',
-            connected: true,
-            joinedAt: '2026-07-31T00:01:00.000Z',
-            isController: false,
-          },
-        ],
-      }),
-      currentPlayerId: latePlayerId,
-    });
-    expect(
-      screen.getByRole('group', { name: 'Word entry mode' }),
-    ).toBeVisible();
   });
 
   it('keeps the phone timer markup and prominent label unchanged', () => {
@@ -436,8 +432,10 @@ describe('RoomLobby word entry', () => {
     renderLobby(undefined, {
       room: createRoom({ phase: 'ROUND_ENDED' }),
     });
-    expect(screen.getByRole('region', { name: 'Puzzle' })).toBeVisible();
-    expect(screen.getByText('Round Complete')).toBeVisible();
+    expect(screen.getByRole('region', { name: 'Round summary' })).toBeVisible();
+    expect(screen.getByText('Look at the TV!')).toBeVisible();
+    expect(screen.queryByRole('grid')).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Word entry mode' })).toBeNull();
     expect(
       screen.queryByRole('region', { name: 'Game host controls' }),
     ).toBeNull();
@@ -521,7 +519,7 @@ describe('RoomLobby word entry', () => {
     expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
   });
 
-  it('leaves ordinary ended phones with only the completed puzzle', () => {
+  it('replaces an ended phone puzzle with a round summary and restores the lobby cleanly', () => {
     const ordinaryPlayerId = '00000000-0000-4000-8000-000000000002';
     const room = createRoom({
       phase: 'ROUND_ENDED',
@@ -537,21 +535,35 @@ describe('RoomLobby word entry', () => {
       ],
     });
 
-    renderLobby(undefined, { room, currentPlayerId: ordinaryPlayerId });
+    const view = renderLobby(undefined, {
+      room,
+      currentPlayerId: ordinaryPlayerId,
+    });
 
-    expect(screen.getByRole('region', { name: 'Puzzle' })).toBeVisible();
-    expect(screen.getByText('Round Complete')).toBeVisible();
-    expect(
-      screen.getByText('Round Complete').closest('.round-clock'),
-    ).toHaveClass('round-clock--phone');
-    expect(
-      screen.queryByText('Round complete — results are on the TV.'),
-    ).toBeNull();
+    expect(screen.getByRole('region', { name: 'Round summary' })).toBeVisible();
+    expect(screen.getByText('Look at the TV!')).toBeVisible();
+    expect(screen.queryByRole('grid')).toBeNull();
+    expect(screen.queryByRole('timer')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Submit' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Word entry mode' })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
     expect(
       screen.queryByRole('region', { name: 'Game host controls' }),
     ).toBeNull();
     expect(screen.queryByRole('table')).toBeNull();
+
+    view.rerender(
+      <RoomLobby
+        {...lobbyProps(undefined, {
+          room: createRoom({ phase: 'LOBBY', round: null }),
+          currentPlayerId: ordinaryPlayerId,
+        })}
+      />,
+    );
+    expect(screen.getByRole('region', { name: 'Puzzle' })).toBeVisible();
+    expect(
+      screen.getByRole('group', { name: 'Word entry mode' }),
+    ).toBeVisible();
   });
 
   it('keeps finalized result cards and the footer on the display', () => {
@@ -1031,9 +1043,8 @@ describe('RoomLobby word entry', () => {
     act(() => {
       vi.advanceTimersByTime(500);
     });
-    expect(
-      screen.getByRole('grid').querySelectorAll('.letter-tile--accepted'),
-    ).toHaveLength(0);
+    expect(screen.queryByRole('grid')).toBeNull();
+    expect(screen.getByRole('region', { name: 'Round summary' })).toBeVisible();
     firstView.unmount();
 
     const response = deferred<SubmitWordResponse>();

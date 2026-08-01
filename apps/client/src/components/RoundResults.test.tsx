@@ -36,7 +36,25 @@ describe('RoundResults', () => {
     expect(
       screen.getAllByRole('heading', { level: 2 }).map((x) => x.textContent),
     ).toEqual(expect.arrayContaining(['♛ Bright Fox', 'Amber Kite']));
+    expect(document.querySelector('.display-results__cards')).toHaveAttribute(
+      'data-result-card-count',
+      '2',
+    );
   });
+
+  it.each([1, 2, 3, 4, 6, 8])(
+    'keeps %i result cards in an explicit intrinsic-width layout variant',
+    (count) => {
+      render(<RoundResults results={result(count)} />);
+
+      expect(document.querySelector('.display-results__cards')).toHaveClass(
+        `display-results__cards--${count}`,
+      );
+      expect(document.querySelectorAll('.result-player-card')).toHaveLength(
+        count,
+      );
+    },
+  );
   it('shows integer points and separate Words and Unique words rows', () => {
     render(<RoundResults results={result()} />);
     expect(screen.getByText('7 points')).toBeVisible();

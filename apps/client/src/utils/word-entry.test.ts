@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   isExpectedSubmissionRejection,
@@ -31,9 +31,35 @@ describe('word entry utilities', () => {
     window.localStorage.clear();
   });
 
-  it('uses Touch unless Trace was remembered locally', () => {
-    expect(loadWordEntryMode()).toBe('touch');
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
+  it('defaults to Trace when no preference was stored', () => {
+    expect(loadWordEntryMode()).toBe('trace');
+  });
+
+  it('defaults to Trace when a stored preference is invalid', () => {
+    window.localStorage.setItem('words:word-entry-mode', 'keyboard');
+
+    expect(loadWordEntryMode()).toBe('trace');
+  });
+
+  it('defaults to Trace when local storage throws', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('Storage unavailable');
+    });
+
+    expect(loadWordEntryMode()).toBe('trace');
+  });
+
+  it('restores an explicitly saved Tap preference', () => {
+    saveWordEntryMode('touch');
+
+    expect(loadWordEntryMode()).toBe('touch');
+  });
+
+  it('restores an explicitly saved Trace preference', () => {
     saveWordEntryMode('trace');
 
     expect(loadWordEntryMode()).toBe('trace');

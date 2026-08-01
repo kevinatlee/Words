@@ -177,35 +177,48 @@ button:disabled {
 }
 .display-results {
   min-height: 70vh;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding-inline: 2vw;
 }
 .display-results__cards {
   display: grid;
-  width: min(96vw, 110rem);
+  width: fit-content;
+  max-width: 96vw;
   gap: 1rem;
+  margin: 0;
   list-style: none;
   padding: 0;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(16rem, max-content));
 }
 .display-results__cards--1 {
-  grid-template-columns: minmax(18rem, 28rem);
-  justify-content: center;
+  grid-template-columns: minmax(16rem, max-content);
 }
 .display-results__cards--5,
 .display-results__cards--6 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(16rem, max-content));
 }
 .display-results__cards--7,
 .display-results__cards--8 {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(16rem, max-content));
 }
 .result-player-card {
+  box-sizing: border-box;
+  min-width: 16rem;
+  max-width: 24rem;
   padding: 1rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--paper);
   color: var(--ink-950);
+  overflow-wrap: anywhere;
+}
+.result-player-card h2,
+.result-player-card li {
+  overflow-wrap: anywhere;
 }
 .result-player-card__points {
   font-size: 1.5rem;
@@ -708,6 +721,7 @@ button:disabled {
 .letter-grid,
 .display-join-board {
   --letter-tile-font-size: clamp(1.8rem, 8vw, 2.75rem);
+  --letter-grid-gap: clamp(0.35rem, 1.2vw, 0.75rem);
 }
 
 .display-join-board {
@@ -716,7 +730,7 @@ button:disabled {
   aspect-ratio: 1;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   grid-template-rows: repeat(5, minmax(0, 1fr));
-  gap: clamp(0.35rem, 1.2vw, 0.75rem);
+  gap: var(--letter-grid-gap);
 }
 .display-join-board__tile {
   display: grid;
@@ -1170,7 +1184,7 @@ button:disabled {
   width: min(100%, 40rem);
   margin-inline: auto;
   grid-template-columns: repeat(var(--grid-size), minmax(0, 1fr));
-  gap: clamp(0.35rem, 1.2vw, 0.75rem);
+  gap: var(--letter-grid-gap);
 }
 
 .letter-grid__cell {
@@ -1824,15 +1838,64 @@ button:disabled {
   padding: 0.75rem;
 }
 
+.phone-round-summary {
+  display: grid;
+  min-height: min(17rem, 52vh);
+  place-content: center;
+  gap: 0.8rem;
+  padding: 1rem;
+  text-align: center;
+}
+
+.phone-round-summary .eyebrow,
+.phone-round-summary h2,
+.phone-round-summary p {
+  margin: 0;
+}
+
+.phone-round-summary h2 {
+  color: var(--mint-strong);
+  font-size: clamp(2rem, 10vw, 3rem);
+  line-height: 1;
+}
+
+.phone-round-summary > p:not(.eyebrow) {
+  color: var(--paper-muted);
+}
+
+.phone-round-summary dl {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0.55rem 0 0;
+}
+
+.phone-round-summary dl > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.phone-round-summary dt {
+  color: var(--paper-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.phone-round-summary dd {
+  margin: 0;
+  color: var(--paper);
+  font-size: clamp(1.35rem, 6vw, 1.8rem);
+  font-weight: 900;
+}
+
 .room-dashboard--phone .board-panel__heading {
   margin-bottom: 0.5rem;
 }
 
 .room-dashboard--phone .letter-grid {
   --letter-tile-font-size: clamp(1.35rem, 8.5vw, 2.3rem);
+  --letter-grid-gap: clamp(0.22rem, 1vw, 0.45rem);
 
   width: min(100%, 26rem);
-  gap: clamp(0.22rem, 1vw, 0.45rem);
 }
 
 @media (max-width: 430px) and (max-height: 760px) {

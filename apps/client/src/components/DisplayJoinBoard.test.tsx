@@ -24,7 +24,7 @@ describe('DisplayJoinBoard', () => {
     shouldThrow.value = false;
   });
 
-  it('renders a noninteractive 5 by 5 demonstration with WORDS on top', () => {
+  it('renders the exact four-word perimeter around a noninteractive 5 by 5 demonstration', () => {
     const { container } = render(<DisplayJoinBoard joinUrl={joinUrl} />);
     const board = screen.getByLabelText('Room joining demonstration board');
     const tiles = Array.from(
@@ -36,13 +36,46 @@ describe('DisplayJoinBoard', () => {
     expect(tiles.every((tile) => tile.classList.contains('letter-tile'))).toBe(
       true,
     );
-    expect(tiles.slice(0, 5).map((tile) => tile.textContent)).toEqual([
+    expect(tiles.map((tile) => tile.textContent)).toEqual([
       'W',
       'O',
       'R',
       'D',
       'S',
+      'A',
+      'H',
+      'N',
+      'A',
+      'N',
+      'R',
+      'A',
+      'T',
+      'L',
+      'E',
+      'E',
     ]);
+    expect(
+      tiles
+        .slice(0, 5)
+        .map((tile) => tile.textContent)
+        .join(''),
+    ).toBe('WORDS');
+    expect(
+      tiles
+        .slice(11)
+        .map((tile) => tile.textContent)
+        .join(''),
+    ).toBe('ATLEE');
+    expect(
+      [tiles[0], tiles[5], tiles[7], tiles[9], tiles[11]]
+        .map((tile) => tile?.textContent)
+        .join(''),
+    ).toBe('WANNA');
+    expect(
+      [tiles[4], tiles[6], tiles[8], tiles[10], tiles[15]]
+        .map((tile) => tile?.textContent)
+        .join(''),
+    ).toBe('SHARE');
     expect(board.querySelectorAll('[role="gridcell"], button')).toHaveLength(0);
     expect(
       board.querySelectorAll('.display-join-board__qr .letter-tile'),

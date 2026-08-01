@@ -20,6 +20,7 @@ export function RoundResults({ results }: RoundResultsProps) {
       <h1 id="round-results-title">Round Results</h1>
       <ol
         className={`display-results__cards display-results__cards--${results.players.length}`}
+        data-result-card-count={results.players.length}
       >
         {results.players.map((player) => {
           const uniqueWords = [...player.words]

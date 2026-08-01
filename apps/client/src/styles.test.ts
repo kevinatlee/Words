@@ -36,8 +36,17 @@ describe('tile typography', () => {
     expect(sharedTileSizingRule).toContain(
       '--letter-tile-font-size: clamp(1.8rem, 8vw, 2.75rem);',
     );
+    expect(sharedTileSizingRule).toContain(
+      '--letter-grid-gap: clamp(0.35rem, 1.2vw, 0.75rem);',
+    );
     expect(styles).toMatch(
-      /\.display-join-board\s*\{[^}]*gap: clamp\(0\.35rem, 1\.2vw, 0\.75rem\);/s,
+      /\.display-join-board\s*\{[^}]*gap: var\(--letter-grid-gap\);/s,
+    );
+    expect(styles).toMatch(
+      /\.letter-grid\s*\{[^}]*gap: var\(--letter-grid-gap\);/s,
+    );
+    expect(styles).toMatch(
+      /\.room-dashboard--phone \.letter-grid\s*\{[^}]*--letter-grid-gap: clamp\(0\.22rem, 1vw, 0\.45rem\);/s,
     );
   });
 
@@ -110,10 +119,23 @@ describe('tile typography', () => {
       /\.display-player-list__name\s*\{[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/s,
     );
     expect(styles).toMatch(
-      /\.display-results__cards--7,\s*\.display-results__cards--8\s*\{[^}]*repeat\(4, minmax\(0, 1fr\)\);/s,
+      /\.display-results__cards\s*\{[^}]*width: fit-content;[^}]*max-width: 96vw;[^}]*grid-template-columns: repeat\(2, minmax\(16rem, max-content\)\);/s,
     );
     expect(styles).toMatch(
+      /\.display-results__cards--1\s*\{[^}]*grid-template-columns: minmax\(16rem, max-content\);/s,
+    );
+    expect(styles).toMatch(
+      /\.display-results__cards--7,\s*\.display-results__cards--8\s*\{[^}]*repeat\(4, minmax\(16rem, max-content\)\);/s,
+    );
+    expect(styles).not.toMatch(/\.display-results__cards\s*\{[^}]*\b1fr\b/s);
+    expect(styles).toMatch(
       /\.result-player-card\s*\{[^}]*border-radius: var\(--radius-md\);[^}]*color: var\(--ink-950\);/s,
+    );
+    expect(styles).toMatch(
+      /\.result-player-card\s*\{[^}]*min-width: 16rem;[^}]*max-width: 24rem;[^}]*overflow-wrap: anywhere;/s,
+    );
+    expect(styles).toMatch(
+      /\.result-player-card h2,\s*\.result-player-card li\s*\{[^}]*overflow-wrap: anywhere;/s,
     );
     expect(styles).toMatch(
       /\.result-player-card__stats\s*\{[^}]*display: grid;[^}]*gap: 0\.15rem;[^}]*margin: 0\.45rem 0 0;/s,
@@ -123,6 +145,9 @@ describe('tile typography', () => {
     );
     expect(styles).toMatch(
       /\.display-join-board__qr\s*\{[^}]*grid-area: 2 \/ 2 \/ 5 \/ 5;/s,
+    );
+    expect(styles).toMatch(
+      /\.phone-round-summary\s*\{[^}]*min-height: min\(17rem, 52vh\);[^}]*place-content: center;/s,
     );
   });
 

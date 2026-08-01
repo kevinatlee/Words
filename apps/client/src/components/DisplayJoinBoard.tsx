@@ -22,23 +22,23 @@ class QrBoundary extends Component<
   }
 }
 
+const perimeterWords = {
+  top: 'WORDS',
+  bottom: 'ATLEE',
+  left: 'WANNA',
+  right: 'SHARE',
+} as const;
+
+// The top and bottom words include the intentionally shared corner tiles.
 const perimeter = [
-  'W',
-  'O',
-  'R',
-  'D',
-  'S',
-  'A',
-  'B',
-  'C',
-  'D',
-  'E',
-  'F',
-  'G',
-  'H',
-  'I',
-  'J',
-  'K',
+  ...perimeterWords.top,
+  perimeterWords.left[1],
+  perimeterWords.right[1],
+  perimeterWords.left[2],
+  perimeterWords.right[2],
+  perimeterWords.left[3],
+  perimeterWords.right[3],
+  ...perimeterWords.bottom,
 ];
 
 export function DisplayJoinBoard({ joinUrl }: DisplayJoinBoardProps) {

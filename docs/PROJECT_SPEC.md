@@ -80,6 +80,11 @@ an accessible label without a visible heading; active participants receive a
 separate Tap/Trace control bubble and no phone provisional score or accepted
 word count. Any aggregate active-TV word-count presentation is deferred to the
 future TV redesign. The production UI does not show a development-stage badge.
+Fresh clients default to Trace while an explicit local Tap choice remains
+persisted. During `ROUND_ENDED`, phones replace the board and word-entry UI
+with their own authoritative final score and the winning score; detailed
+results remain on the display. Official grid sizes share their presentation gap
+system, and the lobby QR board spells `WORDS` / `ATLEE` / `WANNA` / `SHARE`.
 
 Stage 3 adds a separate framework-independent `@words/game-engine` package:
 

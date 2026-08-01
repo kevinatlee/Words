@@ -1356,3 +1356,23 @@ player are separate roles, and neither socket alone owns room lifetime.
 
 - No TV redesign, results timeout, lifecycle transition, server contract,
   scoring, persistence, or later-stage work was added.
+
+## 2026-08-01 — Stage 4G round polish (draft)
+
+- Restored Trace as the fresh-client word-entry default while preserving an
+  explicit, client-only Tap preference and the existing path reset on mode
+  change.
+- Replaced the ended-phone puzzle contents with an authoritative personal round
+  summary: the player's final score and winning score only, with a clear
+  late-joiner and no-scoring-winner state. Detailed result cards remain TV-only.
+- Replaced full-width result-card tracks with a centred, bounded intrinsic grid
+  so one-player results remain geometrically centred and multi-player columns
+  no longer expand to fill the display.
+- Centralized the official LetterGrid gap token across 4 × 4, 5 × 5, and 6 × 6
+  boards without changing board geometry, hit testing, or the lobby QR grid.
+- Replaced the lobby QR-board placeholder perimeter with the exact `WORDS` /
+  `ATLEE` / `WANNA` / `SHARE` mapping around the unchanged merged QR region.
+- No server authority, phases, scoring, Socket.IO contract, deployment, or
+  production release channel changed. Local visual server startup could not
+  claim port 6532 in this environment; final physical review is reserved for
+  the deployed test container.
