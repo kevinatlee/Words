@@ -13,7 +13,7 @@ import {
   type SubmitWordResponse,
 } from '@words/shared';
 
-import { useRoundCountdown } from '../useRoundCountdown';
+import { useRoundDeadlineReached } from '../useRoundCountdown';
 import { createDemoBoard } from '../utils/demoBoard';
 import {
   isExpectedSubmissionRejection,
@@ -27,6 +27,7 @@ import { GameSettings } from './GameSettings';
 import { DisplayJoinBoard } from './DisplayJoinBoard';
 import { LetterGrid } from './LetterGrid';
 import { PrototypeNotice } from './PrototypeNotice';
+import { RoundClock } from './RoundClock';
 import { RoundResults } from './RoundResults';
 
 type RoomLobbyProps = {
@@ -89,7 +90,10 @@ export function RoomLobby({
   const showControllerAdministration =
     isConnectedController && room.phase === 'LOBBY';
   const joinUrl = buildJoinUrl(window.location.origin, room.code);
-  const countdownMs = useRoundCountdown(room);
+  const deadlineReached = useRoundDeadlineReached(
+    room,
+    sessionRole === 'player',
+  );
   const letters = useMemo(
     () =>
       room.round
@@ -109,14 +113,14 @@ export function RoomLobby({
     isRoundParticipant &&
     connectionStatus === 'connected' &&
     currentPlayer?.connected === true &&
-    (countdownMs ?? 0) > 0;
+    !deadlineReached;
   const candidateWord = selectedPath
     .map((tileIndex) => letters[tileIndex] ?? '')
     .join('');
 
   const clearSelectedPath = useCallback(() => {
     selectedPathRef.current = [];
-    setSelectedPath([]);
+    setSelectedPath((current) => (current.length === 0 ? current : []));
   }, []);
 
   const clearAcceptedFeedback = useCallback(() => {
@@ -125,7 +129,7 @@ export function RoomLobby({
       acceptedFeedbackTimerRef.current = null;
     }
     if (isMountedRef.current) {
-      setAcceptedPath([]);
+      setAcceptedPath((current) => (current.length === 0 ? current : []));
     }
   }, []);
 
@@ -166,6 +170,14 @@ export function RoomLobby({
         setSubmissionMessage(
           `Words can contain at most ${productConfig.maximumSubmittedWordLength} letters.`,
         );
+        return selectedPathRef.current;
+      }
+      if (
+        update.path.length === selectedPathRef.current.length &&
+        update.path.every(
+          (index, order) => index === selectedPathRef.current[order],
+        )
+      ) {
         return selectedPathRef.current;
       }
       selectedPathRef.current = update.path;
@@ -361,17 +373,7 @@ export function RoomLobby({
               aria-labelledby="display-highlights-title"
             >
               {roundIsActive && (
-                <div
-                  className="display-highlights-timer"
-                  role="timer"
-                  aria-live="off"
-                  aria-label={`${Math.ceil((countdownMs ?? 0) / 1_000)} seconds remaining`}
-                >
-                  <span className="display-highlights-timer__label">Timer</span>
-                  <strong className="display-highlights-timer__value">
-                    {Math.ceil((countdownMs ?? 0) / 1_000)}
-                  </strong>
-                </div>
+                <RoundClock room={room} presentation="display" />
               )}
               <h2 id="display-highlights-title">Room Highlights</h2>
               <section>
@@ -464,22 +466,7 @@ export function RoomLobby({
             data-round-id={room.round?.id}
             data-round-deadline-at={room.round?.deadlineAt}
           >
-            {room.round && (
-              <div
-                className={`round-clock${isDisplay ? '' : ' round-clock--phone'}`}
-                role="timer"
-                aria-live={roundIsActive ? 'off' : 'polite'}
-              >
-                <small>
-                  {room.phase === 'ROUND_ACTIVE'
-                    ? isDisplay
-                      ? 'Authoritative time remaining'
-                      : 'Timer'
-                    : 'Round Complete'}
-                </small>
-                <strong>{Math.ceil((countdownMs ?? 0) / 1_000)} seconds</strong>
-              </div>
-            )}
+            {room.round && <RoundClock room={room} presentation="phone" />}
             <LetterGrid
               letters={letters}
               size={boardSize}
