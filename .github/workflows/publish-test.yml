@@ -1,0 +1,177 @@
+name: Publish Test Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: Repository branch, tag, or full commit SHA to validate and publish.
+        required: true
+        default: main
+        type: string
+      confirmation:
+        description: Enter PUBLISH_TEST exactly to publish the validated test image.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: words-test-publish
+  cancel-in-progress: true
+
+jobs:
+  publish-test-image:
+    name: Validate and publish test image
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    env:
+      CI: true
+      REQUESTED_TARGET_REF: ${{ inputs.target_ref }}
+      PUBLISH_CONFIRMATION: ${{ inputs.confirmation }}
+    steps:
+      - name: Confirm requested publication
+        shell: bash
+        run: |
+          if [[ "$PUBLISH_CONFIRMATION" != "PUBLISH_TEST" ]]; then
+            echo "::error::Confirmation must be exactly PUBLISH_TEST."
+            exit 1
+          fi
+
+      - name: Check out requested repository ref
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.target_ref }}
+
+      - name: Resolve checked-out target
+        id: target
+        shell: bash
+        run: |
+          if [[ "$REQUESTED_TARGET_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            expected_target="$REQUESTED_TARGET_REF"
+          else
+            candidate_refs=()
+            case "$REQUESTED_TARGET_REF" in
+              refs/heads/*)
+                candidate_refs=("refs/remotes/origin/${REQUESTED_TARGET_REF#refs/heads/}")
+                ;;
+              refs/tags/*)
+                candidate_refs=("$REQUESTED_TARGET_REF")
+                ;;
+              *)
+                if git show-ref --verify --quiet "refs/remotes/origin/$REQUESTED_TARGET_REF"; then
+                  candidate_refs+=("refs/remotes/origin/$REQUESTED_TARGET_REF")
+                fi
+                if git show-ref --verify --quiet "refs/tags/$REQUESTED_TARGET_REF"; then
+                  candidate_refs+=("refs/tags/$REQUESTED_TARGET_REF")
+                fi
+                ;;
+            esac
+            if [[ "${#candidate_refs[@]}" -ne 1 ]] || ! git rev-parse --verify --quiet "${candidate_refs[0]}^{commit}" >/dev/null; then
+              echo "::error::target_ref must resolve to exactly one branch, tag, or full commit SHA in this repository."
+              exit 1
+            fi
+            expected_target="$(git rev-parse "${candidate_refs[0]}^{commit}")"
+          fi
+          TARGET_SHA="$(git rev-parse HEAD)"
+          if ! [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::The checked-out target did not resolve to a full lowercase commit SHA."
+            exit 1
+          fi
+          if [[ "$TARGET_SHA" != "$expected_target" ]]; then
+            echo "::error::The checked-out target did not match the unambiguous requested ref."
+            exit 1
+          fi
+          printf 'Requested target_ref: %s\n' "$REQUESTED_TARGET_REF"
+          printf 'Resolved target SHA: %s\n' "$TARGET_SHA"
+          printf 'sha=%s\n' "$TARGET_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify production game data
+        run: npm run data:verify
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify client bundle excludes game data
+        run: npm run data:verify -- --client-build
+
+      - name: Audit locked dependencies
+        run: npm audit --audit-level=high
+
+      - name: Confirm validation left no repository changes
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+
+      - name: Build, inspect, and smoke-test exact candidate image
+        env:
+          WORDS_SMOKE_IMAGE: ghcr.io/kevinatlee/words:test-sha-${{ steps.target.outputs.sha }}
+          WORDS_SMOKE_REVISION: ${{ steps.target.outputs.sha }}
+        run: npm run smoke:container
+
+      - name: Authenticate to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
+
+      - name: Publish exact tested test-image tags
+        env:
+          IMMUTABLE_IMAGE: ghcr.io/kevinatlee/words:test-sha-${{ steps.target.outputs.sha }}
+          TEST_IMAGE: ghcr.io/kevinatlee/words:test
+        run: |
+          docker tag "$IMMUTABLE_IMAGE" "$TEST_IMAGE"
+          docker push "$IMMUTABLE_IMAGE"
+          docker push "$TEST_IMAGE"
+
+      - name: Verify remote test-image digests
+        env:
+          IMMUTABLE_IMAGE: ghcr.io/kevinatlee/words:test-sha-${{ steps.target.outputs.sha }}
+          TEST_IMAGE: ghcr.io/kevinatlee/words:test
+        shell: bash
+        run: |
+          immutable_digest="$(docker buildx imagetools inspect --raw "$IMMUTABLE_IMAGE" | sha256sum | awk '{print "sha256:" $1}')"
+          test_digest="$(docker buildx imagetools inspect --raw "$TEST_IMAGE" | sha256sum | awk '{print "sha256:" $1}')"
+          test -n "$immutable_digest"
+          test -n "$test_digest"
+          test "$immutable_digest" = "$test_digest"
+          printf 'Immutable test image digest: %s\n' "$immutable_digest"
+          printf 'Mutable test image digest: %s\n' "$test_digest"
+
+      - name: Log out of GitHub Container Registry
+        if: always()
+        run: docker logout ghcr.io || true
+
+      - name: Remove local test image
+        if: always()
+        env:
+          IMMUTABLE_IMAGE: ghcr.io/kevinatlee/words:test-sha-${{ steps.target.outputs.sha }}
+          TEST_IMAGE: ghcr.io/kevinatlee/words:test
+        run: docker image rm --force "$IMMUTABLE_IMAGE" "$TEST_IMAGE" || true

@@ -1,5 +1,19 @@
 # Development log
 
+## 2026-08-01 — Explicit test-container release channel (draft)
+
+- Added a separately dispatched, confirmation-protected test-image workflow
+  that resolves one repository candidate ref, validates it completely, smokes
+  that exact image, and publishes immutable `test-sha-<full-target-sha>` before
+  mutable `test` without touching production `latest`.
+- Added stale-run cancellation, remote-digest comparison, ephemeral GHCR login
+  cleanup, and OCI revision metadata tied to the resolved checked-out target.
+- Documented the isolated Words-Test Unraid container, LAN and later tunnel
+  settings, updates, rollback tags, and the fact that active test rooms end on
+  a test-container update.
+- Preserved gameplay, authority, lifecycle, networking, TV and phone UI, Stage
+  4G, and normal production publishing behavior.
+
 ## 2026-08-01 — Stage 5A container deployment boundary (draft)
 
 - Added a clean production artifact that combines Vite client assets, a bundled

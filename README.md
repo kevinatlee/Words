@@ -250,6 +250,23 @@ only a successful `main` push may publish the exact tested GHCR image. See
 update, and rollback procedure. Run the local commands before review even when
 hosted checks are green.
 
+## Container release channels
+
+Production and test containers are deliberately separate:
+
+| Channel        | Mutable tag                       | Immutable audit/rollback tag                          |
+| -------------- | --------------------------------- | ----------------------------------------------------- |
+| Production     | `ghcr.io/kevinatlee/words:latest` | `ghcr.io/kevinatlee/words:sha-<full-main-sha>`        |
+| Test candidate | `ghcr.io/kevinatlee/words:test`   | `ghcr.io/kevinatlee/words:test-sha-<full-target-sha>` |
+
+`latest` changes only after the normal successful `main` CI path. Test
+publication is never automatic: in GitHub Actions, choose **Publish Test
+Image**, run it from `main`, enter an exact repository branch, tag, or full
+commit SHA as `target_ref`, and enter `PUBLISH_TEST`. After validation,
+container smoke, and publication, update the separate Words-Test Unraid
+container, check health, and complete a real round. A test candidate may be
+unmerged; it never changes production `latest`.
+
 ## Environment variables
 
 Safe defaults work without a `.env` file. `.env.example` documents optional

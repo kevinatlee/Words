@@ -85,7 +85,7 @@ Tunnel test.
 
 `Publish GHCR image` runs only for a successful push to `main`, after all three
 verification jobs. It re-builds and re-smokes the exact image tagged
-`ghcr.io/kevinatlee/words:sha-<full-commit-sha>` before authenticating with the
+`ghcr.io/kevinatlee/words:sha-<full-main-sha>` before authenticating with the
 ephemeral GitHub token. Only then does it publish that exact SHA tag and
 `ghcr.io/kevinatlee/words:latest`.
 
@@ -93,6 +93,32 @@ Pull-request runs never authenticate to GHCR and never publish an image. The
 workflow does not use `latest` before the exact SHA image has passed its smoke
 test. Package visibility is configured outside this repository; no long-lived
 registry credential is stored in source, an image, or documentation examples.
+
+## Manual test-image publishing
+
+[`Publish Test Image`](../.github/workflows/publish-test.yml) is a separate
+`workflow_dispatch`-only operation. It has no push, pull-request, schedule, or
+other automatic trigger. A maintainer opens Actions, selects **Publish Test
+Image**, chooses **Run workflow** from `main`, enters an exact repository
+branch, tag, or full commit SHA as `target_ref`, and enters `PUBLISH_TEST`
+exactly as `confirmation`.
+
+The workflow rejects any other confirmation before checkout or dependency
+installation. It checks out only the current repository’s requested ref without
+persisted credentials, resolves `git rev-parse HEAD` to one validated
+40-character SHA, and runs the full candidate quality, audit, build, client
+data-boundary, clean-tree, and container smoke sequence against that checkout.
+New manual requests cancel an older unfinished request in the dedicated
+`words-test-publish` concurrency group, preventing a stale run from overwriting
+the mutable candidate tag.
+
+Only the exact image that passed smoke is published, first as
+`ghcr.io/kevinatlee/words:test-sha-<full-target-sha>` and then as
+`ghcr.io/kevinatlee/words:test`. The workflow verifies both remote tags resolve
+to the same digest, logs out of GHCR, and removes local image tags. Its OCI
+revision label uses the resolved candidate SHA, not the dispatch event SHA.
+It never tags or pushes `latest`; production publication remains the normal
+successful-`main` CI path.
 
 ## Reproducibility and action pinning
 
@@ -127,6 +153,10 @@ build and smoke complete. No job persists checkout credentials. The workflow
 cannot push commits, modify pull requests, approve reviews, or change
 repository settings.
 
+The manual test-image job also has only `contents: read` and `packages: write`.
+It uses the ephemeral GitHub token only after candidate validation and smoke
+pass; it uses no PAT, repository secret, or persistent Docker login.
+
 `pull_request_target` is deliberately excluded. That event can combine
 privileged base-repository context with untrusted pull-request input. The
 ordinary `pull_request` event provides the code-under-review execution needed
@@ -152,6 +182,18 @@ workflow**. The equivalent authenticated command is:
 ```bash
 gh workflow run ci.yml --ref main
 ```
+
+To seed or replace the manually selected test candidate after the workflow is
+available on `main`:
+
+```bash
+gh workflow run publish-test.yml --ref main \
+  -f target_ref=main \
+  -f confirmation=PUBLISH_TEST
+```
+
+Wait for the run and verify the reported target SHA and the matching remote
+`test` and `test-sha-<full-target-sha>` digests before updating Words-Test.
 
 For a pull request:
 
