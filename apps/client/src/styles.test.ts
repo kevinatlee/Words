@@ -28,6 +28,19 @@ describe('tile typography', () => {
     );
   });
 
+  it('shares gameplay tile sizing and spacing with the lobby board', () => {
+    const sharedTileSizingRule = styles.match(
+      /\.letter-grid,\s*\.display-join-board\s*\{[^}]*\}/s,
+    )?.[0];
+
+    expect(sharedTileSizingRule).toContain(
+      '--letter-tile-font-size: clamp(1.8rem, 8vw, 2.75rem);',
+    );
+    expect(styles).toMatch(
+      /\.display-join-board\s*\{[^}]*gap: clamp\(0\.35rem, 1\.2vw, 0\.75rem\);/s,
+    );
+  });
+
   it('keeps phone timer labels as prominent as the countdown value', () => {
     expect(styles).toMatch(
       /\.room-page--phone \.round-clock--phone small\s*\{[^}]*font-size: clamp\(1\.2rem, 3vw, 1\.8rem\);[^}]*font-weight: 900;/s,
@@ -75,6 +88,9 @@ describe('tile typography', () => {
     expect(styles).toMatch(
       /\.result-player-card\s*\{[^}]*border-radius: var\(--radius-md\);[^}]*color: var\(--ink-950\);/s,
     );
+    expect(styles).toMatch(
+      /\.display-join-board__qr\s*\{[^}]*grid-area: 2 \/ 2 \/ 5 \/ 5;/s,
+    );
   });
 
   it('keeps the embedded TV QR on the letter-tile background', () => {
@@ -92,8 +108,11 @@ describe('tile typography', () => {
     )?.[0];
 
     expect(footerLinkRule).toContain('color: var(--mint-strong);');
-    expect(footerLinkRule).toContain('font-weight: 800;');
+    expect(footerLinkRule).toContain('text-decoration-line: underline;');
     expect(footerLinkRule).toContain('text-decoration-color: var(--mint);');
+    expect(footerLinkRule).not.toContain('font-weight:');
+    expect(footerLinkRule).not.toContain('background:');
+    expect(styles).not.toMatch(/\.display-room-footer__link:hover\s*\{/);
     expect(styles).toMatch(
       /\.display-room-footer__link:focus-visible\s*\{[^}]*outline: 0\.18rem solid var\(--sun\);/s,
     );

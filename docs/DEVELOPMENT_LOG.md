@@ -1,5 +1,12 @@
 # Development log
 
+## 2026-07-31 — TV tile sizing and footer simplification (draft)
+
+- Shared the gameplay tile font-size token and gap expression with the lobby
+  demonstration board so its perimeter letters match official boards.
+- Simplified the green display join link to inherited body weight with an
+  underline and accessible focus outline, removing filled hover treatment.
+
 ## 2026-07-31 — TV tile and join styling correction (draft)
 
 - Removed the positional green tint so ordinary, official, and demonstration

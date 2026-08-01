@@ -652,13 +652,18 @@ button:disabled {
 .display-player-list__item--offline {
   opacity: 0.56;
 }
+.letter-grid,
+.display-join-board {
+  --letter-tile-font-size: clamp(1.8rem, 8vw, 2.75rem);
+}
+
 .display-join-board {
   display: grid;
   width: min(100%, 40rem);
   aspect-ratio: 1;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   grid-template-rows: repeat(5, minmax(0, 1fr));
-  gap: 0.35rem;
+  gap: clamp(0.35rem, 1.2vw, 0.75rem);
 }
 .display-join-board__tile {
   display: grid;
@@ -751,16 +756,11 @@ button:disabled {
   text-align: center;
 }
 .display-room-footer__link {
-  border-radius: 0.35rem;
-  background: rgba(112, 231, 162, 0.08);
   color: var(--mint-strong);
-  font-weight: 800;
+  text-decoration-line: underline;
   text-decoration-color: var(--mint);
   text-decoration-thickness: 0.12em;
   text-underline-offset: 0.2em;
-}
-.display-room-footer__link:hover {
-  background: rgba(112, 231, 162, 0.16);
 }
 .display-room-footer__link:focus-visible {
   outline: 0.18rem solid var(--sun);
@@ -1106,8 +1106,6 @@ button:disabled {
 }
 
 .letter-grid {
-  --letter-tile-font-size: clamp(1.8rem, 8vw, 2.75rem);
-
   display: grid;
   width: min(100%, 40rem);
   margin-inline: auto;

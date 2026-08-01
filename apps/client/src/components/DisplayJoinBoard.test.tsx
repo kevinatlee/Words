@@ -33,6 +33,9 @@ describe('DisplayJoinBoard', () => {
 
     expect(board).toBeVisible();
     expect(tiles).toHaveLength(16);
+    expect(tiles.every((tile) => tile.classList.contains('letter-tile'))).toBe(
+      true,
+    );
     expect(tiles.slice(0, 5).map((tile) => tile.textContent)).toEqual([
       'W',
       'O',
@@ -58,6 +61,7 @@ describe('DisplayJoinBoard', () => {
     expect(container.querySelectorAll('.display-join-board__qr')).toHaveLength(
       1,
     );
+    expect(qrRegion).toHaveClass('display-join-board__qr');
     expect(screen.getByTestId('generated-qr')).toBeVisible();
     expect(qrCodeSvgMock).toHaveBeenCalledWith(
       expect.objectContaining({
