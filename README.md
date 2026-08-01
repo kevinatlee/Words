@@ -7,8 +7,9 @@ shared-screen browser creates and presents a temporary room. Phone players join
 without accounts, and the first player becomes the initial game host
 (controller).
 
-**Stage 4F Touch/Trace entry and integer letter-count scoring are complete and
-merged. The current interface uses the authoritative three-phase lifecycle.**
+**The current interface uses the authoritative three-phase lifecycle. Stage 5A
+adds a reviewed one-container production boundary; Stage 4G remains later
+real-party release-candidate work.**
 The secure lobby, isolated game engine, read-only hosted CI, reproducible
 server-only game data, authoritative rounds, private submissions, and final
 round results and display-only QR joining are complete. Stage 4F adds local
@@ -78,6 +79,9 @@ contract.
 - Rooms and credentials live only in bounded server memory.
 - `GET /api/health` reports the service version and whether controlled game-data
   startup completed.
+- `npm run build:production` creates a clean artifact containing the Vite
+  client, bundled Node server, and server-only dictionary; the Node process
+  serves all three from one origin on port `6532`.
 - Shared strict Zod schemas validate every inbound lobby payload.
 - The Stage 1 visual identity now presents authoritative settings and boards.
 - `@words/game-engine` validates immutable 4 × 4, 5 × 5, and 6 × 6 boards
@@ -111,9 +115,9 @@ previous-round score history, streaks, profiles, progression, achievements,
 ready-up commitments, rematch voting, and penalties for leaving are
 intentional product non-goals, not unfinished MVP features.
 
-Persistence, deployment workflow, container
-packaging, image publishing, server installation, and tunnel configuration
-remain unimplemented. There is no separate results phase.
+Stage 5A provides reviewed production packaging, image publishing automation,
+and operator guidance, but it does not deploy a public instance or add
+persistence. There is no separate results phase.
 
 ## Roles and authority
 
@@ -223,6 +227,10 @@ Run these from the repository root:
 
 ```bash
 npm run dev           # Start Vite and the Node lobby server
+npm run build:production # Create the clean one-process production artifact
+npm run start:production # Run the built artifact from any working directory
+npm run smoke:production # Check the direct production artifact
+npm run smoke:container  # Build and smoke-test the Docker image (needs Docker)
 npm run data:verify   # Verify committed game data without network access
 npm run data:dictionary:audit
 npm run data:boards:audit
@@ -236,8 +244,11 @@ npm audit --audit-level=high
 ```
 
 GitHub runs the same locked-install and verification boundary through
-[`CI`](docs/CI.md). Run the local commands before review even when hosted checks
-are green.
+[`CI`](docs/CI.md). The container check runs after Quality and Dependency audit;
+only a successful `main` push may publish the exact tested GHCR image. See
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the artifact, Unraid, tunnel,
+update, and rollback procedure. Run the local commands before review even when
+hosted checks are green.
 
 ## Environment variables
 
@@ -348,7 +359,7 @@ derivation.
 │   └── game-data/    # Server-only licensed dictionary and generated defaults
 ├── docs/             # Product, architecture, security, and deployment status
 ├── tests/            # Reserved for future cross-package integration tests
-└── unraid/           # Reserved for later deployment packaging
+└── unraid/           # Reserved for optional future Unraid template files
 ```
 
 ## Troubleshooting
@@ -383,9 +394,10 @@ cannot recreate the display.
 - **Stage 4G — later:** real-party and narrow-screen release-candidate testing, defect
   correction, focused interaction polish, scoring-balance observation, and
   stabilization—not feature expansion or cumulative scoring.
-- **Stage 5:** production hardening, a one-container build, Node serving the
-  client, health and graceful shutdown, image publishing, Unraid guidance, and
-  reverse-proxy/tunnel documentation.
+- **Stage 5A — current review:** one-container Node 24 build, static-client
+  serving, health and graceful shutdown, GHCR publishing automation, and
+  Unraid/tunnel guidance. A final private-host and real-device deployment
+  review remains outside this draft.
 
 ## License
 

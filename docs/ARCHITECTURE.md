@@ -85,8 +85,10 @@ Vite client on :5173
                             in-memory RoomStore
 ```
 
-The Vite proxy means the browser connects to its current origin. The current
-production build does not yet serve the React build from Express.
+The Vite proxy means the browser connects to its current origin. This remains
+the development topology only. `npm run build:production` produces a separate,
+single-origin Node 24 artifact where Express serves the built React client and
+Socket.IO retains its `/socket.io` path.
 
 Vite keeps client hot reload. The development server process is intentionally
 single-run rather than watched: workspace dependency activity previously
@@ -506,17 +508,37 @@ Redis is useful when several processes must share room state. The intended
 initial deployment is one Node.js process, so in-memory state is simpler. This
 decision can be revisited if measured needs change.
 
-## Intended production request path
+## Production request path
 
-The eventual production topology is one public HTTPS origin forwarding to one
-Words process on port `6532`. That process will serve the built client, health
-API, Socket.IO, game engine, and an openly licensed dictionary.
+Stage 5A packages one direct Node.js process on port `6532`. It verifies the
+server-only 79,370-word dictionary before binding `0.0.0.0`, then serves the
+built client, health API, Socket.IO, game engine, and dictionary from one
+origin:
 
-Stage 4F adds Touch and Trace word entry while retaining tap/click and keyboard
-fallbacks. Stage 4G remains later focused real-party and
-release-candidate testing without feature expansion. Stage 5 will add
-production hardening, static-client serving from the Node process,
-one-container packaging, production image publishing, server configuration,
-health and graceful shutdown, Unraid-oriented installation, and
-reverse-proxy/tunnel documentation. Stage 4E implements none of those later
-concerns.
+```text
+Public HTTPS browser
+  |
+  v
+Cloudflare Tunnel (TLS terminates at Cloudflare)
+  |
+  v
+Words container :6532
+  |-- GET /api/health
+  |-- /socket.io (unchanged Socket.IO path)
+  |-- /assets/* (immutable hashed Vite assets)
+  `-- approved GET/HEAD SPA navigation paths (no-cache HTML)
+        |
+        v
+      in-memory RoomStore + server-only dictionary
+```
+
+Unknown API and asset requests, Socket.IO paths, non-GET/HEAD requests,
+unknown navigations, and traversal attempts do not receive the SPA document.
+The production entry handles `SIGTERM` and `SIGINT` by stopping Socket.IO, HTTP,
+and lifecycle work; a restart intentionally ends temporary rooms. The
+multi-stage Node 24 image copies only the production artifact, runs as the
+non-root `node` user, and requires no writable data volume.
+
+Stage 4G remains later focused real-party and release-candidate testing without
+feature expansion. Deployment steps, update/rollback, GHCR access, and Unraid
+and Cloudflare Tunnel configuration are in [`DEPLOYMENT.md`](DEPLOYMENT.md).

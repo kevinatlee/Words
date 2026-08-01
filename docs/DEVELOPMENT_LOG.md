@@ -1,5 +1,22 @@
 # Development log
 
+## 2026-08-01 — Stage 5A container deployment boundary (draft)
+
+- Added a clean production artifact that combines Vite client assets, a bundled
+  direct Node 24 server entry, and the verified server-only dictionary without
+  copying source, tests, TypeScript, or runtime development tooling.
+- Added one-origin Express static serving with deliberate deep-link fallback,
+  immutable hashed assets, non-permanent HTML caching, preserved Socket.IO, and
+  graceful direct-process shutdown.
+- Added a multi-stage non-root Docker image, direct and container smoke checks,
+  and CI sequencing that smoke-tests pull requests read-only while publishing
+  only an exact tested SHA image and `latest` after successful `main` checks.
+- Added operator guidance for GHCR access, Unraid bridge configuration,
+  Cloudflare Tunnel, update, exact-SHA rollback, and deployment limitations.
+- Preserved Stage 4G, gameplay, scoring, lifecycle, authority, phone, display,
+  real-time protocol, and visual behavior. Final private-host and real-device
+  deployment review remains outside this draft.
+
 ## 2026-08-01 — Active TV puzzle spacing correction (draft)
 
 - Removed the active display Puzzle panel's compressed top and bottom padding

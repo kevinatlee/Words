@@ -269,10 +269,11 @@ reverses this principle.
 
 ## Current technical non-goals
 
-Stage 4F does not include QR scanning, camera
-permissions, native or installable applications, persistence, deployment
-automation, production container packaging, image publishing, server
-installation, or tunnel configuration.
+Stage 5A does not add QR scanning, camera permissions, native or installable
+applications, persistence, accounts, telemetry, public hosting, Stage 4G work,
+sounds, or animations. It adds only the reviewed production-container boundary,
+GHCR publication automation after `main` checks pass, and private-host operator
+guidance.
 
 The product also has no database, Redis, accounts, external authentication,
 microservices, paid APIs, analytics, advertisements, payments, unlocks, or
@@ -287,12 +288,17 @@ a pinned, filtered ESDB derivative with its complete applicable notice. Every
 future data revision and third-party asset requires a compatible licence and
 recorded attribution.
 
-## Intended production environment
+## Production environment
 
-The eventual design remains one container running one Node.js process on a
-personal server. That process will serve the built React client, Express
-routes, Socket.IO, game engine, and a licensed dictionary. Container and tunnel
-details are future deployment work, not a claim about Stage 2.
+Stage 5A uses one container running one direct Node.js process on a personal
+server. It serves the built React client, Express routes, Socket.IO, game
+engine, and licensed dictionary from port `6532`; the client and real-time
+connection share one public origin. The final runtime artifact excludes source,
+tests, TypeScript, development dependencies, and dictionary data from the
+browser bundle. The container runs as non-root and starts only after the
+dictionary verifies. A Cloudflare Tunnel may provide the public HTTPS hostname
+without opening a public router port. See [`DEPLOYMENT.md`](DEPLOYMENT.md) for
+reviewed operator steps; no public deployment is created by this repository.
 
 ## Staged roadmap
 
@@ -329,9 +335,10 @@ details are future deployment work, not a claim about Stage 2.
 12. **Stage 4G — later:** structured real-party, narrow-phone, display, and
     release-candidate testing with focused defect correction and interaction
     polish—not feature expansion or cumulative scoring.
-13. **Stage 5:** production hardening, one-container build, Node serving the
-    client, graceful shutdown, image publishing, Unraid guidance, and
-    reverse-proxy/tunnel documentation.
+13. **Stage 5A — current review:** one-container Node 24 build, Node static
+    serving, health and graceful shutdown, exact-SHA GHCR publishing after
+    checks, and Unraid/reverse-proxy/tunnel guidance. Final private-host and
+    real-device deployment validation remains outside this draft.
 
 Each stage should remain independently reviewable and must not imply that later
 stages are ready.

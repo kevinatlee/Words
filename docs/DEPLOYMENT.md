@@ -1,109 +1,177 @@
-# Future deployment
+# Stage 5A container deployment
 
-Production deployment is **not implemented through Stage 3.1**. The repository
-contains a working Node.js lobby server, health endpoint, an isolated game
-engine, and read-only CI checks, but it does not contain production packaging,
-a deployment workflow, a published image, server configuration, tunnel
-configuration, or production static-file serving.
+Stage 5A provides a single production container for Words. It is a deployment
+boundary, not a gameplay feature: the container serves the built React client,
+Express health API, Socket.IO, game engine, and the verified server-only
+dictionary from one direct Node.js process.
 
-The Stage 3.1 CI workflow verifies source and dependencies only. It has no write
-permission and cannot publish, release, or deploy anything.
+It does not add persistence, a database, Redis, accounts, Stage 4G work,
+sounds, animations, or a public deployment by itself. Active rooms remain
+intentionally in memory, so a container restart ends active rooms.
 
-## Implemented runtime values
+## Production artifact and local checks
 
-```text
-Node server default port:
-6532
+`npm run build:production` first creates the Vite client build, then creates a
+clean `dist/production/` directory containing only:
 
-Development client:
-http://localhost:5173
+- `client/` — Vite HTML and hashed static assets;
+- `server/index.mjs` — the bundled Node 24 production entry; and
+- `data/dictionary/` — the verified dictionary, manifest, and required notice.
 
-Development health endpoint:
-http://localhost:6532/api/health
+It does not copy TypeScript source, tests, workspace packages, `node_modules`,
+or development tooling into the runtime artifact. The output is independent of
+the current working directory:
 
-Intended public URL:
-https://words.atlee.io
+```bash
+npm run build:production
+npm run start:production
 ```
 
-`npm run dev` starts Vite and the Node server together. Vite proxies `/api` and
-`/socket.io` to port `6532`. This is a development topology, not the intended
-one-container production topology.
+The direct process binds `0.0.0.0` and uses `PORT=6532` by default. It verifies
+the 79,370-word dictionary before listening. `GET /api/health` returns
+`gameDataReady: true` only after that startup succeeds. `SIGTERM` and `SIGINT`
+stop Socket.IO, the HTTP server, and the bounded lifecycle timer cleanly.
 
-## Safe environment configuration
+For a reproducible local boundary check, run:
 
-The server has working defaults. Optional values are documented in
-`.env.example`:
-
-| Variable                   |                  Default | Validated purpose                        |
-| -------------------------- | -----------------------: | ---------------------------------------- |
-| `PORT`                     |                   `6532` | Node HTTP and Socket.IO port             |
-| `PUBLIC_BASE_URL`          | `https://words.atlee.io` | Allowed public browser origin            |
-| `MAX_PLAYERS`              |                      `8` | Phone players per room; display excluded |
-| `MAX_ROOMS`                |                    `500` | Active in-memory room bound              |
-| `ROOM_TTL_MINUTES`         |                    `120` | Sliding room lifetime                    |
-| `RECONNECT_GRACE_SECONDS`  |                     `60` | Display/player reconnect grace           |
-| `CLEANUP_INTERVAL_SECONDS` |                     `30` | Expired-state cleanup frequency          |
-
-Invalid numeric values fall back to bounded defaults. A real `.env` file,
-private host address, credential, tunnel token, or registry token must not be
-committed.
-
-## Intended future values
-
-```text
-Container port:
-6532
-
-Unraid host port:
-6532
-
-Public URL:
-https://words.atlee.io
-
-Cloudflare origin:
-http://UNRAID_SERVER_IP:6532
-
-Future container health endpoint:
-http://UNRAID_SERVER_IP:6532/api/health
-
-Future container URL inside a container network:
-http://words:6532
-
-GHCR image path placeholder:
-ghcr.io/GITHUB_OWNER/words:latest
+```bash
+npm run smoke:production
+npm run smoke:container
 ```
 
-`UNRAID_SERVER_IP` and `GITHUB_OWNER` are placeholders.
+The first command starts the direct production artifact from a temporary,
+unrelated directory. It checks health, all supported browser deep links, a
+hashed asset, a display/player Socket.IO exchange, and graceful SIGTERM. The
+container smoke script builds, inspects, and runs the image with a read-only
+filesystem. It skips only on a non-CI machine where the Docker daemon is not
+available; CI treats Docker unavailability as a failure.
 
-## Intended future flow
+## Runtime request boundary
 
-1. Reviewed source is merged through a pull request.
-2. GitHub Actions runs formatting, linting, type checking, tests, and builds.
-3. A multi-stage build creates one production image.
-4. The image runs as a non-root user and serves both the React client and
-   Node.js real-time server on port `6532`.
-5. The image is published to GitHub Container Registry with reviewable tags.
-6. Unraid maps host TCP port `6532` to container TCP port `6532`.
-7. A Cloudflare Tunnel route for `https://words.atlee.io` forwards HTTP and
-   WebSocket traffic to `http://UNRAID_SERVER_IP:6532`.
-8. A health check calls `/api/health`.
+Production is one origin and one port. `GET` and `HEAD` browser navigations for
+these paths return the SPA document:
 
-The eventual Node.js application will serve the built React files, Express
-routes, Socket.IO, game engine, and dictionary from one container. No separate
-database, Redis, or reverse-proxy container is currently planned.
+- `/`
+- `/display`
+- `/host`
+- `/join`
+- `/join/:roomCode`
+- `/room/:roomCode`
+- `/play/demo`
 
-## Production work still required
+`/assets/*` serves Vite’s hashed files with
+`Cache-Control: public, max-age=31536000, immutable`. HTML uses `no-cache` so a
+new deployment can replace its asset references. Unknown API paths, missing
+assets, Socket.IO paths, non-GET/HEAD requests, unknown navigations, and
+traversal attempts never become SPA fallback responses. Socket.IO remains on
+its existing `/socket.io` path.
 
-- serve the built React application and history-fallback routes from Express
-- create a multi-stage Dockerfile and non-root runtime user
-- add an image-level health check for `/api/health`
-- decide and document graceful shutdown behavior
-- add a separately reviewed image-publishing workflow
-- define GHCR permissions, tags, and update policy
-- create and test an Unraid template
-- verify Cloudflare Tunnel WebSocket behavior and production origin checks
-- add trusted-boundary IP-aware rate limiting
-- document logs, safe metrics, rollback, upgrade, and backup expectations
+Development remains unchanged: `npm run dev` uses Vite on port `5173` and its
+development proxy for `/api` and `/socket.io`.
 
-Until this work is reviewed and tested, the presence of the Node server must
-not be presented as production readiness.
+## Image and GHCR publishing
+
+The multi-stage `Dockerfile` uses official Node 24 images. Its final image has
+only `/app/dist/production`, runs as the built-in non-root `node` user, exposes
+TCP `6532`, and has a Node `fetch` health check for `/api/health`. It requires
+no writable game-data volume and no runtime package installation.
+
+CI runs `Container build and smoke` only after `Quality` and `Dependency audit`
+pass. Pull requests use read-only permissions and never authenticate to or
+publish to GHCR. A successful push to `main` builds and re-smokes the exact
+image before using the ephemeral GitHub token with `packages: write` to publish
+both:
+
+```text
+ghcr.io/kevinatlee/words:sha-<full-commit-sha>
+ghcr.io/kevinatlee/words:latest
+```
+
+`latest` is not published until the exact SHA image has passed its own smoke
+test. The Docker metadata records the source repository, commit revision, and
+MIT licence. No registry token belongs in a repository, image, or `.env` file.
+
+GitHub package visibility is an account-level choice. Public visibility is
+recommended for an uncomplicated private-server pull. If the package remains
+private, configure the host with a least-privilege package-read credential by
+following GitHub’s current package guidance; do not place that credential in
+this repository, an image label, a compose file, or a screenshot.
+
+## Unraid installation
+
+After a reviewed image has been published, create an Unraid Docker template
+with these exact fields:
+
+| Template field       | Value                                    |
+| -------------------- | ---------------------------------------- |
+| Name                 | `Words`                                  |
+| Repository           | `ghcr.io/kevinatlee/words:latest`        |
+| Network type         | `bridge` (normal bridge mode)            |
+| Container port       | `6532` / TCP                             |
+| Host port            | `6532` / TCP                             |
+| WebUI                | `http://[IP]:[PORT:6532]/`               |
+| Required environment | `PUBLIC_BASE_URL=https://words.atlee.io` |
+| Restart policy       | `unless-stopped`                         |
+
+No host path, appdata volume, privileged mode, extra capability, GPU, database,
+or Redis configuration is required. Keep the container port as `6532`; choose a
+different free host port only if the host already uses `6532`, and make the
+tunnel target match that host port. Optional bounded runtime settings are
+documented in `.env.example`; `PORT` normally remains `6532` inside the
+container.
+
+Before exposing the service, open the Unraid WebUI link on the LAN and verify:
+
+```text
+http://<UNRAID-IP>:6532/api/health
+```
+
+It must return `status: "ok"` and `gameDataReady: true`.
+
+## Cloudflare Tunnel
+
+Configure one public hostname, `words.atlee.io`, with an HTTP service target of
+either:
+
+```text
+http://<UNRAID-IP>:6532
+```
+
+or, when the tunnel connector reaches the same Docker network by name:
+
+```text
+http://Words:6532
+```
+
+Use the public hostname `https://words.atlee.io` and set
+`PUBLIC_BASE_URL=https://words.atlee.io` exactly. Cloudflare terminates public
+TLS and forwards normal HTTP and WebSocket traffic through the same tunnel to
+the one Words origin. Do not expose a public router port merely for Words; use
+the direct LAN URL only for local checks. After adding the route, verify the
+public health URL, a TV display, a phone join flow, and Socket.IO reconnecting
+through the public hostname.
+
+## Update and rollback
+
+For a normal update:
+
+1. Wait for the `main` workflow’s Quality, Dependency audit, Container build
+   and smoke, and GHCR publication to finish successfully.
+2. Pull `ghcr.io/kevinatlee/words:latest` on Unraid.
+3. Recreate the Words container with the same ports and
+   `PUBLIC_BASE_URL=https://words.atlee.io`.
+4. Confirm `/api/health`, a TV display, a phone join, and a short round.
+
+The exact SHA tag is the rollback unit. To roll back, change Repository to a
+previously successful `ghcr.io/kevinatlee/words:sha-<full-commit-sha>` tag,
+pull it, recreate the container, and repeat the same health/display/join check.
+Because rooms are in memory, schedule updates between casual sessions.
+
+## Boundaries and remaining operational review
+
+The CI image smoke covers the artifact, health readiness, deep links, static
+assets, Socket.IO display/player creation, non-root runtime, read-only start,
+and SIGTERM. It cannot replace a private-network, Cloudflare Tunnel, or real
+phone/display session review. Before calling any deployment public, review
+host logs, direct-LAN and tunnel connectivity, reconnection behavior, and the
+current GitHub package visibility policy.
