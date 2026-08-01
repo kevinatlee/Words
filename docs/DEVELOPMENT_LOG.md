@@ -1,5 +1,13 @@
 # Development log
 
+## 2026-07-31 — Centered TV Highlights timer (draft)
+
+- Changed the active display Room Highlights timer to a balanced three-column
+  grid so its integer countdown stays geometrically centered while the Timer
+  label remains at the left edge.
+- Increased the timer-label hierarchy without changing countdown authority,
+  active-board sizing, or phone timer presentation.
+
 ## 2026-07-31 — Scoring highlights and TV summary refinement (draft)
 
 - Preserved the previous Last Round highlight through a zero-score

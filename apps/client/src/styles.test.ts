@@ -86,13 +86,16 @@ describe('tile typography', () => {
     expect(styles).not.toContain('.display-active-puzzle');
     expect(styles).not.toContain('.display-round-timer');
     expect(styles).toMatch(
-      /\.display-highlights-timer\s*\{[^}]*display: flex;[^}]*width: 100%;[^}]*align-items: baseline;[^}]*justify-content: space-between;[^}]*gap: 0\.75rem;[^}]*margin-bottom: 0\.9rem;[^}]*padding-bottom: 0\.75rem;[^}]*border-bottom: 1px solid var\(--line\);/s,
+      /\.display-highlights-timer\s*\{[^}]*display: grid;[^}]*width: 100%;[^}]*grid-template-columns: minmax\(0, 1fr\) auto minmax\(0, 1fr\);[^}]*align-items: baseline;[^}]*gap: 0\.75rem;[^}]*margin-bottom: 0\.9rem;[^}]*padding-bottom: 0\.75rem;[^}]*border-bottom: 1px solid var\(--line\);/s,
+    );
+    expect(styles).not.toMatch(
+      /\.display-highlights-timer\s*\{[^}]*justify-content: space-between;/s,
     );
     expect(styles).toMatch(
-      /\.display-highlights-timer__label\s*\{[^}]*color: var\(--paper\);[^}]*font-size: 1rem;[^}]*font-weight: 800;/s,
+      /\.display-highlights-timer__label\s*\{[^}]*grid-column: 1;[^}]*justify-self: start;[^}]*color: var\(--paper\);[^}]*font-size: clamp\(1\.2rem, 1\.7vw, 1\.5rem\);[^}]*font-weight: 900;[^}]*line-height: 1;/s,
     );
     expect(styles).toMatch(
-      /\.display-highlights-timer__value\s*\{[^}]*min-width: 3ch;[^}]*color: var\(--mint-strong\);[^}]*font-size: clamp\(1\.75rem, 2\.5vw, 2\.25rem\);[^}]*font-variant-numeric: tabular-nums;[^}]*font-weight: 900;[^}]*line-height: 1;[^}]*text-align: right;/s,
+      /\.display-highlights-timer__value\s*\{[^}]*grid-column: 2;[^}]*justify-self: center;[^}]*min-width: 3ch;[^}]*color: var\(--mint-strong\);[^}]*font-size: clamp\(1\.75rem, 2\.5vw, 2\.25rem\);[^}]*font-variant-numeric: tabular-nums;[^}]*font-weight: 900;[^}]*line-height: 1;[^}]*text-align: center;/s,
     );
     expect(styles).toMatch(
       /\.display-player-list__name\s*\{[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/s,
