@@ -344,30 +344,17 @@ export function RoomLobby({
               aria-label="Puzzle"
             >
               {roundIsActive && room.round ? (
-                <div className="display-active-puzzle">
-                  <div
-                    className="display-round-timer"
-                    role="timer"
-                    aria-live="off"
-                    aria-label={`${Math.ceil((countdownMs ?? 0) / 1_000)} seconds remaining`}
-                  >
-                    <span className="display-round-timer__label">Timer</span>
-                    <strong className="display-round-timer__value">
-                      {Math.ceil((countdownMs ?? 0) / 1_000)}
-                    </strong>
-                  </div>
-                  <LetterGrid
-                    letters={[...room.round.board.tiles]}
-                    size={room.round.board.size}
-                    label={`${room.round.board.size} by ${room.round.board.size} official letter grid`}
-                    selectedIndices={[]}
-                    interactive={false}
-                    disabled
-                    onSelect={() => undefined}
-                    entryMode="touch"
-                    traceResetKey={room.round.id}
-                  />
-                </div>
+                <LetterGrid
+                  letters={[...room.round.board.tiles]}
+                  size={room.round.board.size}
+                  label={`${room.round.board.size} by ${room.round.board.size} official letter grid`}
+                  selectedIndices={[]}
+                  interactive={false}
+                  disabled
+                  onSelect={() => undefined}
+                  entryMode="touch"
+                  traceResetKey={room.round.id}
+                />
               ) : (
                 <DisplayJoinBoard joinUrl={joinUrl} />
               )}
@@ -376,6 +363,19 @@ export function RoomLobby({
               className="panel display-side-panel"
               aria-labelledby="display-highlights-title"
             >
+              {roundIsActive && (
+                <div
+                  className="display-highlights-timer"
+                  role="timer"
+                  aria-live="off"
+                  aria-label={`${Math.ceil((countdownMs ?? 0) / 1_000)} seconds remaining`}
+                >
+                  <span className="display-highlights-timer__label">Timer</span>
+                  <strong className="display-highlights-timer__value">
+                    {Math.ceil((countdownMs ?? 0) / 1_000)}
+                  </strong>
+                </div>
+              )}
               <h2 id="display-highlights-title">Room Highlights</h2>
               <section>
                 <h3>Last Round</h3>

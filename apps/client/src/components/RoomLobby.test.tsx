@@ -316,7 +316,7 @@ describe('RoomLobby word entry', () => {
     phone.unmount();
   });
 
-  it('renders the active display Timer above the official board from the authoritative deadline', () => {
+  it('renders the active display Timer first in Room Highlights from the authoritative deadline', () => {
     vi.useFakeTimers();
     vi.setSystemTime('2026-07-31T00:00:00.000Z');
     let monotonicTime = 100;
@@ -330,19 +330,29 @@ describe('RoomLobby word entry', () => {
     });
 
     const timer = screen.getByRole('timer');
-    expect(timer).toHaveClass('display-round-timer');
+    const highlights = screen.getByRole('complementary', {
+      name: 'Room Highlights',
+    });
+    const puzzle = screen.getByRole('region', { name: 'Puzzle' });
+    expect(timer).toHaveClass('display-highlights-timer');
     expect(timer).not.toHaveClass('round-clock');
     expect(timer).toHaveAttribute('aria-live', 'off');
     expect(within(timer).getByText('Timer')).toHaveClass(
-      'display-round-timer__label',
+      'display-highlights-timer__label',
     );
     expect(within(timer).getByText('60')).toHaveClass(
-      'display-round-timer__value',
+      'display-highlights-timer__value',
     );
     expect(timer).toHaveAccessibleName('60 seconds remaining');
     expect(screen.queryByText('Time Remaining')).toBeNull();
     expect(timer).not.toHaveTextContent('seconds');
-    expect(timer.parentElement).toHaveClass('display-active-puzzle');
+    expect(highlights.firstElementChild).toBe(timer);
+    expect(puzzle).not.toContainElement(timer);
+    expect(
+      timer.compareDocumentPosition(
+        within(highlights).getByRole('heading', { name: 'Room Highlights' }),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
 
     act(() => {
       monotonicTime += 1_000;
@@ -624,6 +634,9 @@ describe('RoomLobby word entry', () => {
       expect(joinLink).toHaveAttribute('href', joinUrl);
       expect(joinLink).toHaveAttribute('target', '_blank');
       expect(joinLink).toHaveAttribute('rel', 'noreferrer');
+      expect(screen.queryByRole('timer')).toBe(
+        room.phase === 'LOBBY' ? null : screen.getByRole('timer'),
+      );
       view.unmount();
     }
   });

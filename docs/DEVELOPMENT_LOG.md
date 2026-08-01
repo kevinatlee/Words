@@ -1,5 +1,12 @@
 # Development log
 
+## 2026-07-31 — TV results recap and timer placement (draft)
+
+- Split display result-card word statistics into compact semantic rows and
+  order each unique-word preview longest first without changing results data.
+- Moved the active display Timer into Room Highlights, leaving the Puzzle
+  bubble to the official board.
+
 ## 2026-07-31 — TV round timer simplification (draft)
 
 - Restored the active display board to the normal display-panel width and

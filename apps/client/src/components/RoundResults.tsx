@@ -23,7 +23,13 @@ export function RoundResults({ roundNumber, results }: RoundResultsProps) {
         className={`display-results__cards display-results__cards--${results.players.length}`}
       >
         {results.players.map((player) => {
-          const uniqueWords = player.words.filter((word) => !word.shared);
+          const uniqueWords = [...player.words]
+            .filter((word) => !word.shared)
+            .sort(
+              (left, right) =>
+                right.word.length - left.word.length ||
+                left.word.localeCompare(right.word),
+            );
           const winner = results.winnerPlayerIds.includes(player.playerId);
           return (
             <li className="result-player-card" key={player.playerId}>
@@ -34,9 +40,16 @@ export function RoundResults({ roundNumber, results }: RoundResultsProps) {
               <strong className="result-player-card__points">
                 {player.finalScore} points
               </strong>
-              <p>
-                Accepted: {player.words.length} · Unique: {uniqueWords.length}
-              </p>
+              <dl className="result-player-card__stats">
+                <div>
+                  <dt>Words</dt>
+                  <dd>{player.words.length}</dd>
+                </div>
+                <div>
+                  <dt>Unique words</dt>
+                  <dd>{uniqueWords.length}</dd>
+                </div>
+              </dl>
               {uniqueWords.length > 0 && (
                 <ul aria-label={`${player.displayName} unique words`}>
                   {uniqueWords.slice(0, limit).map((word) => (

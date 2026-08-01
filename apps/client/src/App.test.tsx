@@ -2123,14 +2123,20 @@ describe('Stage 4B display and player room routes', () => {
     expect(
       screen.getByRole('complementary', { name: 'Room Highlights' }),
     ).toBeVisible();
+    const highlights = screen.getByRole('complementary', {
+      name: 'Room Highlights',
+    });
+    const puzzle = screen.getByRole('region', { name: 'Puzzle' });
     const timer = screen.getByRole('timer');
     expect(timer).toBeVisible();
-    expect(timer).toHaveClass('display-round-timer');
+    expect(timer).toHaveClass('display-highlights-timer');
     expect(timer).not.toHaveClass('round-clock');
     expect(within(timer).getByText('Timer')).toBeVisible();
     expect(within(timer).getByText('30')).toBeVisible();
     expect(timer).not.toHaveTextContent('seconds');
     expect(screen.queryByText('Time Remaining')).toBeNull();
+    expect(highlights.firstElementChild).toBe(timer);
+    expect(puzzle).not.toContainElement(timer);
     expect(
       screen.getByRole('grid', { name: '4 by 4 official letter grid' }),
     ).toBeVisible();

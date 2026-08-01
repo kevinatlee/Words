@@ -81,13 +81,12 @@ describe('tile typography', () => {
       /\.panel\.display-puzzle-panel--active\s*\{[^}]*padding:\s*0\.35rem clamp\(1\.1rem, 2\.5vw, 1\.75rem\) 0\.5rem;/s,
     );
     expect(styles).toMatch(
-      /\.display-active-puzzle\s*\{[^}]*width: 100%;[^}]*justify-items: center;[^}]*gap: 0\.25rem;/s,
+      /\.display-puzzle-panel--active > \.letter-grid\s*\{[^}]*width: 100%;/s,
     );
+    expect(styles).not.toContain('.display-active-puzzle');
+    expect(styles).not.toContain('.display-round-timer');
     expect(styles).toMatch(
-      /\.display-active-puzzle \.letter-grid\s*\{[^}]*width: 100%;/s,
-    );
-    expect(styles).toMatch(
-      /\.display-round-timer\s*\{[^}]*margin: 0;[^}]*padding: 0;[^}]*border: 0;[^}]*border-radius: 0;[^}]*background: transparent;/s,
+      /\.display-highlights-timer\s*\{[^}]*display: flex;[^}]*align-items: baseline;[^}]*justify-content: center;[^}]*gap: 0\.35rem;[^}]*border-bottom: 1px solid var\(--line\);/s,
     );
     expect(styles).toMatch(
       /\.display-player-list__name\s*\{[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/s,
@@ -97,6 +96,12 @@ describe('tile typography', () => {
     );
     expect(styles).toMatch(
       /\.result-player-card\s*\{[^}]*border-radius: var\(--radius-md\);[^}]*color: var\(--ink-950\);/s,
+    );
+    expect(styles).toMatch(
+      /\.result-player-card__stats\s*\{[^}]*display: grid;[^}]*gap: 0\.15rem;[^}]*margin: 0\.45rem 0 0;/s,
+    );
+    expect(styles).toMatch(
+      /\.result-player-card__stats > div\s*\{[^}]*display: flex;[^}]*justify-content: space-between;/s,
     );
     expect(styles).toMatch(
       /\.display-join-board__qr\s*\{[^}]*grid-area: 2 \/ 2 \/ 5 \/ 5;/s,

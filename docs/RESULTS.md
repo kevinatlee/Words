@@ -176,8 +176,8 @@ not publish obsolete results.
 `ROUND_ENDED` is a 20-second server-authoritative results window, not a fourth
 phase. The display replaces its header with redesigned result cards for every
 authoritative participant, including departed players, plus the join URL footer.
-Cards show final integer points, accepted and unique counts, and a bounded
-unique-word list; there is no board, QR, timer, side bubble, control, table, or
+Cards show final integer points, separate Words and Unique words counts, and a
+bounded unique-word list; there is no board, QR, timer, side bubble, control, table, or
 word review. Phones retain only their completed board, `Round Complete`,
 Tap/Trace, and connection status; they receive no administration or detailed
 results.

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { RoundResults as R } from '@words/shared';
 import { RoundResults } from './RoundResults';
@@ -36,10 +36,17 @@ describe('RoundResults', () => {
       screen.getAllByRole('heading', { level: 2 }).map((x) => x.textContent),
     ).toEqual(expect.arrayContaining(['♛ Bright Fox', 'Amber Kite']));
   });
-  it('shows integer points and accepted/unique counts', () => {
+  it('shows integer points and separate Words and Unique words rows', () => {
     render(<RoundResults roundNumber={1} results={result()} />);
     expect(screen.getByText('7 points')).toBeVisible();
-    expect(screen.getAllByText('Accepted: 2 · Unique: 1')).toHaveLength(2);
+    expect(screen.getAllByText('Words')).toHaveLength(2);
+    expect(screen.getAllByText('Unique words')).toHaveLength(2);
+    expect(screen.queryByText(/Accepted:/)).toBeNull();
+    const stats = screen.getAllByText('Words')[0]?.closest('dl');
+    expect(stats).toHaveClass('result-player-card__stats');
+    expect(stats?.querySelectorAll(':scope > div')).toHaveLength(2);
+    expect(within(stats!).getByText('2')).toBeVisible();
+    expect(within(stats!).getByText('1')).toBeVisible();
   });
   it('lists unique words but not shared words', () => {
     render(<RoundResults roundNumber={1} results={result()} />);
@@ -72,6 +79,39 @@ describe('RoundResults', () => {
     };
     render(<RoundResults roundNumber={1} results={x} />);
     expect(screen.getAllByText('+2 more')).toHaveLength(count);
+  });
+  it('sorts copied unique previews longest first, then alphabetically, before limiting', () => {
+    const base = result(1);
+    const x: R = {
+      ...base,
+      players: [
+        {
+          ...base.players[0]!,
+          words: [
+            word('DOG'),
+            word('APPLE'),
+            word('ELEPHANT'),
+            word('BAKER'),
+            word('PLANETS'),
+            word('CAT'),
+            word('SHARED', true),
+          ],
+        },
+      ],
+    };
+
+    render(<RoundResults roundNumber={1} results={x} />);
+
+    const preview = screen.getByRole('list', {
+      name: 'Bright Fox unique words',
+    });
+    expect(
+      within(preview)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['ELEPHANT', 'PLANETS', 'APPLE', 'BAKER', 'CAT', '+1 more']);
+    expect(within(preview).queryByText('DOG')).toBeNull();
+    expect(within(preview).queryByText('SHARED')).toBeNull();
   });
   it('has no table, disclosure, or interactive controls', () => {
     render(<RoundResults roundNumber={1} results={result()} />);
