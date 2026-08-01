@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-07-31 — Accepted-word tile feedback (draft)
+
+- Added short, client-only accepted tile feedback after the server confirms a
+  submitted word, without changing submission authority or payloads.
+- Refined the TV footer link and removed the display Room Record round label.
+
 ## 2026-07-31 — TV tile sizing and footer simplification (draft)
 
 - Shared the gameplay tile font-size token and gap expression with the lobby

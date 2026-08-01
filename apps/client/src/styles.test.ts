@@ -102,19 +102,33 @@ describe('tile typography', () => {
     expect(qrSurfaceRule).not.toMatch(/#fff|#ffffff/i);
   });
 
-  it('keeps the display footer URL compact, green, and keyboard-visible', () => {
+  it('keeps the display footer URL dark green, unadorned, and keyboard-visible', () => {
     const footerLinkRule = styles.match(
       /\.display-room-footer__link\s*\{[^}]*\}/s,
     )?.[0];
 
-    expect(footerLinkRule).toContain('color: var(--mint-strong);');
-    expect(footerLinkRule).toContain('text-decoration-line: underline;');
-    expect(footerLinkRule).toContain('text-decoration-color: var(--mint);');
+    expect(styles).toContain('--mint-deep: #3fbf75;');
+    expect(footerLinkRule).toContain('color: var(--mint-deep);');
+    expect(footerLinkRule).toContain('text-decoration: none;');
     expect(footerLinkRule).not.toContain('font-weight:');
     expect(footerLinkRule).not.toContain('background:');
-    expect(styles).not.toMatch(/\.display-room-footer__link:hover\s*\{/);
     expect(styles).toMatch(
-      /\.display-room-footer__link:focus-visible\s*\{[^}]*outline: 0\.18rem solid var\(--sun\);/s,
+      /\.display-room-footer__link:hover\s*\{[^}]*text-decoration: none;/s,
+    );
+    expect(styles).not.toMatch(
+      /\.display-room-footer__link(?::visited|:hover|:active|:focus-visible)?\s*\{[^}]*background:/s,
+    );
+    expect(styles).toMatch(
+      /\.display-room-footer__link:focus-visible\s*\{[^}]*outline: 0\.18rem solid var\(--sun\);[^}]*text-decoration: none;/s,
+    );
+  });
+
+  it('gives authoritative accepted tiles a later, green override', () => {
+    expect(styles).toMatch(
+      /\.letter-tile--accepted\s*\{[^}]*border-color: var\(--mint-deep\);[^}]*background: var\(--mint-strong\) !important;/s,
+    );
+    expect(styles.indexOf('.letter-tile--accepted')).toBeGreaterThan(
+      styles.indexOf('.letter-tile--selected'),
     );
   });
 });

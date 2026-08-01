@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -99,7 +99,29 @@ function createSubmissionState(): PlayerRoundSubmissionState {
   };
 }
 
-function renderLobby(
+function acceptedSubmission(word = 'ABC', points = 3): SubmitWordResponse {
+  const acceptedAt = new Date().toISOString();
+  return {
+    ok: true,
+    acceptedWord: { sequence: 1, word, points, acceptedAt },
+    state: {
+      ...createSubmissionState(),
+      submissionVersion: 1,
+      acceptedWords: [{ sequence: 1, word, points, acceptedAt }],
+      provisionalScore: points,
+    },
+  };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
+function lobbyProps(
   onSubmitWord: (input: SubmitWordInput) => Promise<SubmitWordResponse> = vi.fn(
     async (): Promise<SubmitWordResponse> => ({
       ok: false,
@@ -117,22 +139,37 @@ function renderLobby(
     currentPlayerId?: string | null;
   } = {},
 ) {
+  return {
+    room,
+    sessionRole,
+    currentPlayerId,
+    connectionStatus: 'connected' as const,
+    onTransferController: async () => null,
+    onUpdateSettings: async () => null,
+    onStartRound: async () => null,
+    submissionState: createSubmissionState(),
+    onSubmitWord,
+  };
+}
+
+function renderLobby(
+  onSubmitWord: (input: SubmitWordInput) => Promise<SubmitWordResponse> = vi.fn(
+    async (): Promise<SubmitWordResponse> => ({
+      ok: false,
+      error: { code: 'INTERNAL_ERROR', message: 'Unexpected error.' },
+      state: createSubmissionState(),
+    }),
+  ),
+  options: {
+    room?: RoomState;
+    sessionRole?: 'display' | 'player';
+    currentPlayerId?: string | null;
+  } = {},
+) {
   const slot = document.createElement('div');
   slot.id = 'phone-entry-mode-slot';
   document.body.append(slot);
-  return render(
-    <RoomLobby
-      room={room}
-      sessionRole={sessionRole}
-      currentPlayerId={currentPlayerId}
-      connectionStatus="connected"
-      onTransferController={async () => null}
-      onUpdateSettings={async () => null}
-      onStartRound={async () => null}
-      submissionState={createSubmissionState()}
-      onSubmitWord={onSubmitWord}
-    />,
-  );
+  return render(<RoomLobby {...lobbyProps(onSubmitWord, options)} />);
 }
 
 function tileButtons() {
@@ -173,6 +210,7 @@ afterEach(() => {
     slot.remove();
   });
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe('RoomLobby word entry', () => {
@@ -560,6 +598,36 @@ describe('RoomLobby word entry', () => {
     }
   });
 
+  it('keeps display grids free of player accepted feedback and omits the Room Record round label', () => {
+    const displayRoom = createRoom({
+      phase: 'LOBBY',
+      round: null,
+      highlights: {
+        lastRound: null,
+        roomRecord: {
+          roundNumber: 7,
+          holders: [{ playerId, displayName: 'Bright Fox' }],
+          score: 12,
+        },
+      },
+    });
+    const { container } = renderLobby(undefined, {
+      room: displayRoom,
+      sessionRole: 'display',
+      currentPlayerId: null,
+    });
+
+    expect(container.querySelectorAll('.letter-tile--accepted')).toHaveLength(
+      0,
+    );
+    const roomRecord = screen
+      .getByRole('heading', { name: 'Room Record' })
+      .closest('section');
+    expect(roomRecord).toHaveTextContent('Bright Fox');
+    expect(roomRecord).toHaveTextContent('12 points');
+    expect(roomRecord).not.toHaveTextContent('Round 7');
+  });
+
   it('uses Tap backtracking without leaving disconnected paths', async () => {
     const user = userEvent.setup();
     renderLobby();
@@ -852,6 +920,231 @@ describe('RoomLobby word entry', () => {
       await screen.findByText('Could not submit that word. Try again.'),
     ).toBeVisible();
     expect(screen.getByRole('heading', { name: 'ABC' })).toBeVisible();
+  });
+
+  it('keeps a submitted path selected while pending, then flashes only an accepted response', async () => {
+    vi.useFakeTimers();
+    const response = deferred<SubmitWordResponse>();
+    renderLobby(() => response.promise);
+
+    for (const tile of tileButtons().slice(0, 3)) {
+      fireEvent.click(tile);
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+    expect(screen.getByRole('button', { name: 'Checking…' })).toBeDisabled();
+    for (const tile of tileButtons().slice(0, 3)) {
+      expect(tile).toHaveClass('letter-tile--selected');
+      expect(tile).not.toHaveClass('letter-tile--accepted');
+    }
+
+    await act(async () => {
+      response.resolve(acceptedSubmission());
+      await response.promise;
+    });
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'ABC accepted for 3 points.',
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Select adjacent tiles' }),
+    ).toBeVisible();
+    for (const tile of tileButtons().slice(0, 3)) {
+      expect(tile).toHaveClass('letter-tile--accepted');
+      expect(tile).not.toHaveClass('letter-tile--selected');
+    }
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(
+      screen.getByRole('grid').querySelectorAll('.letter-tile--accepted'),
+    ).toHaveLength(0);
+  });
+
+  it('clears accepted feedback on phase changes and ignores a stale round response', async () => {
+    vi.useFakeTimers();
+    const activeRoom = createRoom();
+    const firstView = renderLobby(async () => acceptedSubmission(), {
+      room: activeRoom,
+    });
+    for (const tile of tileButtons().slice(0, 3)) {
+      fireEvent.click(tile);
+    }
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    });
+    expect(
+      screen.getByRole('grid').querySelectorAll('.letter-tile--accepted'),
+    ).toHaveLength(3);
+
+    firstView.rerender(
+      <RoomLobby
+        {...lobbyProps(async () => acceptedSubmission(), {
+          room: { ...activeRoom, phase: 'ROUND_ENDED' },
+        })}
+      />,
+    );
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(
+      screen.getByRole('grid').querySelectorAll('.letter-tile--accepted'),
+    ).toHaveLength(0);
+    firstView.unmount();
+
+    const response = deferred<SubmitWordResponse>();
+    const staleView = renderLobby(() => response.promise, { room: activeRoom });
+    for (const tile of tileButtons().slice(0, 3)) {
+      fireEvent.click(tile);
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    const nextRound = {
+      ...activeRoom.round!,
+      id: '00000000-0000-4000-8000-000000000011',
+      number: 2,
+    };
+    staleView.rerender(
+      <RoomLobby
+        {...lobbyProps(() => response.promise, {
+          room: { ...activeRoom, round: nextRound },
+        })}
+      />,
+    );
+    await act(async () => {
+      response.resolve(acceptedSubmission());
+      await response.promise;
+    });
+
+    expect(
+      screen.getByRole('grid').querySelectorAll('.letter-tile--accepted'),
+    ).toHaveLength(0);
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+
+  it('replaces accepted feedback and clears it when a player starts another word or changes entry mode', async () => {
+    vi.useFakeTimers();
+    const responses = [acceptedSubmission('ABC'), acceptedSubmission('EFG')];
+    const onSubmitWord = vi.fn(async (): Promise<SubmitWordResponse> =>
+      responses.shift()!,
+    );
+    renderLobby(onSubmitWord);
+
+    for (const tile of tileButtons().slice(0, 3)) {
+      fireEvent.click(tile);
+    }
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    });
+    expect(
+      screen.getByRole('grid').querySelectorAll('.letter-tile--accepted'),
+    ).toHaveLength(3);
+
+    fireEvent.click(tileButtons()[4]!);
+    expect(
+      screen.getByRole('grid').querySelectorAll('.letter-tile--accepted'),
+    ).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Trace' }));
+    expect(
+      screen.getByRole('grid').querySelectorAll('.letter-tile--accepted'),
+    ).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tap' }));
+    for (const tile of [
+      tileButtons()[4]!,
+      tileButtons()[5]!,
+      tileButtons()[6]!,
+    ]) {
+      fireEvent.click(tile);
+    }
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    });
+
+    const acceptedIndexes = Array.from(
+      screen.getByRole('grid').querySelectorAll('.letter-tile--accepted'),
+    ).map((tile) => tile.getAttribute('data-tile-index'));
+    expect(acceptedIndexes).toEqual(['4', '5', '6']);
+  });
+
+  it('never adds accepted styling for rejected or failed submissions', async () => {
+    vi.useFakeTimers();
+    const rejected = renderLobby(async () => ({
+      ok: false,
+      error: { code: 'WORD_NOT_IN_DICTIONARY', message: 'Not in dictionary.' },
+      state: createSubmissionState(),
+    }));
+    for (const tile of tileButtons().slice(0, 3)) {
+      fireEvent.click(tile);
+    }
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('Not in dictionary.');
+    expect(
+      screen.getByRole('grid').querySelectorAll('.letter-tile--accepted'),
+    ).toHaveLength(0);
+    rejected.unmount();
+
+    renderLobby(async () => {
+      throw new Error('offline');
+    });
+    for (const tile of tileButtons().slice(0, 3)) {
+      fireEvent.click(tile);
+    }
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    });
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Could not submit that word. Try again.',
+    );
+    expect(
+      screen.getByRole('grid').querySelectorAll('.letter-tile--accepted'),
+    ).toHaveLength(0);
+  });
+
+  it('uses the same accepted feedback for a Trace submission', async () => {
+    vi.useFakeTimers();
+    renderLobby(async () => acceptedSubmission());
+    fireEvent.click(screen.getByRole('button', { name: 'Trace' }));
+    const grid = screen.getByRole('grid');
+    const tiles = tileButtons();
+    mockTileGeometry();
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: vi.fn().mockReturnValue(tiles[0]!),
+    });
+
+    fireEvent.pointerDown(tiles[0]!, {
+      clientX: 50,
+      clientY: 50,
+      pointerId: 11,
+      pointerType: 'mouse',
+    });
+    fireEvent.pointerMove(grid, {
+      clientX: 150,
+      clientY: 50,
+      pointerId: 11,
+      pointerType: 'mouse',
+    });
+    fireEvent.pointerMove(grid, {
+      clientX: 250,
+      clientY: 50,
+      pointerId: 11,
+      pointerType: 'mouse',
+    });
+    await act(async () => {
+      fireEvent.pointerUp(grid, {
+        clientX: 250,
+        clientY: 50,
+        pointerId: 11,
+        pointerType: 'mouse',
+      });
+    });
+
+    expect(
+      screen.getByRole('grid').querySelectorAll('.letter-tile--accepted'),
+    ).toHaveLength(3);
   });
 
   it('keeps QU as two candidate letters', async () => {

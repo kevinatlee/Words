@@ -19,6 +19,7 @@
   --paper-muted: #c7c8c2;
   --mint: #b9f6d0;
   --mint-strong: #70e7a2;
+  --mint-deep: #3fbf75;
   --coral: #ff816d;
   --sun: #ffd66d;
   --blue: #7ac7ff;
@@ -756,15 +757,22 @@ button:disabled {
   text-align: center;
 }
 .display-room-footer__link {
+  color: var(--mint-deep);
+  text-decoration: none;
+}
+.display-room-footer__link:visited,
+.display-room-footer__link:active {
+  color: var(--mint-deep);
+  text-decoration: none;
+}
+.display-room-footer__link:hover {
   color: var(--mint-strong);
-  text-decoration-line: underline;
-  text-decoration-color: var(--mint);
-  text-decoration-thickness: 0.12em;
-  text-underline-offset: 0.2em;
+  text-decoration: none;
 }
 .display-room-footer__link:focus-visible {
   outline: 0.18rem solid var(--sun);
   outline-offset: 0.15rem;
+  text-decoration: none;
 }
 
 .room-dashboard__lobby,
@@ -1144,6 +1152,14 @@ button:disabled {
   box-shadow:
     inset 0 -0.32rem 0 rgba(6, 16, 27, 0.12),
     0 0 0 0.18rem rgba(255, 129, 109, 0.25);
+}
+
+.letter-tile--accepted {
+  border-color: var(--mint-deep);
+  background: var(--mint-strong) !important;
+  box-shadow:
+    inset 0 -0.32rem 0 rgba(6, 16, 27, 0.12),
+    0 0 0 0.18rem rgba(63, 191, 117, 0.28);
 }
 
 .letter-tile__order {

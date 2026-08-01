@@ -64,9 +64,14 @@ export function RoomLobby({
   const [submissionMessage, setSubmissionMessage] = useState<string | null>(
     null,
   );
+  const [acceptedPath, setAcceptedPath] = useState<number[]>([]);
   const activeRoundIdRef = useRef(room.round?.id);
   const selectedPathRef = useRef<number[]>([]);
   const submissionPendingRef = useRef(false);
+  const acceptedFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const isMountedRef = useRef(true);
   const [entryMode, setEntryMode] = useState<WordEntryMode>(loadWordEntryMode);
   const currentPlayer = room.players.find(
     (player) => player.id === currentPlayerId,
@@ -114,6 +119,24 @@ export function RoomLobby({
     setSelectedPath([]);
   }, []);
 
+  const clearAcceptedFeedback = useCallback(() => {
+    if (acceptedFeedbackTimerRef.current !== null) {
+      clearTimeout(acceptedFeedbackTimerRef.current);
+      acceptedFeedbackTimerRef.current = null;
+    }
+    if (isMountedRef.current) {
+      setAcceptedPath([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      clearAcceptedFeedback();
+    };
+  }, [clearAcceptedFeedback]);
+
   useEffect(() => {
     activeRoundIdRef.current = room.round?.id;
     submissionPendingRef.current = false;
@@ -121,14 +144,16 @@ export function RoomLobby({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSubmissionPending(false);
     clearSelectedPath();
+    clearAcceptedFeedback();
     setSubmissionMessage(null);
-  }, [clearSelectedPath, room.phase, room.round?.id]);
+  }, [clearAcceptedFeedback, clearSelectedPath, room.phase, room.round?.id]);
 
   const selectTile = useCallback(
     (tileIndex: number) => {
       if (!canBuildWord || submissionPendingRef.current) {
         return selectedPathRef.current;
       }
+      clearAcceptedFeedback();
       setSubmissionMessage(null);
       const update = updateWordPath(
         selectedPathRef.current,
@@ -147,7 +172,7 @@ export function RoomLobby({
       setSelectedPath(update.path);
       return update.path;
     },
-    [boardSize, canBuildWord, letters],
+    [boardSize, canBuildWord, clearAcceptedFeedback, letters],
   );
 
   const selectEntryMode = (mode: WordEntryMode) => {
@@ -157,6 +182,7 @@ export function RoomLobby({
     saveWordEntryMode(mode);
     setEntryMode(mode);
     clearSelectedPath();
+    clearAcceptedFeedback();
     setSubmissionMessage(null);
   };
 
@@ -181,11 +207,17 @@ export function RoomLobby({
         word,
         path: [...path],
       });
-      if (activeRoundIdRef.current !== roundId) {
+      if (!isMountedRef.current || activeRoundIdRef.current !== roundId) {
         return;
       }
       if (response.ok) {
         clearSelectedPath();
+        clearAcceptedFeedback();
+        setAcceptedPath([...path]);
+        acceptedFeedbackTimerRef.current = setTimeout(
+          clearAcceptedFeedback,
+          500,
+        );
         setSubmissionMessage(
           `${response.acceptedWord.word} accepted for ${response.acceptedWord.points} ${response.acceptedWord.points === 1 ? 'point' : 'points'}.`,
         );
@@ -196,16 +228,23 @@ export function RoomLobby({
         setSubmissionMessage('Could not submit that word. Try again.');
       }
     } catch {
-      if (activeRoundIdRef.current === roundId) {
+      if (isMountedRef.current && activeRoundIdRef.current === roundId) {
         setSubmissionMessage('Could not submit that word. Try again.');
       }
     } finally {
-      if (activeRoundIdRef.current === roundId) {
+      if (isMountedRef.current && activeRoundIdRef.current === roundId) {
         submissionPendingRef.current = false;
         setSubmissionPending(false);
       }
     }
-  }, [canBuildWord, clearSelectedPath, letters, onSubmitWord, room.round?.id]);
+  }, [
+    canBuildWord,
+    clearAcceptedFeedback,
+    clearSelectedPath,
+    letters,
+    onSubmitWord,
+    room.round?.id,
+  ]);
 
   const cancelTrace = useCallback(() => {
     clearSelectedPath();
@@ -355,8 +394,7 @@ export function RoomLobby({
                   <p>
                     <strong>{formatHighlightNames(roomRecord.holders)}</strong>
                     <br />
-                    {roomRecord.score} points{' '}
-                    <small>Round {roomRecord.roundNumber}</small>
+                    {roomRecord.score} points
                   </p>
                 )}
               </section>
@@ -445,6 +483,11 @@ export function RoomLobby({
               size={boardSize}
               label={`${boardSize} by ${boardSize} ${room.round ? 'official' : 'demonstration'} letter grid`}
               selectedIndices={selectedPath}
+              acceptedIndices={
+                sessionRole === 'player' && roundIsActive && isRoundParticipant
+                  ? acceptedPath
+                  : []
+              }
               interactive={
                 sessionRole === 'player' &&
                 roundIsActive &&
