@@ -678,9 +678,6 @@ button:disabled {
   width: min(55vw, 44rem, calc(100dvh - 8.75rem));
   place-items: center;
 }
-.panel.display-puzzle-panel--active {
-  padding: 0.35rem clamp(1.1rem, 2.5vw, 1.75rem) 0.5rem;
-}
 .display-puzzle-panel--active > .letter-grid {
   width: 100%;
 }

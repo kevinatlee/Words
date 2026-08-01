@@ -1,5 +1,17 @@
 # Development log
 
+## 2026-08-01 — Active TV puzzle spacing correction (draft)
+
+- Removed the active display Puzzle panel's compressed top and bottom padding
+  override so it inherits the ordinary panel inset while retaining the active
+  LetterGrid width rule.
+- Preserved the active board dimensions, three-column TV layout, timer, footer,
+  lobby, phone presentation, and the merged phone-runtime optimizations.
+- Added a stylesheet contract guard for the shared panel source, active board
+  width, 720p height constraint, phone panel inset, and unchanged display
+  presentation rules. The in-app browser was capped at 1280 × 720, so the
+  1920 × 1080 result is documented as CSS-derived pending physical TV review.
+
 ## 2026-07-31 — Phone runtime optimization (draft)
 
 - Isolated the visible countdown in a small leaf, replaced 250 ms polling with
