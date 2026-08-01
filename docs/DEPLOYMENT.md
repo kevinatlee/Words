@@ -80,16 +80,36 @@ CI runs `Container build and smoke` only after `Quality` and `Dependency audit`
 pass. Pull requests use read-only permissions and never authenticate to or
 publish to GHCR. A successful push to `main` builds and re-smokes the exact
 image before using the ephemeral GitHub token with `packages: write` to publish
-both:
+the production channel:
 
 ```text
-ghcr.io/kevinatlee/words:sha-<full-commit-sha>
+ghcr.io/kevinatlee/words:sha-<full-main-sha>
 ghcr.io/kevinatlee/words:latest
 ```
 
 `latest` is not published until the exact SHA image has passed its own smoke
 test. The Docker metadata records the source repository, commit revision, and
 MIT licence. No registry token belongs in a repository, image, or `.env` file.
+
+The separate test-candidate channel is manual only:
+
+```text
+ghcr.io/kevinatlee/words:test-sha-<full-target-sha>
+ghcr.io/kevinatlee/words:test
+```
+
+To publish a candidate, open Actions, select **Publish Test Image**, choose
+**Run workflow** from `main`, enter an exact repository branch, tag, or full
+commit SHA for `target_ref`, and enter `PUBLISH_TEST` exactly. The workflow
+resolves and prints one full SHA, validates that checked-out candidate, smokes
+the image carrying that SHA as OCI revision metadata, pushes the immutable tag
+before the mutable `test` tag, and confirms the two remote tags share one
+digest. The test workflow is never automatic and never changes `latest`.
+
+`test` may contain unmerged candidate code. Its immutable SHA tag is available
+for rollback. A new test image updates only Words-Test; it cannot affect the
+production Words container. Both containers have independent in-memory rooms
+and no shared storage, so active Words-Test rooms end when Words-Test updates.
 
 GitHub package visibility is an account-level choice. Public visibility is
 recommended for an uncomplicated private-server pull. If the package remains
@@ -128,6 +148,29 @@ http://<UNRAID-IP>:6532/api/health
 
 It must return `status: "ok"` and `gameDataReady: true`.
 
+## Words-Test installation
+
+Create a second Unraid container for test candidates with these exact fields:
+
+| Template field            | Value                                     |
+| ------------------------- | ----------------------------------------- |
+| Name                      | `Words-Test`                              |
+| Repository                | `ghcr.io/kevinatlee/words:test`           |
+| Network                   | `bridge`                                  |
+| Host port                 | `6533` / TCP                              |
+| Container port            | `6532` / TCP                              |
+| Protocol                  | TCP                                       |
+| Restart policy            | `unless-stopped`                          |
+| Volume mappings           | none                                      |
+| Immediate LAN environment | `PUBLIC_BASE_URL=http://10.10.10.10:6533` |
+
+For immediate LAN-only testing, use the listed HTTP `PUBLIC_BASE_URL` exactly
+and check `http://10.10.10.10:6533/api/health`, a display, phone joining, and a
+real round after each candidate update. For later public tunnel testing, change
+it to `PUBLIC_BASE_URL=https://test.words.atlee.io` and route the existing,
+separate CloudflareTunnel container to `http://10.10.10.10:6533`. cloudflared is
+not included in Words or Words-Test.
+
 ## Cloudflare Tunnel
 
 Configure one public hostname, `words.atlee.io`, with an HTTP service target of
@@ -163,7 +206,7 @@ For a normal update:
 4. Confirm `/api/health`, a TV display, a phone join, and a short round.
 
 The exact SHA tag is the rollback unit. To roll back, change Repository to a
-previously successful `ghcr.io/kevinatlee/words:sha-<full-commit-sha>` tag,
+previously successful `ghcr.io/kevinatlee/words:sha-<full-main-sha>` tag,
 pull it, recreate the container, and repeat the same health/display/join check.
 Because rooms are in memory, schedule updates between casual sessions.
 

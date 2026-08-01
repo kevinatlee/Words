@@ -10,7 +10,8 @@ const repositoryRoot = path.resolve(
 );
 const imageName = process.env.WORDS_SMOKE_IMAGE ?? 'words:stage-5a-smoke';
 const containerName = `words-smoke-${process.pid}-${Date.now()}`;
-const buildRevision = process.env.GITHUB_SHA ?? 'local-smoke';
+const buildRevision =
+  process.env.WORDS_SMOKE_REVISION ?? process.env.GITHUB_SHA ?? 'local-smoke';
 
 function run(command, arguments_, options = {}) {
   const result = spawnSync(command, arguments_, {
@@ -129,6 +130,11 @@ try {
   }
   if (!image.Config.ExposedPorts?.['6532/tcp'] || !image.Config.Healthcheck) {
     fail('runtime image is missing the expected port or health check.');
+  }
+  if (
+    image.Config.Labels?.['org.opencontainers.image.revision'] !== buildRevision
+  ) {
+    fail('runtime image revision metadata does not match the tested revision.');
   }
   console.log(
     `Container image: ${image.Architecture}, ${Math.round(image.Size / 1024 / 1024)} MiB, user ${image.Config.User}.`,
