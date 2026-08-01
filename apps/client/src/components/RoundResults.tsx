@@ -1,7 +1,6 @@
 import type { RoundResults as RoundResultsState } from '@words/shared';
 
 type RoundResultsProps = {
-  roundNumber: number;
   results: RoundResultsState;
   currentPlayerId?: string | null;
   isDisplay?: boolean;
@@ -14,11 +13,11 @@ function uniqueLimit(count: number): number {
   return 2;
 }
 
-export function RoundResults({ roundNumber, results }: RoundResultsProps) {
+export function RoundResults({ results }: RoundResultsProps) {
   const limit = uniqueLimit(results.players.length);
   return (
     <section className="display-results" aria-labelledby="round-results-title">
-      <h1 id="round-results-title">Round {roundNumber} Results</h1>
+      <h1 id="round-results-title">Round Results</h1>
       <ol
         className={`display-results__cards display-results__cards--${results.players.length}`}
       >

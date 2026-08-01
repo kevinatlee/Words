@@ -2217,7 +2217,7 @@ describe('Stage 4B display and player room routes', () => {
     );
 
     expect(
-      await screen.findByRole('heading', { name: 'Round 1 Results' }),
+      await screen.findByRole('heading', { name: 'Round Results' }),
     ).toBeVisible();
     expect(screen.getByRole('heading', { name: /Silver Owl/ })).toBeVisible();
     expect(screen.getByText('4 points')).toBeVisible();

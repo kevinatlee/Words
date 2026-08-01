@@ -86,7 +86,13 @@ describe('tile typography', () => {
     expect(styles).not.toContain('.display-active-puzzle');
     expect(styles).not.toContain('.display-round-timer');
     expect(styles).toMatch(
-      /\.display-highlights-timer\s*\{[^}]*display: flex;[^}]*align-items: baseline;[^}]*justify-content: center;[^}]*gap: 0\.35rem;[^}]*border-bottom: 1px solid var\(--line\);/s,
+      /\.display-highlights-timer\s*\{[^}]*display: flex;[^}]*width: 100%;[^}]*align-items: baseline;[^}]*justify-content: space-between;[^}]*gap: 0\.75rem;[^}]*margin-bottom: 0\.9rem;[^}]*padding-bottom: 0\.75rem;[^}]*border-bottom: 1px solid var\(--line\);/s,
+    );
+    expect(styles).toMatch(
+      /\.display-highlights-timer__label\s*\{[^}]*color: var\(--paper\);[^}]*font-size: 1rem;[^}]*font-weight: 800;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-highlights-timer__value\s*\{[^}]*min-width: 3ch;[^}]*color: var\(--mint-strong\);[^}]*font-size: clamp\(1\.75rem, 2\.5vw, 2\.25rem\);[^}]*font-variant-numeric: tabular-nums;[^}]*font-weight: 900;[^}]*line-height: 1;[^}]*text-align: right;/s,
     );
     expect(styles).toMatch(
       /\.display-player-list__name\s*\{[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/s,

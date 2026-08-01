@@ -588,7 +588,7 @@ describe('RoomLobby word entry', () => {
     });
 
     expect(
-      screen.getByRole('heading', { name: 'Round 1 Results' }),
+      screen.getByRole('heading', { name: 'Round Results' }),
     ).toBeVisible();
     expect(screen.getByRole('heading', { name: /Bright Fox/ })).toBeVisible();
     expect(screen.getByText('4 points')).toBeVisible();

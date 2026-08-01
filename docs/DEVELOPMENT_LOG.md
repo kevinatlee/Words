@@ -1,5 +1,14 @@
 # Development log
 
+## 2026-07-31 — Scoring highlights and TV summary refinement (draft)
+
+- Preserved the previous Last Round highlight through a zero-score
+  finalization, while successful scoring rounds continue to replace it and the
+  all-time Room Record rule remains unchanged.
+- Refined the active display Highlights timer into a full-width, readable
+  label/value row and standardized the finished-display heading as
+  `Round Results`.
+
 ## 2026-07-31 — TV results recap and timer placement (draft)
 
 - Split display result-card word statistics into compact semantic rows and

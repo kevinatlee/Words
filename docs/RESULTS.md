@@ -78,6 +78,9 @@ Each player result contains:
 The round result contains the deterministically ordered player results and
 `winnerPlayerIds`.
 
+The finished display presents this projection under the stable `Round Results`
+heading; round numbering remains result data rather than visible heading copy.
+
 The strict shared schemas reject missing or extra participants, changed names,
 duplicate IDs or words, incorrect sharing, score totals, ordering, ranks,
 winners, point values, phase/result combinations, and unknown fields.
@@ -99,6 +102,11 @@ winner in result order. An all-shared round can therefore produce a positive
 tie. Only when no participant submitted a scoring word are all final scores
 zero; then `winnerPlayerIds` is empty and the interface says “No scoring winner
 this round.”
+
+After a scoring round, Last Round records that round's winners and winning
+score. A zero-score round preserves the existing Last Round highlight; if none
+exists yet, it remains empty. The Room Record continues to change only when a
+positive final score exceeds its current record.
 
 ## Participant lifecycle
 

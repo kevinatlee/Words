@@ -1581,11 +1581,7 @@ export class RoomStore {
             winners,
             winningScore,
           }
-        : {
-            roundNumber: finalizedRound.number,
-            winners: [],
-            winningScore: null,
-          };
+        : room.highlights.lastRound;
     const existingRecord = room.highlights.roomRecord;
     const roomRecord =
       winningScore > 0 &&

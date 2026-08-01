@@ -2256,13 +2256,32 @@ describe('RoomStore authoritative settings and rounds', () => {
     expect(next.round?.id).toBe(createUuid(702));
   });
 
+  it('keeps both highlights null after a first-ever non-scoring round', () => {
+    let now = Date.parse('2026-07-29T20:00:00.000Z');
+    const { store, display, controllerSession } = createRoundRoom({
+      now: () => now,
+      reconcileWords: (participants) =>
+        reconcileWithFinalScores([0])(participants),
+    });
+
+    store.startRound(controllerSession, 'socket-controller');
+    now += 120_000;
+    expect(store.advanceDueRounds()).toEqual([display.room.code]);
+
+    const ended = store.getRoomState(display.room.code);
+    expect(ended?.phase).toBe('ROUND_ENDED');
+    expect(ended?.round?.results?.winnerPlayerIds).toEqual([]);
+    expect(ended?.highlights).toEqual({ lastRound: null, roomRecord: null });
+  });
+
   it('derives, preserves, and replaces authoritative highlights across rounds', () => {
     let now = Date.parse('2026-07-29T20:00:00.000Z');
     const scorePlans = [
       [4, 0],
-      [4, 4],
       [0, 0],
+      [4, 4],
       [8, 8],
+      [4, 0],
     ] as const;
     let finalizationIndex = 0;
     const { store, display, controllerSession } = createRoundRoom({
@@ -2325,6 +2344,7 @@ describe('RoomStore authoritative settings and rounds', () => {
     expect(freshFirst?.highlights.lastRound?.winners[0]?.displayName).toBe(
       'Silver Owl',
     );
+    const firstHighlights = freshFirst?.highlights;
 
     const lobbyAfterFirst = resetRound();
     expect(lobbyAfterFirst?.phase).toBe('LOBBY');
@@ -2336,27 +2356,25 @@ describe('RoomStore authoritative settings and rounds', () => {
       ],
       score: 4,
     });
+    expect(lobbyAfterFirst?.highlights.lastRound).toEqual(
+      firstHighlights?.lastRound,
+    );
 
     const second = finishRound();
     expect(second?.round?.number).toBe(2);
-    expect(second?.highlights.lastRound).toEqual({
-      roundNumber: 2,
+    expect(second?.highlights).toEqual(firstHighlights);
+
+    resetRound();
+    const third = finishRound();
+    expect(third?.highlights.lastRound).toEqual({
+      roundNumber: 3,
       winners: [
         { playerId: controllerSession.playerId, displayName: 'Silver Owl' },
         { playerId: ordinary.session.playerId, displayName: 'Amber Kite' },
       ],
       winningScore: 4,
     });
-    expect(second?.highlights.roomRecord?.roundNumber).toBe(1);
-
-    resetRound();
-    const third = finishRound();
-    expect(third?.highlights.lastRound).toEqual({
-      roundNumber: 3,
-      winners: [],
-      winningScore: null,
-    });
-    expect(third?.highlights.roomRecord?.score).toBe(4);
+    expect(third?.highlights.roomRecord).toEqual(firstHighlights?.roomRecord);
 
     resetRound();
     const fourth = finishRound();
@@ -2380,7 +2398,20 @@ describe('RoomStore authoritative settings and rounds', () => {
     expect(freshFourth?.highlights.roomRecord?.holders[0]?.displayName).toBe(
       'Silver Owl',
     );
-    const version = fourth?.stateVersion;
+    resetRound();
+    const fifth = finishRound();
+    expect(fifth?.round?.number).toBe(5);
+    expect(fifth?.highlights.lastRound).toEqual({
+      roundNumber: 5,
+      winners: [
+        { playerId: controllerSession.playerId, displayName: 'Silver Owl' },
+      ],
+      winningScore: 4,
+    });
+    expect(fifth?.highlights.roomRecord).toEqual(
+      freshFourth?.highlights.roomRecord,
+    );
+    const version = fifth?.stateVersion;
     expect(store.advanceDueRounds()).toEqual([]);
     expect(store.getRoomState(display.room.code)?.stateVersion).toBe(version);
   });

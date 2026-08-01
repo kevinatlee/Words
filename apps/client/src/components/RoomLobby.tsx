@@ -296,10 +296,7 @@ export function RoomLobby({
     return (
       <div className="room-page display-room-page">
         {roundIsEnded && room.round?.results ? (
-          <RoundResults
-            roundNumber={room.round.number}
-            results={room.round.results}
-          />
+          <RoundResults results={room.round.results} />
         ) : (
           <div className="display-room-layout">
             <aside
@@ -380,7 +377,7 @@ export function RoomLobby({
               <section>
                 <h3>Last Round</h3>
                 {lastRound === null ? (
-                  <p>No completed rounds yet</p>
+                  <p>No scoring rounds yet</p>
                 ) : lastRound.winners.length === 0 ? (
                   <p>No scoring winner</p>
                 ) : (
