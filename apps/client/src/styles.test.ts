@@ -45,7 +45,7 @@ describe('tile typography', () => {
 
   it('keeps the display presentation centered and within TV-height bounds', () => {
     expect(styles).toMatch(
-      /\.site-header--display\s*\{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/s,
+      /\.site-header--display\s*\{[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/s,
     );
     expect(styles).toMatch(
       /\.display-room-layout\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\) auto minmax\(0, 1fr\);/s,

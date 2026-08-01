@@ -55,18 +55,23 @@ export function DisplayJoinBoard({ joinUrl }: DisplayJoinBoardProps) {
           {letter}
         </span>
       ))}
-      <div className="display-join-board__qr" aria-label="Room joining QR code">
-        <QrBoundary key={joinUrl}>
-          <QRCodeSVG
-            value={joinUrl}
-            size={320}
-            level="M"
-            boostLevel={false}
-            marginSize={4}
-            aria-hidden="true"
-            focusable="false"
-          />
-        </QrBoundary>
+      <div
+        className="display-join-board__qr display-join-board__qr--rounded"
+        aria-label="Room joining QR code"
+      >
+        <div className="display-join-board__qr-surface">
+          <QrBoundary key={joinUrl}>
+            <QRCodeSVG
+              value={joinUrl}
+              size={320}
+              level="M"
+              boostLevel={false}
+              marginSize={4}
+              aria-hidden="true"
+              focusable="false"
+            />
+          </QrBoundary>
+        </div>
       </div>
     </section>
   );

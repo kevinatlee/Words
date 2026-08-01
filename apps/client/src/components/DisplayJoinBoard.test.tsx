@@ -49,7 +49,12 @@ describe('DisplayJoinBoard', () => {
   it('embeds one merged QR region for the authoritative join URL', () => {
     const { container } = render(<DisplayJoinBoard joinUrl={joinUrl} />);
 
-    expect(screen.getByLabelText('Room joining QR code')).toBeVisible();
+    const qrRegion = screen.getByLabelText('Room joining QR code');
+    expect(qrRegion).toBeVisible();
+    expect(qrRegion).toHaveClass('display-join-board__qr--rounded');
+    expect(
+      qrRegion.querySelector('.display-join-board__qr-surface'),
+    ).not.toBeNull();
     expect(container.querySelectorAll('.display-join-board__qr')).toHaveLength(
       1,
     );

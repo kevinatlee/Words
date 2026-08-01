@@ -1,5 +1,14 @@
 # Development log
 
+## 2026-07-31 — TV header and embedded QR physical refinement (draft)
+
+- Split the shared-display header into four equally spaced regions for the
+  Words logo, authoritative Game Host, settings summary, and connection state.
+- Rounded and clipped the merged lobby QR tile to match ordinary letter tiles
+  while preserving its white quiet zone and exact fallback text.
+- Kept phone header structure, active boards, server behavior, and lifecycle
+  state unchanged.
+
 ## 2026-07-31 — Phone information architecture refinement (draft)
 
 - Reduced phone visual density while preserving the authoritative lobby and

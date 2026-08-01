@@ -49,7 +49,7 @@ function createDisplayRoom(overrides: Partial<RoomState> = {}): RoomState {
 }
 
 describe('AppShell display header', () => {
-  it('keeps Word and Game Host left, settings centered, and status right', () => {
+  it('exposes four equal display header regions in display order', () => {
     const { container } = render(
       <AppShell
         displayRoom={createDisplayRoom()}
@@ -60,10 +60,16 @@ describe('AppShell display header', () => {
     );
 
     const header = container.querySelector('.site-header--display');
-    expect(header?.children).toHaveLength(3);
-    expect(header?.children[0]).toHaveClass('display-header__host');
-    expect(header?.children[1]).toHaveClass('display-header__settings');
-    expect(header?.children[2]).toHaveClass('connection-status--display');
+    expect(header?.children).toHaveLength(4);
+    expect(header?.children[0]).toHaveClass('display-header__logo');
+    expect(header?.children[1]).toHaveClass('display-header__host');
+    expect(header?.children[2]).toHaveClass('display-header__settings-region');
+    expect(header?.children[3]).toHaveClass('display-header__connection');
+    expect(
+      Array.from(header?.children ?? []).map((region) =>
+        region.getAttribute('data-display-header-region'),
+      ),
+    ).toEqual(['logo', 'host', 'settings', 'connection']);
     expect(screen.getByRole('link', { name: 'Words home' })).toBeVisible();
     expect(screen.getByLabelText('Game Host')).toBeVisible();
     expect(screen.getByText('Bright Fox')).toBeVisible();

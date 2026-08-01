@@ -33,10 +33,18 @@ export function AppShell({
       >
         {displayRoom ? (
           <>
-            <div className="display-header__host">
+            <div
+              className="display-header__region display-header__logo"
+              data-display-header-region="logo"
+            >
               <a className="site-header__home" href="/" aria-label="Words home">
                 <ProductTitle compact />
               </a>
+            </div>
+            <div
+              className="display-header__region display-header__host"
+              data-display-header-region="host"
+            >
               <span
                 className="display-header__host-name"
                 title={displayController?.displayName}
@@ -51,22 +59,32 @@ export function AppShell({
                 )}
               </span>
             </div>
-            <span className="display-header__settings">
-              {displaySettings &&
-                formatDisplaySettings(
-                  displaySettings.gridSize,
-                  displaySettings.roundDurationSeconds,
-                )}
-            </span>
-            <span
-              className={`connection-status connection-status--display connection-status--${displayConnectionStatus ?? 'disconnected'}`}
+            <div
+              className="display-header__region display-header__settings-region"
+              data-display-header-region="settings"
             >
-              {displayConnectionStatus === 'connected'
-                ? 'Connected'
-                : displayConnectionStatus === 'connecting'
-                  ? 'Reconnecting…'
-                  : 'Disconnected'}
-            </span>
+              <span className="display-header__settings">
+                {displaySettings &&
+                  formatDisplaySettings(
+                    displaySettings.gridSize,
+                    displaySettings.roundDurationSeconds,
+                  )}
+              </span>
+            </div>
+            <div
+              className="display-header__region display-header__connection"
+              data-display-header-region="connection"
+            >
+              <span
+                className={`connection-status connection-status--display connection-status--${displayConnectionStatus ?? 'disconnected'}`}
+              >
+                {displayConnectionStatus === 'connected'
+                  ? 'Connected'
+                  : displayConnectionStatus === 'connecting'
+                    ? 'Reconnecting…'
+                    : 'Disconnected'}
+              </span>
+            </div>
           </>
         ) : (
           <>

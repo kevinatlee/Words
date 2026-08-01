@@ -23,10 +23,10 @@ contract.
   player.
 - Zero to eight phone players can join through the room-specific
   `/join/:roomCode` link or enter a six-character code manually at `/join`.
-- In `LOBBY`, the shared display uses three equal header regions (Words and
-  Game Host, settings, and connection), Players and Room Highlights bubbles,
-  a centered demonstration board with its QR merged into the middle 3 × 3
-  region, and the exact join URL in the footer.
+- In `LOBBY`, the shared display uses four equal header regions (Words, Game
+  Host, settings, and connection), Players and Room Highlights bubbles, a
+  centered demonstration board with its rounded QR tile merged into the
+  middle 3 × 3 region, and the exact join URL in the footer.
 - The first player becomes the server-assigned controller; later players join
   without gaining controller authority.
 - The connected game host can explicitly transfer authority to another
