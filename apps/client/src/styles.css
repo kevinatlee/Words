@@ -735,8 +735,8 @@ button:disabled {
   overflow: hidden;
   place-items: center;
   border-radius: calc(clamp(0.5rem, 1.4vw, 1rem) - 0.18rem);
-  background: #fff;
-  color: #000;
+  background: var(--paper);
+  color: var(--ink-950);
 }
 .display-join-board__qr svg {
   display: block;
@@ -749,6 +749,22 @@ button:disabled {
   padding: 0.35rem 0.75rem;
   color: var(--paper-muted);
   text-align: center;
+}
+.display-room-footer__link {
+  border-radius: 0.35rem;
+  background: rgba(112, 231, 162, 0.08);
+  color: var(--mint-strong);
+  font-weight: 800;
+  text-decoration-color: var(--mint);
+  text-decoration-thickness: 0.12em;
+  text-underline-offset: 0.2em;
+}
+.display-room-footer__link:hover {
+  background: rgba(112, 231, 162, 0.16);
+}
+.display-room-footer__link:focus-visible {
+  outline: 0.18rem solid var(--sun);
+  outline-offset: 0.15rem;
 }
 
 .room-dashboard__lobby,
@@ -1122,14 +1138,6 @@ button:disabled {
   font-size: var(--letter-tile-font-size);
   font-weight: 900;
   line-height: 1;
-}
-
-.letter-tile:nth-child(5n + 2) {
-  background: #edf7e9;
-}
-
-.letter-grid > :nth-child(5n + 2) .letter-tile--button {
-  background: #edf7e9;
 }
 
 .letter-tile--selected {

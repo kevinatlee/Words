@@ -67,6 +67,8 @@ export function DisplayJoinBoard({ joinUrl }: DisplayJoinBoardProps) {
               level="M"
               boostLevel={false}
               marginSize={4}
+              bgColor="transparent"
+              fgColor="#000000"
               aria-hidden="true"
               focusable="false"
             />

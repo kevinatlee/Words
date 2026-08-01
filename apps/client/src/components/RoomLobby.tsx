@@ -363,7 +363,16 @@ export function RoomLobby({
             </aside>
           </div>
         )}
-        <footer className="display-room-footer">{joinUrl}</footer>
+        <footer className="display-room-footer">
+          <a
+            className="display-room-footer__link"
+            href={joinUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {joinUrl}
+          </a>
+        </footer>
       </div>
     );
   }

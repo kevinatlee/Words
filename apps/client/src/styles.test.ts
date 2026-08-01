@@ -18,6 +18,16 @@ describe('tile typography', () => {
     );
   });
 
+  it('keeps every unselected letter tile on the uniform paper background', () => {
+    expect(styles).toMatch(
+      /\.letter-tile\s*\{[^}]*background: var\(--paper\);/s,
+    );
+    expect(styles).not.toContain('.letter-tile:nth-child(5n + 2)');
+    expect(styles).not.toContain(
+      '.letter-grid > :nth-child(5n + 2) .letter-tile--button',
+    );
+  });
+
   it('keeps phone timer labels as prominent as the countdown value', () => {
     expect(styles).toMatch(
       /\.room-page--phone \.round-clock--phone small\s*\{[^}]*font-size: clamp\(1\.2rem, 3vw, 1\.8rem\);[^}]*font-weight: 900;/s,
@@ -64,6 +74,28 @@ describe('tile typography', () => {
     );
     expect(styles).toMatch(
       /\.result-player-card\s*\{[^}]*border-radius: var\(--radius-md\);[^}]*color: var\(--ink-950\);/s,
+    );
+  });
+
+  it('keeps the embedded TV QR on the letter-tile background', () => {
+    const qrSurfaceRule = styles.match(
+      /\.display-join-board__qr-surface\s*\{[^}]*\}/s,
+    )?.[0];
+
+    expect(qrSurfaceRule).toContain('background: var(--paper);');
+    expect(qrSurfaceRule).not.toMatch(/#fff|#ffffff/i);
+  });
+
+  it('keeps the display footer URL compact, green, and keyboard-visible', () => {
+    const footerLinkRule = styles.match(
+      /\.display-room-footer__link\s*\{[^}]*\}/s,
+    )?.[0];
+
+    expect(footerLinkRule).toContain('color: var(--mint-strong);');
+    expect(footerLinkRule).toContain('font-weight: 800;');
+    expect(footerLinkRule).toContain('text-decoration-color: var(--mint);');
+    expect(styles).toMatch(
+      /\.display-room-footer__link:focus-visible\s*\{[^}]*outline: 0\.18rem solid var\(--sun\);/s,
     );
   });
 });

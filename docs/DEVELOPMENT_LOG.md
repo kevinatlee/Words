@@ -1,5 +1,14 @@
 # Development log
 
+## 2026-07-31 — TV tile and join styling correction (draft)
+
+- Removed the positional green tint so ordinary, official, and demonstration
+  letter tiles share one unselected paper tone.
+- Restored the display footer join URL as a compact green external link with
+  safe wrapping and keyboard focus treatment.
+- Matched the embedded QR backing to the letter-tile tone while retaining its
+  dark modules, four-module quiet zone, rounded clipping, and fallback.
+
 ## 2026-07-31 — TV header and embedded QR physical refinement (draft)
 
 - Split the shared-display header into four equally spaced regions for the

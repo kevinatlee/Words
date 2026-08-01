@@ -60,7 +60,13 @@ describe('DisplayJoinBoard', () => {
     );
     expect(screen.getByTestId('generated-qr')).toBeVisible();
     expect(qrCodeSvgMock).toHaveBeenCalledWith(
-      expect.objectContaining({ value: joinUrl, size: 320 }),
+      expect.objectContaining({
+        value: joinUrl,
+        size: 320,
+        bgColor: 'transparent',
+        fgColor: '#000000',
+        marginSize: 4,
+      }),
     );
   });
 

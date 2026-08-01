@@ -93,8 +93,10 @@ gzip) to 23.45 kB (5.41 kB gzip), an approximate delta of 0.72 kB minified and
   inversion, or decorative module styling.
 
 The SVG has a scalable `viewBox`, stays square through CSS, and is hidden from
-the accessibility tree. It sits in one merged white 3 × 3 center region of a
-noninteractive 5 × 5 demonstration board; the five top tiles spell `WORDS`.
+the accessibility tree. The embedded display QR sits in one merged
+letter-tile-tone 3 × 3 center region of a noninteractive 5 × 5 demonstration
+board; the five top tiles spell `WORDS`. Its four-module quiet zone remains
+inside the rounded clipped tile surface.
 The exact URL appears in the display footer. No live region or automatic focus
 movement is used.
 

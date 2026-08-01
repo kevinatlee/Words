@@ -514,7 +514,16 @@ describe('RoomLobby word entry', () => {
     ).toBeVisible();
     expect(screen.getByRole('heading', { name: /Bright Fox/ })).toBeVisible();
     expect(screen.getByText('4 points')).toBeVisible();
-    expect(screen.getByText('http://localhost:3000/join/ABC234')).toBeVisible();
+    const joinLink = screen.getByRole('link', {
+      name: 'http://localhost:3000/join/ABC234',
+    });
+    expect(joinLink).toBeVisible();
+    expect(joinLink).toHaveAttribute(
+      'href',
+      'http://localhost:3000/join/ABC234',
+    );
+    expect(joinLink).toHaveAttribute('target', '_blank');
+    expect(joinLink).toHaveAttribute('rel', 'noreferrer');
     expect(screen.queryByRole('region', { name: 'Puzzle' })).toBeNull();
     expect(screen.queryByRole('complementary', { name: 'Players' })).toBeNull();
     expect(
@@ -527,6 +536,28 @@ describe('RoomLobby word entry', () => {
       screen.queryByRole('region', { name: 'Game host controls' }),
     ).toBeNull();
     expect(screen.queryByRole('table')).toBeNull();
+  });
+
+  it('keeps the authoritative join link in lobby and active display phases', () => {
+    const joinUrl = 'http://localhost:3000/join/ABC234';
+
+    for (const room of [
+      createRoom({ phase: 'LOBBY', round: null }),
+      createRoom({ phase: 'ROUND_ACTIVE' }),
+    ]) {
+      const view = renderLobby(undefined, {
+        room,
+        sessionRole: 'display',
+        currentPlayerId: null,
+      });
+      const joinLink = screen.getByRole('link', { name: joinUrl });
+
+      expect(joinLink).toBeVisible();
+      expect(joinLink).toHaveAttribute('href', joinUrl);
+      expect(joinLink).toHaveAttribute('target', '_blank');
+      expect(joinLink).toHaveAttribute('rel', 'noreferrer');
+      view.unmount();
+    }
   });
 
   it('uses Tap backtracking without leaving disconnected paths', async () => {
