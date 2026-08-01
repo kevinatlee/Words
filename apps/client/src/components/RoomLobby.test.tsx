@@ -307,18 +307,48 @@ describe('RoomLobby word entry', () => {
     ).toBeVisible();
   });
 
-  it('keeps display timer wording separate from prominent phone timer labels', () => {
+  it('keeps the phone timer markup and prominent label unchanged', () => {
     const phone = renderLobby();
     expect(screen.getByText('Timer').closest('.round-clock')).toHaveClass(
       'round-clock--phone',
     );
+    expect(screen.getByRole('timer')).toHaveClass('round-clock');
     phone.unmount();
+  });
 
-    renderLobby(undefined, { sessionRole: 'display', currentPlayerId: null });
-    expect(screen.getByText('Time Remaining')).toBeVisible();
-    expect(
-      screen.getByText('Time Remaining').closest('.round-clock'),
-    ).not.toHaveClass('round-clock--phone');
+  it('renders the active display Timer above the official board from the authoritative deadline', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime('2026-07-31T00:00:00.000Z');
+    let monotonicTime = 100;
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
+    const room = createRoom();
+
+    renderLobby(undefined, {
+      room,
+      sessionRole: 'display',
+      currentPlayerId: null,
+    });
+
+    const timer = screen.getByRole('timer');
+    expect(timer).toHaveClass('display-round-timer');
+    expect(timer).not.toHaveClass('round-clock');
+    expect(timer).toHaveAttribute('aria-live', 'off');
+    expect(within(timer).getByText('Timer')).toHaveClass(
+      'display-round-timer__label',
+    );
+    expect(within(timer).getByText('60')).toHaveClass(
+      'display-round-timer__value',
+    );
+    expect(timer).toHaveAccessibleName('60 seconds remaining');
+    expect(screen.queryByText('Time Remaining')).toBeNull();
+    expect(timer).not.toHaveTextContent('seconds');
+    expect(timer.parentElement).toHaveClass('display-active-puzzle');
+
+    act(() => {
+      monotonicTime += 1_000;
+      vi.advanceTimersByTime(1_000);
+    });
+    expect(within(timer).getByText('59')).toBeVisible();
   });
 
   it('removes obsolete controls and keeps Submit available', () => {

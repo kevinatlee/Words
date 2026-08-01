@@ -1,5 +1,12 @@
 # Development log
 
+## 2026-07-31 — TV round timer simplification (draft)
+
+- Restored the active display board to the normal display-panel width and
+  placed its compact, authoritative Timer above the board without a timer
+  bubble.
+- Preserved the shared LetterGrid, lobby QR board, and all phone timer markup.
+
 ## 2026-07-31 — Accepted-word tile feedback (draft)
 
 - Added short, client-only accepted tile feedback after the server confirms a

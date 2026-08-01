@@ -344,11 +344,16 @@ export function RoomLobby({
               aria-label="Puzzle"
             >
               {roundIsActive && room.round ? (
-                <>
-                  <div className="round-clock" role="timer" aria-live="off">
-                    <small>Time Remaining</small>
-                    <strong>
-                      {Math.ceil((countdownMs ?? 0) / 1_000)} seconds
+                <div className="display-active-puzzle">
+                  <div
+                    className="display-round-timer"
+                    role="timer"
+                    aria-live="off"
+                    aria-label={`${Math.ceil((countdownMs ?? 0) / 1_000)} seconds remaining`}
+                  >
+                    <span className="display-round-timer__label">Timer</span>
+                    <strong className="display-round-timer__value">
+                      {Math.ceil((countdownMs ?? 0) / 1_000)}
                     </strong>
                   </div>
                   <LetterGrid
@@ -362,7 +367,7 @@ export function RoomLobby({
                     entryMode="touch"
                     traceResetKey={room.round.id}
                   />
-                </>
+                </div>
               ) : (
                 <DisplayJoinBoard joinUrl={joinUrl} />
               )}

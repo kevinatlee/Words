@@ -61,7 +61,7 @@ contract.
 - Final results show deterministic competition ranks, every tied positive
   winner, or no winner when no participant submitted a scoring word.
 - In `ROUND_ACTIVE`, the display keeps its Players and Room Highlights bubbles
-  beside the complete official board and Time Remaining; it has no QR or
+  beside the complete official board and compact Timer; it has no QR or
   submission totals. In `ROUND_ENDED`, it shows only redesigned result cards
   and the footer. Phones keep their completed board, Round Complete, Tap/Trace,
   and connection state without administration or detailed results.

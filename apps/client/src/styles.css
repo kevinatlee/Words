@@ -626,8 +626,36 @@ button:disabled {
   width: min(55vw, 44rem, calc(100dvh - 8.75rem));
   place-items: center;
 }
-.display-puzzle-panel--active {
-  width: min(55vw, 44rem, calc(100dvh - 14.5rem));
+.panel.display-puzzle-panel--active {
+  padding: 0.35rem clamp(1.1rem, 2.5vw, 1.75rem) 0.5rem;
+}
+.display-active-puzzle {
+  display: grid;
+  width: 100%;
+  justify-items: center;
+  gap: 0.25rem;
+}
+.display-active-puzzle .letter-grid {
+  width: 100%;
+}
+.display-round-timer {
+  display: grid;
+  justify-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--paper);
+  line-height: 1;
+}
+.display-round-timer__label {
+  color: var(--paper-muted);
+  font-size: clamp(0.72rem, 1vw, 0.875rem);
+  font-weight: 800;
+}
+.display-round-timer__value {
+  font-size: clamp(1.35rem, 2vw, 1.6rem);
 }
 .display-player-list {
   display: grid;

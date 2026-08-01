@@ -76,8 +76,18 @@ describe('tile typography', () => {
     expect(styles).toMatch(
       /\.display-room-page\s*\{[^}]*min-height: calc\(100dvh - 4\.75rem\);/s,
     );
+    expect(styles).not.toContain('100dvh - 14.5rem');
     expect(styles).toMatch(
-      /\.display-puzzle-panel--active\s*\{[^}]*100dvh - 14\.5rem/s,
+      /\.panel\.display-puzzle-panel--active\s*\{[^}]*padding:\s*0\.35rem clamp\(1\.1rem, 2\.5vw, 1\.75rem\) 0\.5rem;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-active-puzzle\s*\{[^}]*width: 100%;[^}]*justify-items: center;[^}]*gap: 0\.25rem;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-active-puzzle \.letter-grid\s*\{[^}]*width: 100%;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-round-timer\s*\{[^}]*margin: 0;[^}]*padding: 0;[^}]*border: 0;[^}]*border-radius: 0;[^}]*background: transparent;/s,
     );
     expect(styles).toMatch(
       /\.display-player-list__name\s*\{[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/s,
