@@ -77,11 +77,20 @@ describe('tile typography', () => {
       /\.display-room-page\s*\{[^}]*min-height: calc\(100dvh - 4\.75rem\);/s,
     );
     expect(styles).not.toContain('100dvh - 14.5rem');
+    expect(styles).not.toMatch(
+      /\.panel\.display-puzzle-panel--active\s*\{[^}]*padding:/s,
+    );
     expect(styles).toMatch(
-      /\.panel\.display-puzzle-panel--active\s*\{[^}]*padding:\s*0\.35rem clamp\(1\.1rem, 2\.5vw, 1\.75rem\) 0\.5rem;/s,
+      /\.panel\s*\{[^}]*padding: clamp\(1\.1rem, 2\.5vw, 1\.75rem\);/s,
     );
     expect(styles).toMatch(
       /\.display-puzzle-panel--active > \.letter-grid\s*\{[^}]*width: 100%;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-puzzle-panel\s*\{[^}]*width: min\(55vw, 44rem, calc\(100dvh - 8\.75rem\)\);/s,
+    );
+    expect(styles).toMatch(
+      /\.room-dashboard--phone \.board-panel\s*\{[^}]*padding: 0\.75rem;/s,
     );
     expect(styles).not.toContain('.display-active-puzzle');
     expect(styles).not.toContain('.display-round-timer');
