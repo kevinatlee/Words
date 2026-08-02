@@ -47,6 +47,9 @@ jobs:
       - name: Verify production game data
         run: npm run data:verify
 
+      - name: Check public documentation privacy
+        run: npm run privacy:check
+
       - name: Check formatting
         run: npm run format:check
 

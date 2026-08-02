@@ -1,8 +1,7 @@
 # QR joining
 
-Stage 4D is complete and merged on the trusted
-`c8bbc33f2b150c9c04c047b0bb2f64091cecb0b2` main baseline. Stage 4E is
-complete and merged. It adds a display-only QR presentation without changing the
+Stages 4D and 4E are complete and merged. The display-only QR presentation does
+not change the
 server, room contract, gameplay lifecycle, scoring, or ordinary player join
 flow.
 
@@ -36,8 +35,8 @@ The shared helper normalizes the public room code, replaces any stale path with
 userinfo. It preserves the browser's scheme, host, and optional port. Examples:
 
 ```text
-https://words.atlee.io/join/ABC234
-http://192.168.1.42:5173/join/ABC234
+<public origin>
+<public origin>
 ```
 
 The QR contains no display or player session ID, reconnect token, controller
@@ -57,7 +56,7 @@ remote code, or `eval`. Its published licence notice is preserved verbatim in
 
 The package was selected because it:
 
-- renders SVG directly from React;
+- renders QR canvases directly from React;
 - supports React 19 and TypeScript;
 - exposes explicit error-correction, margin, foreground, and background
   options;
@@ -82,18 +81,18 @@ gzip) to 23.45 kB (5.41 kB gzip), an approximate delta of 0.72 kB minified and
 
 ## Rendering policy
 
-`JoinQrCode` renders `QRCodeSVG` with:
+`JoinQrCode` renders `QRCodeCanvas` with:
 
 - black `#000000` modules;
 - a permanently white `#FFFFFF` background;
 - error-correction level M with automatic level boosting disabled;
 - an embedded four-module quiet zone;
-- ordinary square modules and crisp SVG paths;
+- ordinary square modules in one opaque canvas bitmap;
 - no logo, image, overlay, gradient, transparency, animation, rotation,
   inversion, or decorative module styling.
 
-The SVG has a scalable `viewBox`, stays square through CSS, and is hidden from
-the accessibility tree. The embedded display QR sits in one merged
+The canvas stays square through CSS and is hidden from the accessibility tree.
+The embedded display QR sits in one merged
 letter-tile-tone 3 × 3 center region of a noninteractive 5 × 5 demonstration
 board; the five top tiles spell `WORDS`. Its four-module quiet zone remains
 inside the rounded clipped tile surface.
@@ -155,40 +154,21 @@ display or player.
 Automated coverage verifies:
 
 - the exact payload and renderer options;
-- lobby, active-round, and ended-round presentations;
+- merged lobby presentation and active/ended absence;
 - display-only role enforcement and route exclusions;
 - accessible text and visual-tree hiding;
 - deterministic rerendering and renderer-failure containment;
 - current-origin behavior, normalization, stale path replacement, query,
   fragment, and userinfo removal;
-- production, local, LAN IPv4, and hostname fixtures;
+- browser-origin and route-normalization fixtures;
 - unchanged active-round waiting and next-round behavior.
 
-Manual verification uses a LAN-reachable Vite origin rather than `localhost`,
-because `localhost` on a phone refers to that phone. The original review record
-distinguished automated barcode decoding from a real native-camera scan and did
-not claim a production deployment. Physical review later accepted the remaining
-display limitations.
+Browser validation verifies the exact credential-free canvas payload, lobby
+placement, active/ended absence, manual room-code fallback, reconnect behavior,
+and phone-route exclusion. Native-camera scan reliability still depends on the
+physical display and device; automated tests do not claim a physical scan.
 
-The implemented browser run used a private LAN-reachable Vite origin. It
-verified the exact credential-free payload, all three phase presentations,
-ordinary first-player controller assignment, a second player, a mid-round
-third player who waited and remained outside the completed result, that
-player's inclusion in the next round, manual lowercase room-code entry,
-expired-room rejection, display reconnect, controller transfer, and
-phone-route QR exclusion. The 1280 × 720 shared display had no horizontal
-overflow; its prominent QR was square at 281.59 CSS pixels and its compact QR
-was square at 153.59 CSS pixels. Browser consoles were clean, and the page
-asset inventory showed the QR as a local inline SVG with no external image or
-QR service request.
-
-At the time of this implementation record, a physical native-iPhone Camera
-scan, a physical scan of the compact active-round presentation, true 1920 ×
-1080 and 3840 × 2160 display runs, and a genuine browser 200% zoom run were
-not available. Subsequent product review accepted the documented display
-limitations before Stage 4E merged. No production deployment was tested.
-
-## Known limitations and Stage 4F boundary
+## Known limitations and Stage 4H boundary
 
 - QR visibility depends on physical display size, viewing distance, glare,
   focus, and the scanning device.
@@ -198,5 +178,5 @@ limitations before Stage 4E merged. No production deployment was tested.
 - Rooms remain temporary and are lost on a server restart.
 - There is no result history or cumulative score by deliberate product design.
 
-Stage 4F Touch and Trace entry is complete. QR behavior remains display-only
-and does not add cumulative scoring, persistence, or release packaging.
+Stage 4H leaves QR behavior unchanged. It remains display-only and does not add
+cumulative scoring, persistence, or another game phase.

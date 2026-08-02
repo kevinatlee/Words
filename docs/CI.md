@@ -39,15 +39,17 @@ The `Quality` job runs on `ubuntu-latest`, has a 20-minute timeout, and sets
 4. runs `npm ci`;
 5. verifies the committed production dictionary, notice, manifest, generated
    distribution data, and client-exclusion boundary without network access;
-6. checks formatting;
-7. runs ESLint;
-8. type-checks every workspace;
-9. runs every test;
-10. builds the client and verifies server, engine, and game-data boundaries;
-11. repeats offline verification against the emitted client bundle, checking
+6. checks public documentation and examples for privacy-sensitive deployment
+   details;
+7. checks formatting;
+8. runs ESLint;
+9. type-checks every workspace;
+10. runs every test;
+11. builds the client and verifies server, engine, and game-data boundaries;
+12. repeats offline verification against the emitted client bundle, checking
     the package identifier, dictionary checksum, representative sentinels, and
     absence of symbolic links;
-12. verifies that the commands left no tracked changes or untracked,
+13. verifies that the commands left no tracked changes or untracked,
     non-ignored files.
 
 Each verification command has its own step so a failure is visible without
@@ -78,16 +80,16 @@ it read-only.
 
 The smoke then proves health readiness, supported deep links, immutable hashed
 assets, an existing-path Socket.IO display/player exchange, and graceful
-SIGTERM. It is an image/runtime test, not browser gameplay or a Cloudflare
-Tunnel test.
+SIGTERM. It is an image/runtime test, not browser gameplay or a private
+reverse-proxy/tunnel test.
 
 ## Main-only GHCR publishing
 
 `Publish GHCR image` runs only for a successful push to `main`, after all three
 verification jobs. It re-builds and re-smokes the exact image tagged
-`ghcr.io/kevinatlee/words:sha-<full-main-sha>` before authenticating with the
+`<registry image>:sha-<full-main-sha>` before authenticating with the
 ephemeral GitHub token. Only then does it publish that exact SHA tag and
-`ghcr.io/kevinatlee/words:latest`.
+`<registry image>:latest`.
 
 Pull-request runs never authenticate to GHCR and never publish an image. The
 workflow does not use `latest` before the exact SHA image has passed its smoke
@@ -106,15 +108,15 @@ exactly as `confirmation`.
 The workflow rejects any other confirmation before checkout or dependency
 installation. It checks out only the current repository’s requested ref without
 persisted credentials, resolves `git rev-parse HEAD` to one validated
-40-character SHA, and runs the full candidate quality, audit, build, client
+40-character SHA, and runs the full candidate privacy, quality, audit, build, client
 data-boundary, clean-tree, and container smoke sequence against that checkout.
 New manual requests cancel an older unfinished request in the dedicated
 `words-test-publish` concurrency group, preventing a stale run from overwriting
 the mutable candidate tag.
 
 Only the exact image that passed smoke is published, first as
-`ghcr.io/kevinatlee/words:test-sha-<full-target-sha>` and then as
-`ghcr.io/kevinatlee/words:test`. The workflow verifies both remote tags resolve
+`<registry image>:test-sha-<full-target-sha>` and then as
+`<registry image>:test`. The workflow verifies both remote tags resolve
 to the same digest, logs out of GHCR, and removes local image tags. Its OCI
 revision label uses the resolved candidate SHA, not the dispatch event SHA.
 It never tags or pushes `latest`; production publication remains the normal
@@ -193,7 +195,7 @@ gh workflow run publish-test.yml --ref main \
 ```
 
 Wait for the run and verify the reported target SHA and the matching remote
-`test` and `test-sha-<full-target-sha>` digests before updating Words-Test.
+`test` and `test-sha-<full-target-sha>` digests before updating the test deployment.
 
 For a pull request:
 
@@ -231,9 +233,9 @@ that GitHub has never observed.
   diagnose image changes.
 - This workflow does not run the long-lived development servers, perform
   browser end-to-end gameplay testing, configure package visibility, deploy to
-  a private host, configure Cloudflare Tunnel, or change repository settings.
+  a private host, configure a reverse proxy or tunnel, or change repository settings.
 - Stage 4A data verification does not rebuild ESDB in CI. The pinned source
   reproduction command remains an explicit reviewed maintenance operation.
 - Browser end-to-end gameplay, physical QR scanning, and production deployment
   remain outside hosted CI. Component tests and the production build cover the
-  local SVG renderer.
+  local canvas renderer.

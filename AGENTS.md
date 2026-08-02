@@ -60,7 +60,7 @@ and explain important choices in plain language.
   checksum, and licence notice. Keep dictionary validity separate from future
   sensitive-word presentation policy.
 - Preserve port `6532` as the default production port.
-- Preserve `https://words.atlee.io` as the intended public URL.
+- Preserve the configured public origin as the intended deployment URL.
 - Keep the product name and other shared values centralized where practical.
 - Do not add persistence unless a documented requirement justifies it.
 - Do not add production dependencies unless they solve a documented
@@ -70,7 +70,7 @@ and explain important choices in plain language.
 - Do not name commercial products in public-facing documentation or metadata.
 - Add a regression test for every game-engine bug fix.
 - Update documentation whenever architecture or behavior changes.
-- Never commit passwords, API tokens, Cloudflare credentials, private keys,
+- Never commit passwords, API tokens, tunnel credentials, private keys,
   personal addresses, or any other secrets.
 
 ## Required verification

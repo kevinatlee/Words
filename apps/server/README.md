@@ -25,16 +25,21 @@ official board, snapshots connected participants, owns the exact deadline, and
 ends the round through one bounded lifecycle sweep. Reconnect and controller
 transfer do not change the current board or deadline.
 
+During an active round, accepted submissions advance one count-only public
+progress entry and one room version. Word identities and provisional scores
+remain in the submitting player's private acknowledgement and server state.
+
 Run both the server and Vite client from the repository root with `npm run dev`.
-The server listens on `http://localhost:6532` by default.
+The server listens on port `6532` by default.
 Client hot reload remains enabled. The server deliberately does not restart
 automatically because doing so would discard its temporary rooms; stop and
 restart `npm run dev` after changing server source. Server crashes remain
 visible and terminate the combined command.
 
 Current participants may submit one bounded path through the official board,
-private production dictionary, and traditional scorer. Personal accepted words
-and provisional points are reconnect-safe and never broadcast while active. At
+private production dictionary, and traditional scorer. Personal accepted word
+identities and provisional points are reconnect-safe and never broadcast while
+active; only authoritative accepted counts are public. At
 the exact deadline, the room store atomically reconciles the immutable
 participant snapshot, retains every accepted word's base points, awards an
 fixed +1 or +2 bonus only to unique words, ranks final scores, and publishes the

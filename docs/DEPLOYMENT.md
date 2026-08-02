@@ -27,8 +27,8 @@ npm run build:production
 npm run start:production
 ```
 
-The direct process binds `0.0.0.0` and uses `PORT=6532` by default. It verifies
-the 79,370-word dictionary before listening. `GET /api/health` returns
+The direct process binds on all container interfaces and uses `PORT=6532` by
+default. It verifies the 79,370-word dictionary before listening. `GET /api/health` returns
 `gameDataReady: true` only after that startup succeeds. `SIGTERM` and `SIGINT`
 stop Socket.IO, the HTTP server, and the bounded lifecycle timer cleanly.
 
@@ -69,7 +69,7 @@ its existing `/socket.io` path.
 Development remains unchanged: `npm run dev` uses Vite on port `5173` and its
 development proxy for `/api` and `/socket.io`.
 
-## Image and GHCR publishing
+## Image publishing
 
 The multi-stage `Dockerfile` uses official Node 24 images. Its final image has
 only `/app/dist/production`, runs as the built-in non-root `node` user, exposes
@@ -78,13 +78,13 @@ no writable game-data volume and no runtime package installation.
 
 CI runs `Container build and smoke` only after `Quality` and `Dependency audit`
 pass. Pull requests use read-only permissions and never authenticate to or
-publish to GHCR. A successful push to `main` builds and re-smokes the exact
+publish to the registry. A successful push to `main` builds and re-smokes the exact
 image before using the ephemeral GitHub token with `packages: write` to publish
 the production channel:
 
 ```text
-ghcr.io/kevinatlee/words:sha-<full-main-sha>
-ghcr.io/kevinatlee/words:latest
+<registry image>:sha-<full-main-sha>
+<registry image>:latest
 ```
 
 `latest` is not published until the exact SHA image has passed its own smoke
@@ -94,8 +94,8 @@ MIT licence. No registry token belongs in a repository, image, or `.env` file.
 The separate test-candidate channel is manual only:
 
 ```text
-ghcr.io/kevinatlee/words:test-sha-<full-target-sha>
-ghcr.io/kevinatlee/words:test
+<registry image>:test-sha-<full-target-sha>
+<registry image>:test
 ```
 
 To publish a candidate, open Actions, select **Publish Test Image**, choose
@@ -107,9 +107,9 @@ before the mutable `test` tag, and confirms the two remote tags share one
 digest. The test workflow is never automatic and never changes `latest`.
 
 `test` may contain unmerged candidate code. Its immutable SHA tag is available
-for rollback. A new test image updates only Words-Test; it cannot affect the
-production Words container. Both containers have independent in-memory rooms
-and no shared storage, so active Words-Test rooms end when Words-Test updates.
+for rollback. A new test image updates only the test container; it cannot affect
+the production container. Both containers have independent in-memory rooms and
+no shared storage, so active test rooms end when the test container updates.
 
 GitHub package visibility is an account-level choice. Public visibility is
 recommended for an uncomplicated private-server pull. If the package remains
@@ -117,21 +117,21 @@ private, configure the host with a least-privilege package-read credential by
 following GitHub’s current package guidance; do not place that credential in
 this repository, an image label, a compose file, or a screenshot.
 
-## Unraid installation
+## Production container installation
 
-After a reviewed image has been published, create an Unraid Docker template
-with these exact fields:
+After a reviewed image has been published, create a container definition with
+these fields:
 
-| Template field       | Value                                    |
-| -------------------- | ---------------------------------------- |
-| Name                 | `Words`                                  |
-| Repository           | `ghcr.io/kevinatlee/words:latest`        |
-| Network type         | `bridge` (normal bridge mode)            |
-| Container port       | `6532` / TCP                             |
-| Host port            | `6532` / TCP                             |
-| WebUI                | `http://[IP]:[PORT:6532]/`               |
-| Required environment | `PUBLIC_BASE_URL=https://words.atlee.io` |
-| Restart policy       | `unless-stopped`                         |
+| Template field       | Value                             |
+| -------------------- | --------------------------------- |
+| Name                 | the production container          |
+| Repository           | `<registry image>:latest`         |
+| Network type         | `bridge` (normal bridge mode)     |
+| Container port       | `6532` / TCP                      |
+| Host port            | `6532` / TCP                      |
+| WebUI                | `<public origin>`                 |
+| Required environment | `PUBLIC_BASE_URL=<public origin>` |
+| Restart policy       | `unless-stopped`                  |
 
 No host path, appdata volume, privileged mode, extra capability, GPU, database,
 or Redis configuration is required. Keep the container port as `6532`; choose a
@@ -140,73 +140,54 @@ tunnel target match that host port. Optional bounded runtime settings are
 documented in `.env.example`; `PORT` normally remains `6532` inside the
 container.
 
-Before exposing the service, open the Unraid WebUI link on the LAN and verify:
+Before exposing the service, request `/api/health` through the server's LAN
+address. It must return `status: "ok"` and `gameDataReady: true`.
 
-```text
-http://<UNRAID-IP>:6532/api/health
-```
+## Test container installation
 
-It must return `status: "ok"` and `gameDataReady: true`.
+Create a separate container for test candidates with these fields:
 
-## Words-Test installation
+| Template field            | Value                             |
+| ------------------------- | --------------------------------- |
+| Name                      | the test container                |
+| Repository                | `<registry image>:test`           |
+| Network                   | `bridge`                          |
+| Host port                 | `6533` / TCP                      |
+| Container port            | `6532` / TCP                      |
+| Protocol                  | TCP                               |
+| Restart policy            | `unless-stopped`                  |
+| Volume mappings           | none                              |
+| Immediate LAN environment | `PUBLIC_BASE_URL=<public origin>` |
 
-Create a second Unraid container for test candidates with these exact fields:
+For immediate LAN-only testing, set `PUBLIC_BASE_URL` to the server's LAN
+origin and check `/api/health`, a display, phone joining, and a real round after
+each candidate update. For public testing, set it to `<public origin>` and route
+the separate reverse proxy or tunnel to the test container. The proxy or tunnel
+is not included in either Words image.
 
-| Template field            | Value                                     |
-| ------------------------- | ----------------------------------------- |
-| Name                      | `Words-Test`                              |
-| Repository                | `ghcr.io/kevinatlee/words:test`           |
-| Network                   | `bridge`                                  |
-| Host port                 | `6533` / TCP                              |
-| Container port            | `6532` / TCP                              |
-| Protocol                  | TCP                                       |
-| Restart policy            | `unless-stopped`                          |
-| Volume mappings           | none                                      |
-| Immediate LAN environment | `PUBLIC_BASE_URL=http://10.10.10.10:6533` |
+## Reverse proxy or tunnel
 
-For immediate LAN-only testing, use the listed HTTP `PUBLIC_BASE_URL` exactly
-and check `http://10.10.10.10:6533/api/health`, a display, phone joining, and a
-real round after each candidate update. For later public tunnel testing, change
-it to `PUBLIC_BASE_URL=https://test.words.atlee.io` and route the existing,
-separate CloudflareTunnel container to `http://10.10.10.10:6533`. cloudflared is
-not included in Words or Words-Test.
-
-## Cloudflare Tunnel
-
-Configure one public hostname, `words.atlee.io`, with an HTTP service target of
-either:
-
-```text
-http://<UNRAID-IP>:6532
-```
-
-or, when the tunnel connector reaches the same Docker network by name:
-
-```text
-http://Words:6532
-```
-
-Use the public hostname `https://words.atlee.io` and set
-`PUBLIC_BASE_URL=https://words.atlee.io` exactly. Cloudflare terminates public
-TLS and forwards normal HTTP and WebSocket traffic through the same tunnel to
-the one Words origin. Do not expose a public router port merely for Words; use
-the direct LAN URL only for local checks. After adding the route, verify the
-public health URL, a TV display, a phone join flow, and Socket.IO reconnecting
-through the public hostname.
+Configure the public hostname to forward HTTP and WebSocket traffic to the
+production container on port `6532`. Set `PUBLIC_BASE_URL=<public origin>`
+exactly. The reverse proxy or tunnel terminates public TLS and forwards both
+normal HTTP and Socket.IO traffic to the same Words origin. Keep the server's
+LAN address for local checks. After adding the route, verify `/api/health`, a TV
+display, a phone join flow, and Socket.IO reconnection through the public
+origin.
 
 ## Update and rollback
 
 For a normal update:
 
 1. Wait for the `main` workflow’s Quality, Dependency audit, Container build
-   and smoke, and GHCR publication to finish successfully.
-2. Pull `ghcr.io/kevinatlee/words:latest` on Unraid.
-3. Recreate the Words container with the same ports and
-   `PUBLIC_BASE_URL=https://words.atlee.io`.
+   and smoke, and registry publication to finish successfully.
+2. Pull `<registry image>:latest` on the container host.
+3. Recreate the production container with the same ports and
+   `PUBLIC_BASE_URL=<public origin>`.
 4. Confirm `/api/health`, a TV display, a phone join, and a short round.
 
 The exact SHA tag is the rollback unit. To roll back, change Repository to a
-previously successful `ghcr.io/kevinatlee/words:sha-<full-main-sha>` tag,
+previously successful `<registry image>:sha-<full-main-sha>` tag,
 pull it, recreate the container, and repeat the same health/display/join check.
 Because rooms are in memory, schedule updates between casual sessions.
 
@@ -214,7 +195,7 @@ Because rooms are in memory, schedule updates between casual sessions.
 
 The CI image smoke covers the artifact, health readiness, deep links, static
 assets, Socket.IO display/player creation, non-root runtime, read-only start,
-and SIGTERM. It cannot replace a private-network, Cloudflare Tunnel, or real
+and SIGTERM. It cannot replace a private-network, reverse-proxy/tunnel, or real
 phone/display session review. Before calling any deployment public, review
-host logs, direct-LAN and tunnel connectivity, reconnection behavior, and the
-current GitHub package visibility policy.
+host logs, LAN and public connectivity, reconnection behavior, and the current
+registry package visibility policy.
