@@ -88,9 +88,10 @@ system, and the lobby QR board spells `WORDS` / `ATLEE` / `WANNA` / `SHARE`.
 Pre-round demonstrations use fixed, size-keyed presentation boards only; the
 5 × 5 fourth row is `NSEVR`, and they never replace server-generated official
 boards. The merged lobby QR keeps its same payload and perimeter words on a
-matched square SVG surface. Its QR viewport uses the same opaque paper colour
-as that surface with crisp module rendering; physical test-channel verification
-remains required for Safari boundary artifacts.
+single opaque `#f5f1e7` canvas tile with the same quiet zone. Square SVG sizing
+and an opaque SVG background reduced but did not eliminate physical Safari
+quiet-zone marks, so the nested QR surface and inset shadow were removed with
+the canvas replacement. Physical test-channel verification remains required.
 
 Stage 3 adds a separate framework-independent `@words/game-engine` package:
 

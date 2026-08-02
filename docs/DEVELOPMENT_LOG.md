@@ -1,5 +1,20 @@
 # Development log
 
+## 2026-08-02 — Lobby QR canvas renderer replacement (draft)
+
+- Replaced the TV lobby QR SVG with `qrcode.react`'s existing canvas renderer
+  at a 640px integer source size, an opaque `#f5f1e7` background, black modules,
+  error correction M, disabled boost, and the same four-module quiet zone.
+- Physical testing established that square SVG sizing did not resolve the
+  original artifact, and that an opaque SVG background reduced but did not
+  eliminate lower/right quiet-zone marks. The QR now renders directly in its
+  one paper-coloured tile; the nested QR surface and QR-only inset shadow are
+  removed to eliminate their compositing layers.
+- The join payload, central merged placement, `WORDS` / `ATLEE` / `WANNA` /
+  `SHARE` perimeter, and all presentation boards remain unchanged. The current
+  JSDOM environment mocks the QR canvas and does not expose its pixel buffer,
+  so physical validation on `WordsTest` remains required.
+
 ## 2026-08-02 — Lobby demonstration board and QR boundary correction (draft)
 
 - Corrected the presentation-only 5 × 5 demonstration board's fourth row to

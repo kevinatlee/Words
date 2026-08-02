@@ -1,17 +1,18 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { qrCodeSvgMock, shouldThrow } = vi.hoisted(() => ({
-  qrCodeSvgMock: vi.fn(),
+const { qrCodeCanvasMock, shouldThrow } = vi.hoisted(() => ({
+  qrCodeCanvasMock: vi.fn(),
   shouldThrow: { value: false },
 }));
 
 vi.mock('qrcode.react', () => ({
-  QRCodeSVG: (props: Record<string, unknown>) => {
+  QRCodeCanvas: (props: Record<string, unknown>) => {
     if (shouldThrow.value) throw new Error('Synthetic QR renderer failure');
-    qrCodeSvgMock(props);
-    return <svg data-testid="generated-qr" aria-hidden="true" />;
+    qrCodeCanvasMock(props);
+    return <canvas data-testid="generated-qr-canvas" aria-hidden="true" />;
   },
+  QRCodeSVG: () => <svg data-testid="generated-qr-svg" aria-hidden="true" />,
 }));
 
 import { DisplayJoinBoard } from './DisplayJoinBoard';
@@ -20,7 +21,7 @@ const joinUrl = 'https://words.atlee.io/join/ABC234';
 
 describe('DisplayJoinBoard', () => {
   beforeEach(() => {
-    qrCodeSvgMock.mockClear();
+    qrCodeCanvasMock.mockClear();
     shouldThrow.value = false;
   });
 
@@ -82,7 +83,7 @@ describe('DisplayJoinBoard', () => {
     ).toHaveLength(0);
   });
 
-  it('embeds one merged QR region for the authoritative join URL', () => {
+  it('embeds one opaque canvas QR region for the authoritative join URL', () => {
     const { container } = render(<DisplayJoinBoard joinUrl={joinUrl} />);
 
     const qrRegion = screen.getByLabelText('Room joining QR code');
@@ -90,27 +91,31 @@ describe('DisplayJoinBoard', () => {
     expect(qrRegion).toHaveClass('display-join-board__qr--rounded');
     expect(
       qrRegion.querySelector('.display-join-board__qr-surface'),
-    ).not.toBeNull();
-    expect(qrRegion.querySelectorAll('svg')).toHaveLength(1);
+    ).toBeNull();
+    expect(qrRegion.querySelectorAll('canvas')).toHaveLength(1);
+    expect(qrRegion.querySelectorAll('svg')).toHaveLength(0);
     expect(container.querySelectorAll('.display-join-board__qr')).toHaveLength(
       1,
     );
     expect(qrRegion).toHaveClass('display-join-board__qr');
-    expect(screen.getByTestId('generated-qr')).toBeVisible();
-    expect(qrCodeSvgMock).toHaveBeenCalledWith(
+    expect(screen.getByTestId('generated-qr-canvas')).toBeVisible();
+    expect(screen.queryByTestId('generated-qr-svg')).toBeNull();
+    expect(qrCodeCanvasMock).toHaveBeenCalledWith(
       expect.objectContaining({
         value: joinUrl,
-        size: 320,
+        size: 640,
+        level: 'M',
+        boostLevel: false,
         bgColor: '#f5f1e7',
         fgColor: '#000000',
         marginSize: 4,
-        shapeRendering: 'crispEdges',
       }),
     );
-    const qrProps = qrCodeSvgMock.mock.calls[0]?.[0];
+    const qrProps = qrCodeCanvasMock.mock.calls[0]?.[0];
     expect(qrProps).not.toHaveProperty('stroke');
     expect(qrProps).not.toHaveProperty('border');
     expect(qrProps).not.toHaveProperty('outline');
+    expect(qrProps?.style).toEqual({ width: '100%', height: '100%' });
   });
 
   it('uses the exact QR unavailable fallback', () => {
@@ -124,7 +129,7 @@ describe('DisplayJoinBoard', () => {
     });
 
     expect(screen.getByText('QR unavailable')).toBeVisible();
-    expect(screen.queryByTestId('generated-qr')).toBeNull();
+    expect(screen.queryByTestId('generated-qr-canvas')).toBeNull();
     error.mockRestore();
   });
 });

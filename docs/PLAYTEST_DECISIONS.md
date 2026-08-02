@@ -92,10 +92,11 @@ display-only rounding.
 - Pre-round phone demonstration boards are explicit presentation-only 4 × 4,
   5 × 5, and 6 × 6 layouts; the 5 × 5 fourth row is `NSEVR`. Official round
   boards remain server-generated. The embedded QR retains its data and
-  perimeter words while its square SVG surface has an opaque `#f5f1e7`
-  viewport background and crisp module rendering. The prior square-sizing-only
-  correction did not eliminate the physical Safari artifact; repeat validation
-  on the test channel remains required.
+  perimeter words while its opaque `#f5f1e7` canvas retains the same quiet zone.
+  Square SVG sizing and then an opaque SVG background reduced but did not
+  eliminate physical Safari quiet-zone marks, so the nested QR surface and QR
+  inset shadow were removed with the canvas replacement. Repeat validation on
+  the test channel remains required.
 - Phones do not show provisional scores or accepted-word counts. A possible
   active-TV word-count presentation remains deferred to the separate TV
   redesign because it needs an aggregate-display decision.

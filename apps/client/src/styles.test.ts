@@ -162,16 +162,11 @@ describe('tile typography', () => {
       /\.display-join-board__qr\s*\{[^}]*grid-area: 2 \/ 2 \/ 5 \/ 5;/s,
     );
     expect(styles).toMatch(
-      /\.display-join-board__qr-surface\s*\{[^}]*width: 100%;[^}]*height: 100%;[^}]*aspect-ratio: 1;[^}]*overflow: hidden;/s,
+      /\.display-join-board__qr-canvas\s*\{[^}]*display: block;[^}]*width: 100%;[^}]*height: 100%;[^}]*max-width: 100%;[^}]*max-height: 100%;[^}]*border: 0;[^}]*outline: 0;[^}]*image-rendering: pixelated;/s,
     );
-    expect(styles).toMatch(
-      /\.display-join-board__qr svg\s*\{[^}]*display: block;[^}]*width: 100%;[^}]*height: 100%;[^}]*max-width: 100%;[^}]*max-height: 100%;/s,
-    );
-    expect(styles).toMatch(
-      /\.display-join-board__qr svg\s*\{[^}]*border: 0;[^}]*outline: 0;/s,
-    );
+    expect(styles).not.toContain('.display-join-board__qr-surface');
     expect(styles).not.toMatch(
-      /\.display-join-board__qr svg\s*\{[^}]*height: auto;/s,
+      /\.display-join-board__qr\s*\{[^}]*box-shadow:/s,
     );
     expect(styles).toMatch(
       /\.phone-round-summary\s*\{[^}]*min-height: min\(17rem, 52vh\);[^}]*place-content: center;/s,
@@ -182,12 +177,13 @@ describe('tile typography', () => {
   });
 
   it('keeps the embedded TV QR on the letter-tile background', () => {
-    const qrSurfaceRule = styles.match(
-      /\.display-join-board__qr-surface\s*\{[^}]*\}/s,
+    const qrTileRule = styles.match(
+      /\.display-join-board__qr\s*\{[^}]*\}/s,
     )?.[0];
 
-    expect(qrSurfaceRule).toContain('background: var(--paper);');
-    expect(qrSurfaceRule).not.toMatch(/#fff|#ffffff/i);
+    expect(qrTileRule).toContain('background: var(--paper);');
+    expect(qrTileRule).not.toMatch(/#fff|#ffffff/i);
+    expect(qrTileRule).not.toContain('box-shadow:');
   });
 
   it('keeps the display footer URL dark green, unadorned, and keyboard-visible', () => {
