@@ -192,6 +192,21 @@ describe('tile typography', () => {
     );
   });
 
+  it('anchors the compact audio key below the header without moving TV content', () => {
+    expect(styles).toMatch(
+      /\.display-audio-control-layer\s*\{[^}]*position: relative;[^}]*z-index: 5;[^}]*width: min\(100% - 2rem, 90rem\);[^}]*height: 0;[^}]*margin-inline: auto;[^}]*pointer-events: none;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-audio-key\s*\{[^}]*position: absolute;[^}]*top: 0\.5rem;[^}]*right: clamp\(0\.25rem, 1vw, 0\.75rem\);[^}]*width: 2\.65rem;[^}]*height: 2\.25rem;[^}]*border: 1px solid var\(--mint-strong\);[^}]*background: rgba\(16, 38, 58, 0\.96\);[^}]*color: var\(--mint-strong\);[^}]*pointer-events: auto;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-audio-key:focus-visible\s*\{[^}]*outline: 0\.18rem solid var\(--sun\);[^}]*outline-offset: 0\.15rem;/s,
+    );
+    expect(styles).not.toMatch(
+      /@media[^}]*\{[^}]*\.display-audio-(?:control-layer|key)\s*\{/s,
+    );
+  });
+
   it('keeps the embedded TV QR on the letter-tile background', () => {
     const qrTileRule = styles.match(
       /\.display-join-board__qr\s*\{[^}]*\}/s,

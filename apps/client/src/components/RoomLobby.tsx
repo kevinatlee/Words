@@ -14,12 +14,9 @@ import {
 } from '@words/shared';
 
 import { useRoundDeadlineReached } from '../useRoundCountdown';
-import { useDisplayAudio } from '../hooks/useDisplayAudio';
 import { createDemoBoard } from '../utils/demoBoard';
 import {
   isExpectedSubmissionRejection,
-  loadWordEntryMode,
-  saveWordEntryMode,
   updateWordPath,
   type WordEntryMode,
 } from '../utils/word-entry';
@@ -42,6 +39,8 @@ type RoomLobbyProps = {
   onStartRound: () => Promise<RoomError | null>;
   submissionState: PlayerRoundSubmissionState | null;
   onSubmitWord: (input: SubmitWordInput) => Promise<SubmitWordResponse>;
+  entryMode: WordEntryMode;
+  onEntryModeChange: (mode: WordEntryMode) => void;
 };
 
 function formatHighlightNames(
@@ -59,6 +58,8 @@ export function RoomLobby({
   onUpdateSettings,
   onStartRound,
   onSubmitWord,
+  entryMode,
+  onEntryModeChange,
 }: RoomLobbyProps) {
   const [actionPending, setActionPending] = useState(false);
   const [actionError, setActionError] = useState<RoomError | null>(null);
@@ -75,12 +76,10 @@ export function RoomLobby({
     null,
   );
   const isMountedRef = useRef(true);
-  const [entryMode, setEntryMode] = useState<WordEntryMode>(loadWordEntryMode);
   const currentPlayer = room.players.find(
     (player) => player.id === currentPlayerId,
   );
   const isDisplay = sessionRole === 'display';
-  const displayAudio = useDisplayAudio(room, isDisplay);
   const isConnectedController =
     sessionRole === 'player' &&
     connectionStatus === 'connected' &&
@@ -193,8 +192,7 @@ export function RoomLobby({
     if (mode === entryMode) {
       return;
     }
-    saveWordEntryMode(mode);
-    setEntryMode(mode);
+    onEntryModeChange(mode);
     clearSelectedPath();
     clearAcceptedFeedback();
     setSubmissionMessage(null);
@@ -415,15 +413,6 @@ export function RoomLobby({
                 <RoundClock room={room} presentation="display" />
               )}
               <h2 id="display-highlights-title">Room Highlights</h2>
-              {!displayAudio.enabled && (
-                <button
-                  className="display-enable-sound"
-                  type="button"
-                  onClick={() => void displayAudio.enable()}
-                >
-                  Enable sound
-                </button>
-              )}
               <section>
                 <h3>Last Round</h3>
                 {lastRound === null ? (
@@ -476,7 +465,6 @@ export function RoomLobby({
       )}
       {!isDisplay &&
         sessionRole === 'player' &&
-        !roundIsEnded &&
         document.getElementById('phone-entry-mode-slot') &&
         createPortal(
           <div

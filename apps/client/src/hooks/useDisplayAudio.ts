@@ -2,20 +2,23 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { RoomState } from '@words/shared';
 
-import { DisplayAudioEngine } from '../audio/display-audio';
+import {
+  DisplayAudioEngine,
+  type DisplayAudioStatus,
+} from '../audio/display-audio';
 
 type TrackedRoom = {
   roundId: string | null;
-  phase: RoomState['phase'];
+  phase: RoomState['phase'] | null;
   counts: Map<string, number>;
 };
 
-function trackedRoom(room: RoomState): TrackedRoom {
+function trackedRoom(room: RoomState | null): TrackedRoom {
   return {
-    roundId: room.round?.id ?? null,
-    phase: room.phase,
+    roundId: room?.round?.id ?? null,
+    phase: room?.phase ?? null,
     counts: new Map(
-      room.round?.acceptedWordCounts.map((entry) => [
+      room?.round?.acceptedWordCounts.map((entry) => [
         entry.playerId,
         entry.count,
       ]) ?? [],
@@ -23,8 +26,17 @@ function trackedRoom(room: RoomState): TrackedRoom {
   };
 }
 
-export function useDisplayAudio(room: RoomState, isDisplay: boolean) {
-  const [enabled, setEnabled] = useState(false);
+export type DisplayAudioController = {
+  status: DisplayAudioStatus;
+  showControl: boolean;
+  enable: () => Promise<void>;
+};
+
+export function useDisplayAudio(
+  room: RoomState | null,
+  isDisplaySession: boolean,
+): DisplayAudioController {
+  const [status, setStatus] = useState<DisplayAudioStatus>('checking');
   const engineRef = useRef<DisplayAudioEngine | null>(null);
   const previousRef = useRef<TrackedRoom | null>(null);
   const roomRef = useRef(room);
@@ -34,24 +46,46 @@ export function useDisplayAudio(room: RoomState, isDisplay: boolean) {
   }, [room]);
 
   const enable = useCallback(async () => {
-    if (!isDisplay) return;
-    engineRef.current ??= new DisplayAudioEngine();
-    if (await engineRef.current.enable()) setEnabled(true);
-  }, [isDisplay]);
+    if (!isDisplaySession) return;
+    await engineRef.current?.enable();
+  }, [isDisplaySession]);
 
   useEffect(() => {
-    if (!isDisplay || enabled) return;
-    const attempt = () => void enable();
-    window.addEventListener('pointerdown', attempt, { once: true });
-    window.addEventListener('keydown', attempt, { once: true });
+    if (!isDisplaySession) {
+      previousRef.current = null;
+      return;
+    }
+
+    const engine = new DisplayAudioEngine();
+    engineRef.current = engine;
+    const unsubscribe = engine.subscribe(setStatus);
+    void engine.enable();
+
+    return () => {
+      unsubscribe();
+      void engine.dispose();
+      if (engineRef.current === engine) engineRef.current = null;
+      previousRef.current = null;
+    };
+  }, [isDisplaySession]);
+
+  useEffect(() => {
+    if (!isDisplaySession || status === 'running' || status === 'unsupported') {
+      return;
+    }
+    const attempt = () => void engineRef.current?.enable();
+    window.addEventListener('pointerdown', attempt);
+    window.addEventListener('click', attempt);
+    window.addEventListener('keydown', attempt);
     return () => {
       window.removeEventListener('pointerdown', attempt);
+      window.removeEventListener('click', attempt);
       window.removeEventListener('keydown', attempt);
     };
-  }, [enable, enabled, isDisplay]);
+  }, [isDisplaySession, status]);
 
   useEffect(() => {
-    if (!isDisplay) return;
+    if (!isDisplaySession) return;
     const current = trackedRoom(room);
     const previous = previousRef.current;
     previousRef.current = current;
@@ -60,18 +94,18 @@ export function useDisplayAudio(room: RoomState, isDisplay: boolean) {
       engineRef.current?.cancelAcceptedTones();
     }
     if (
-      enabled &&
+      status === 'running' &&
       previous.phase === 'ROUND_ACTIVE' &&
       current.phase === 'ROUND_ACTIVE' &&
       previous.roundId === current.roundId &&
-      room.round
+      room?.round
     ) {
       let deltaOrder = 0;
       room.round.participants.forEach((participant, index) => {
         const before = previous.counts.get(participant.playerId) ?? 0;
         const after = current.counts.get(participant.playerId) ?? 0;
         if (after > before) {
-          engineRef.current?.playAccepted(index, deltaOrder * 0.06);
+          engineRef.current?.playAccepted(index, deltaOrder * 0.09);
           deltaOrder += 1;
         }
       });
@@ -80,36 +114,35 @@ export function useDisplayAudio(room: RoomState, isDisplay: boolean) {
       engineRef.current?.cancelAcceptedTones();
     }
     if (
-      enabled &&
+      status === 'running' &&
       previous.phase === 'ROUND_ACTIVE' &&
       current.phase === 'ROUND_ENDED' &&
       previous.roundId === current.roundId &&
-      (room.round?.results?.winnerPlayerIds.length ?? 0) > 0
+      (room?.round?.results?.winnerPlayerIds.length ?? 0) > 0
     ) {
       engineRef.current?.playWinnerTune();
     }
-  }, [enabled, isDisplay, room]);
+  }, [isDisplaySession, room, status]);
 
   useEffect(() => {
-    if (!isDisplay) return;
+    if (!isDisplaySession) return;
     const onVisibilityChange = () => {
+      previousRef.current = trackedRoom(roomRef.current);
       if (document.visibilityState === 'hidden') {
         engineRef.current?.cancelAcceptedTones();
+      } else {
+        void engineRef.current?.enable();
       }
-      previousRef.current = trackedRoom(roomRef.current);
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () =>
       document.removeEventListener('visibilitychange', onVisibilityChange);
-  }, [isDisplay]);
+  }, [isDisplaySession]);
 
-  useEffect(
-    () => () => {
-      void engineRef.current?.dispose();
-      engineRef.current = null;
-    },
-    [],
-  );
-
-  return { enabled, enable };
+  return {
+    status,
+    showControl:
+      isDisplaySession && (status === 'blocked' || status === 'suspended'),
+    enable,
+  };
 }

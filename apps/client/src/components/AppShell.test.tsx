@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createEmptyRoomHighlights, type RoomState } from '@words/shared';
 
@@ -147,5 +147,69 @@ describe('AppShell display header', () => {
       'connection-status--phone',
     );
     expect(screen.queryByText('No Game Host')).toBeNull();
+  });
+
+  it('anchors one accessible blocked-audio key below the display header in every phase', () => {
+    const enable = vi.fn(async () => undefined);
+    const audio = {
+      status: 'blocked' as const,
+      showControl: true,
+      enable,
+    };
+    const { container, rerender } = render(
+      <AppShell displayRoom={createDisplayRoom()} displayAudio={audio}>
+        <p>Lobby</p>
+      </AppShell>,
+    );
+
+    const layer = container.querySelector('.display-audio-control-layer');
+    expect(layer).toHaveAttribute(
+      'data-display-audio-position',
+      'below-header-upper-right',
+    );
+    expect(layer?.previousElementSibling).toHaveClass('site-header--display');
+    const key = screen.getByRole('button', { name: 'Enable sound' });
+    expect(key).toHaveClass('display-audio-key');
+    expect(key).toHaveAttribute('title', 'Enable sound');
+
+    for (const phase of ['ROUND_ACTIVE', 'ROUND_ENDED'] as const) {
+      rerender(
+        <AppShell
+          displayRoom={createDisplayRoom({ phase })}
+          displayAudio={audio}
+        >
+          <p>{phase}</p>
+        </AppShell>,
+      );
+      expect(
+        screen.getByRole('button', { name: 'Enable sound' }),
+      ).toBeVisible();
+    }
+  });
+
+  it('keeps the zero-height audio anchor stable and hides its key when running or on phones', () => {
+    const { container, rerender } = render(
+      <AppShell
+        displayRoom={createDisplayRoom()}
+        displayAudio={{
+          status: 'running',
+          showControl: false,
+          enable: async () => undefined,
+        }}
+      >
+        <p>Room</p>
+      </AppShell>,
+    );
+    expect(
+      container.querySelector('.display-audio-control-layer'),
+    ).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Enable sound' })).toBeNull();
+
+    rerender(
+      <AppShell phoneConnectionStatus="connected">
+        <p>Phone</p>
+      </AppShell>,
+    );
+    expect(container.querySelector('.display-audio-control-layer')).toBeNull();
   });
 });

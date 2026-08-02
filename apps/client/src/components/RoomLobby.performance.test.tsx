@@ -100,6 +100,8 @@ function props(
     onStartRound: async () => null,
     submissionState: null,
     onSubmitWord,
+    entryMode: 'trace' as const,
+    onEntryModeChange: vi.fn(),
   };
 }
 
