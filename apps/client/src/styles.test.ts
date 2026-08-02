@@ -162,6 +162,15 @@ describe('tile typography', () => {
       /\.display-join-board__qr\s*\{[^}]*grid-area: 2 \/ 2 \/ 5 \/ 5;/s,
     );
     expect(styles).toMatch(
+      /\.display-join-board__qr-surface\s*\{[^}]*width: 100%;[^}]*height: 100%;[^}]*aspect-ratio: 1;[^}]*overflow: hidden;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-join-board__qr svg\s*\{[^}]*display: block;[^}]*width: 100%;[^}]*height: 100%;[^}]*max-width: 100%;[^}]*max-height: 100%;/s,
+    );
+    expect(styles).not.toMatch(
+      /\.display-join-board__qr svg\s*\{[^}]*height: auto;/s,
+    );
+    expect(styles).toMatch(
       /\.phone-round-summary\s*\{[^}]*min-height: min\(17rem, 52vh\);[^}]*place-content: center;/s,
     );
     expect(styles).toMatch(

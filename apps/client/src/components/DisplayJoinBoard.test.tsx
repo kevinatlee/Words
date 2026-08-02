@@ -91,6 +91,7 @@ describe('DisplayJoinBoard', () => {
     expect(
       qrRegion.querySelector('.display-join-board__qr-surface'),
     ).not.toBeNull();
+    expect(qrRegion.querySelectorAll('svg')).toHaveLength(1);
     expect(container.querySelectorAll('.display-join-board__qr')).toHaveLength(
       1,
     );

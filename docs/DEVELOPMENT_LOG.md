@@ -1387,3 +1387,15 @@ player are separate roles, and neither socket alone owns room lifetime.
   winner border/crown accent. The compact centred intrinsic layout is unchanged.
 - No result projection, scoring, lifecycle, authority, Socket.IO, deployment,
   or production channel behavior changed.
+
+## 2026-08-02 — Stage 4G lobby demonstration refinement (draft)
+
+- Replaced the generic pre-round character stream with explicit static 4 × 4,
+  5 × 5, and 6 × 6 presentation boards. They are client-only demonstrations
+  and never participate in server-generated official rounds.
+- Matched the embedded lobby QR SVG height to its width within an explicitly
+  square, clipped surface. This removes fractional auto-height divergence that
+  could expose a thin bottom/right seam while retaining the QR payload, quiet
+  zone, and `WORDS` / `ATLEE` / `WANNA` / `SHARE` perimeter.
+- No scoring, authority, phases, result behavior, Socket.IO, deployment, or
+  production channel behavior changed.

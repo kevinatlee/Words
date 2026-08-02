@@ -85,6 +85,10 @@ persisted. During `ROUND_ENDED`, phones replace the board and word-entry UI
 with their own authoritative final score and the winning score; detailed
 results remain on the display. Official grid sizes share their presentation gap
 system, and the lobby QR board spells `WORDS` / `ATLEE` / `WANNA` / `SHARE`.
+Pre-round demonstrations use fixed, size-keyed presentation boards only; they
+never replace server-generated official boards. The merged lobby QR keeps its
+same payload and perimeter words on a matched square SVG surface to avoid
+fractional edge seams.
 
 Stage 3 adds a separate framework-independent `@words/game-engine` package:
 

@@ -89,6 +89,10 @@ display-only rounding.
 - Official 4 × 4, 5 × 5, and 6 × 6 grids use the same gap token for each
   presentation. The TV lobby demonstration board's perimeter spells `WORDS`,
   `ATLEE`, `WANNA`, and `SHARE` around its unchanged merged QR region.
+- Pre-round phone demonstration boards are explicit presentation-only 4 × 4,
+  5 × 5, and 6 × 6 layouts; official round boards remain server-generated.
+  The embedded QR retains its data and perimeter words while its square SVG
+  surface prevents fractional bottom/right edge seams.
 - Phones do not show provisional scores or accepted-word counts. A possible
   active-TV word-count presentation remains deferred to the separate TV
   redesign because it needs an aggregate-display decision.
