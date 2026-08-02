@@ -14,6 +14,7 @@ import {
 } from '@words/shared';
 
 import { useRoundDeadlineReached } from '../useRoundCountdown';
+import { useDisplayAudio } from '../hooks/useDisplayAudio';
 import { createDemoBoard } from '../utils/demoBoard';
 import {
   isExpectedSubmissionRejection,
@@ -79,6 +80,7 @@ export function RoomLobby({
     (player) => player.id === currentPlayerId,
   );
   const isDisplay = sessionRole === 'display';
+  const displayAudio = useDisplayAudio(room, isDisplay);
   const isConnectedController =
     sessionRole === 'player' &&
     connectionStatus === 'connected' &&
@@ -95,12 +97,11 @@ export function RoomLobby({
     room,
     sessionRole === 'player',
   );
+  const roundTiles = room.round?.board.tiles;
   const letters = useMemo(
     () =>
-      room.round
-        ? [...room.round.board.tiles]
-        : createDemoBoard(room.settings.gridSize),
-    [room.round, room.settings.gridSize],
+      roundTiles ? [...roundTiles] : createDemoBoard(room.settings.gridSize),
+    [roundTiles, room.settings.gridSize],
   );
   const boardSize = room.round?.board.size ?? room.settings.gridSize;
   const isRoundParticipant =
@@ -291,20 +292,43 @@ export function RoomLobby({
   };
 
   if (isDisplay) {
-    const controller = room.players.find(
+    const currentPlayerIds = new Set(room.players.map((player) => player.id));
+    const visiblePlayers = [
+      ...room.players,
+      ...(roundIsActive
+        ? (room.round?.participants ?? [])
+            .filter(
+              (participant) => !currentPlayerIds.has(participant.playerId),
+            )
+            .map((participant) => ({
+              id: participant.playerId,
+              displayName: participant.displayName,
+              connected: false,
+              joinedAt: room.round?.startedAt ?? room.createdAt,
+              isController: false,
+            }))
+        : []),
+    ];
+    const controller = visiblePlayers.find(
       (player) => player.id === room.controllerPlayerId,
     );
     const orderedPlayers = [
       ...(controller ? [controller] : []),
-      ...room.players.filter(
+      ...visiblePlayers.filter(
         (player) => player.id !== controller?.id && player.connected,
       ),
-      ...room.players.filter(
+      ...visiblePlayers.filter(
         (player) => player.id !== controller?.id && !player.connected,
       ),
     ];
     const lastRound = room.highlights.lastRound;
     const roomRecord = room.highlights.roomRecord;
+    const acceptedCounts = new Map(
+      room.round?.acceptedWordCounts.map((entry) => [
+        entry.playerId,
+        entry.count,
+      ]) ?? [],
+    );
 
     return (
       <div className="room-page display-room-page">
@@ -330,14 +354,28 @@ export function RoomLobby({
                       }
                       key={player.id}
                     >
-                      <span
-                        className="display-player-list__name"
-                        title={player.displayName}
-                      >
-                        {player.id === controller?.id && (
-                          <span aria-label="Game Host">♛ </span>
+                      <span className="display-player-list__primary">
+                        <span
+                          className="display-player-list__name"
+                          title={player.displayName}
+                        >
+                          {player.id === controller?.id && (
+                            <span aria-label="Game Host">♛ </span>
+                          )}
+                          {player.displayName}
+                        </span>
+                        {roundIsActive && (
+                          <span
+                            className="display-player-list__count"
+                            aria-label={
+                              acceptedCounts.has(player.id)
+                                ? `${acceptedCounts.get(player.id)} accepted ${acceptedCounts.get(player.id) === 1 ? 'word' : 'words'}`
+                                : 'Waiting for next round'
+                            }
+                          >
+                            {acceptedCounts.get(player.id) ?? '—'}
+                          </span>
                         )}
-                        {player.displayName}
                       </span>
                       <small>
                         {player.connected
@@ -377,6 +415,15 @@ export function RoomLobby({
                 <RoundClock room={room} presentation="display" />
               )}
               <h2 id="display-highlights-title">Room Highlights</h2>
+              {!displayAudio.enabled && (
+                <button
+                  className="display-enable-sound"
+                  type="button"
+                  onClick={() => void displayAudio.enable()}
+                >
+                  Enable sound
+                </button>
+              )}
               <section>
                 <h3>Last Round</h3>
                 {lastRound === null ? (

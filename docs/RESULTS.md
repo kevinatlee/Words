@@ -124,9 +124,10 @@ snapshotted participant.
 
 ## Timed privacy transition
 
-While `ROUND_ACTIVE`, accepted words, provisional scores, submission versions,
-and shared status remain private. The display and other players cannot observe
-submission activity.
+While `ROUND_ACTIVE`, accepted word identities, provisional scores, submission
+versions, and shared status remain private. The common room snapshot exposes
+only each immutable participant's accepted-word count for TV progress and
+display-only tone selection.
 
 Only after submissions close does the detached public result projection reveal
 participant words, base values, shared/unique status, integer uniqueness bonuses,
@@ -184,9 +185,12 @@ not publish obsolete results.
 `ROUND_ENDED` is a 20-second server-authoritative results window, not a fourth
 phase. The display replaces its header with redesigned result cards for every
 authoritative participant, including departed players, plus the join URL footer.
-Cards show final integer points, separate Words and Unique words counts, and a
+Compact dark cards show final integer points, separate Words and Unique words counts, and a
 bounded unique-word list; their bounded intrinsic columns form a centred group
-rather than stretching across the display. There is no board, QR, timer, side
+rather than stretching across the display. Positive-scoring rounds use
+authoritative competition ranks for restrained vertical podium levels; ties
+share a level, while all-zero rounds remain flat and do not celebrate. There is
+no board, QR, timer, side
 bubble, control, table, or word review. Phones replace their puzzle with a
 concise `ROUND OVER` / `Look at the TV!` summary showing only their own final
 score and the winning score (or `No scoring winner`). Below a positive winning
@@ -239,9 +243,6 @@ Stage 4E adds the display-only QR presentation without modifying results,
 scoring, phases, publication, state versions, TTL, participants, or next-round
 replacement.
 
-Stage 4F is complete and merged. Stage 4G will perform focused casual-play
-release-candidate testing and polish without adding match state or cumulative
-scoring. Stage 5 will address production hardening, a one-container production
-build, serving the built client from Node, production image publishing,
-production server configuration, health and graceful shutdown, Unraid-oriented
-installation documentation, and reverse-proxy/tunnel documentation.
+Stages 4F, 4G, and 5A are complete. Stage 4H is the active test candidate for
+count-only TV progress, display-only sounds, and winner presentation without
+adding match state or cumulative scoring.

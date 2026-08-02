@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { productConfig } from './config';
 import { buildJoinUrl } from './join-url';
 
 describe('player join URLs', () => {

@@ -64,6 +64,97 @@ describe('RoundResults', () => {
       );
     },
   );
+  it('uses authoritative competition ranks for flow-safe podium levels', () => {
+    const base = result(4);
+    const ranked: R = {
+      ...base,
+      players: base.players.map((player, index) => ({
+        ...player,
+        rank: index + 1,
+      })),
+    };
+    render(<RoundResults results={ranked} />);
+
+    const cards = document.querySelectorAll('.result-player-card');
+    expect(
+      [...cards].map((card) => card.getAttribute('data-authoritative-rank')),
+    ).toEqual(['1', '2', '3', '4']);
+    expect(
+      [...cards].map((card) => card.getAttribute('data-podium-level')),
+    ).toEqual(['1', '2', '3', '4']);
+  });
+
+  it.each([
+    [
+      [1, 1, 3],
+      ['1', '1', '3'],
+    ],
+    [
+      [1, 2, 2, 4],
+      ['1', '2', '2', '4'],
+    ],
+  ])(
+    'keeps tied authoritative ranks on the same podium level',
+    (ranks, levels) => {
+      const base = result(ranks.length);
+      const tied: R = {
+        ...base,
+        players: base.players.map((player, index) => ({
+          ...player,
+          rank: ranks[index]!,
+        })),
+      };
+      render(<RoundResults results={tied} />);
+      expect(
+        [...document.querySelectorAll('.result-player-card')].map((card) =>
+          card.getAttribute('data-podium-level'),
+        ),
+      ).toEqual(levels);
+    },
+  );
+
+  it('keeps all-zero rounds flat and free of celebration styling', () => {
+    const base = result(4);
+    const zero: R = {
+      ...base,
+      winnerPlayerIds: [],
+      players: base.players.map((player) => ({
+        ...player,
+        rank: 1,
+        baseScore: 0,
+        uniqueBonusScore: 0,
+        finalScore: 0,
+        words: [],
+      })),
+    };
+    render(<RoundResults results={zero} />);
+
+    const cards = [...document.querySelectorAll('.result-player-card')];
+    expect(cards.map((card) => card.getAttribute('data-podium-level'))).toEqual(
+      ['0', '0', '0', '0'],
+    );
+    expect(document.querySelector('.result-player-card--celebrate')).toBeNull();
+  });
+
+  it('replaces podium and winner styling when a later round is rendered', () => {
+    const first = result(2);
+    const view = render(<RoundResults results={first} />);
+    const second: R = {
+      ...first,
+      players: [
+        { ...first.players[0]!, rank: 2, finalScore: 4 },
+        { ...first.players[1]!, rank: 1, finalScore: 8 },
+      ],
+      winnerPlayerIds: [first.players[1]!.playerId],
+    };
+    view.rerender(<RoundResults results={second} />);
+
+    const cards = [...document.querySelectorAll('.result-player-card')];
+    expect(cards[0]).toHaveAttribute('data-podium-level', '2');
+    expect(cards[0]).not.toHaveClass('result-player-card--celebrate');
+    expect(cards[1]).toHaveAttribute('data-podium-level', '1');
+    expect(cards[1]).toHaveClass('result-player-card--celebrate');
+  });
   it('shows integer points and separate Words and Unique words rows', () => {
     render(<RoundResults results={result()} />);
     expect(screen.getByText('7 points')).toBeVisible();

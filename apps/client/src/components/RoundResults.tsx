@@ -15,6 +15,7 @@ function uniqueLimit(count: number): number {
 
 export function RoundResults({ results }: RoundResultsProps) {
   const limit = uniqueLimit(results.players.length);
+  const celebrate = (results.players[0]?.finalScore ?? 0) > 0;
   return (
     <section className="display-results" aria-labelledby="round-results-title">
       <h1 id="round-results-title">Round Results</h1>
@@ -31,9 +32,12 @@ export function RoundResults({ results }: RoundResultsProps) {
                 left.word.localeCompare(right.word),
             );
           const winner = results.winnerPlayerIds.includes(player.playerId);
+          const podiumLevel = celebrate ? Math.min(player.rank, 4) : 0;
           return (
             <li
-              className={`result-player-card${winner ? ' result-player-card--winner' : ''}`}
+              className={`result-player-card${winner ? ' result-player-card--winner result-player-card--celebrate' : ''}`}
+              data-podium-level={podiumLevel}
+              data-authoritative-rank={player.rank}
               key={player.playerId}
             >
               <h2>

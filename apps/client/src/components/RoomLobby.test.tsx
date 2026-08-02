@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createEmptyRoomHighlights,
+  productConfig,
   type PlayerRoundSubmissionState,
   RoomState,
   SubmitWordInput,
@@ -79,6 +80,7 @@ function createRoom(overrides: Partial<RoomState> = {}): RoomState {
         ],
       },
       participants: [{ playerId, displayName: 'Bright Fox' }],
+      acceptedWordCounts: [{ playerId, count: 0 }],
       startedAt,
       deadlineAt,
       endedAt: null,
@@ -355,6 +357,90 @@ describe('RoomLobby word entry', () => {
       vi.advanceTimersByTime(1_000);
     });
     expect(within(timer).getByText('59')).toBeVisible();
+  });
+
+  it('shows authoritative active counts by participant ID without exposing them on phones or in the lobby', () => {
+    const players = Array.from({ length: 8 }, (_, index) => ({
+      id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+      displayName:
+        index === 1
+          ? 'A very long participant name'
+          : `Player ${String(index + 1)}`,
+      connected: index !== 2,
+      joinedAt: new Date(
+        Date.parse(timestamps.createdAt) + index,
+      ).toISOString(),
+      isController: index === 0,
+    }));
+    const active = createRoom();
+    const participants = players.slice(0, 7).map((player) => ({
+      playerId: player.id,
+      displayName: player.displayName,
+    }));
+    const counts = [
+      0,
+      1,
+      9,
+      10,
+      99,
+      productConfig.maximumAcceptedWordsPerPlayerPerRound,
+      2,
+    ];
+    const room: RoomState = {
+      ...active,
+      controllerPlayerId: players[0]!.id,
+      players: players.filter((_player, index) => index !== 6),
+      round: active.round
+        ? {
+            ...active.round,
+            participants,
+            acceptedWordCounts: participants.map((participant, index) => ({
+              playerId: participant.playerId,
+              count: counts[index]!,
+            })),
+          }
+        : null,
+    };
+    const display = renderLobby(undefined, {
+      room,
+      sessionRole: 'display',
+      currentPlayerId: null,
+    });
+
+    expect(screen.getByLabelText('0 accepted words')).toHaveTextContent('0');
+    expect(screen.getByLabelText('1 accepted word')).toHaveTextContent('1');
+    expect(screen.getByLabelText('10 accepted words')).toHaveTextContent('10');
+    expect(
+      screen.getByLabelText(
+        `${productConfig.maximumAcceptedWordsPerPlayerPerRound} accepted words`,
+      ),
+    ).toBeVisible();
+    expect(screen.getByLabelText('Waiting for next round')).toHaveTextContent(
+      '—',
+    );
+    expect(screen.getByText('A very long participant name')).toHaveAttribute(
+      'title',
+      'A very long participant name',
+    );
+    expect(screen.getByLabelText('Game Host')).toBeVisible();
+    expect(screen.getAllByText('Recently disconnected')).toHaveLength(2);
+    expect(
+      document.querySelectorAll('.display-player-list__primary'),
+    ).toHaveLength(8);
+    expect(screen.getByText('Player 7')).toBeVisible();
+    display.unmount();
+
+    const phone = renderLobby(undefined, { room });
+    expect(document.querySelector('.display-player-list__count')).toBeNull();
+    expect(screen.queryByLabelText('1 accepted word')).toBeNull();
+    phone.unmount();
+
+    renderLobby(undefined, {
+      room: { ...room, phase: 'LOBBY', round: null },
+      sessionRole: 'display',
+      currentPlayerId: null,
+    });
+    expect(document.querySelector('.display-player-list__count')).toBeNull();
   });
 
   it('removes obsolete controls and keeps Submit available', () => {

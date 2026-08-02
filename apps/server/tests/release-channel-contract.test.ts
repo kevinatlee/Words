@@ -88,7 +88,7 @@ describe('manual test-container release channel', () => {
     );
   });
 
-  it('documents separate immutable production and test channels with the manual Words-Test procedure', async () => {
+  it('documents separate immutable production and test channels with a generic manual test procedure', async () => {
     const documents = await Promise.all(
       [
         'README.md',
@@ -99,13 +99,12 @@ describe('manual test-container release channel', () => {
     );
     const documentation = documents.join('\n');
 
+    expect(documentation).toContain('<registry image>:sha-<full-main-sha>');
     expect(documentation).toContain(
-      'ghcr.io/kevinatlee/words:sha-<full-main-sha>',
+      '<registry image>:test-sha-<full-target-sha>',
     );
-    expect(documentation).toContain(
-      'ghcr.io/kevinatlee/words:test-sha-<full-target-sha>',
-    );
+    expect(documentation).not.toContain('ghcr.io/kevinatlee/words');
     expect(documentation).toContain('PUBLISH_TEST');
-    expect(documentation).toContain('Words-Test');
+    expect(documentation).toContain('Test container installation');
   });
 });

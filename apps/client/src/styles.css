@@ -223,6 +223,32 @@ button:disabled {
     linear-gradient(135deg, rgba(112, 231, 162, 0.16), transparent 58%),
     rgba(16, 38, 58, 0.8);
 }
+.result-player-card[data-podium-level='2'] {
+  margin-top: clamp(0.5rem, 1.5vh, 1rem);
+}
+.result-player-card[data-podium-level='3'] {
+  margin-top: clamp(1rem, 3vh, 2rem);
+}
+.result-player-card[data-podium-level='4'] {
+  margin-top: clamp(1.35rem, 4vh, 2.75rem);
+}
+.result-player-card--celebrate {
+  animation: result-winner-arrival 1.2s ease-out both;
+}
+@keyframes result-winner-arrival {
+  0% {
+    scale: 0.96;
+    box-shadow: 0 0 0 rgba(112, 231, 162, 0);
+  }
+  45% {
+    scale: 1.025;
+    box-shadow: 0 0 1.4rem rgba(112, 231, 162, 0.34);
+  }
+  100% {
+    scale: 1;
+    box-shadow: var(--shadow);
+  }
+}
 .result-player-card--winner h2 [aria-label='Game Host winner'] {
   color: var(--sun);
 }
@@ -739,6 +765,36 @@ button:disabled {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 800;
+}
+.display-player-list__primary {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) 3ch;
+  align-items: baseline;
+  gap: 0.55rem;
+}
+.display-player-list__count {
+  justify-self: end;
+  min-width: 3ch;
+  color: var(--mint-strong);
+  font-size: clamp(1rem, 1.5vw, 1.25rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  text-align: right;
+}
+.display-enable-sound {
+  margin: 0 0 0.85rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--paper-muted);
+  font: inherit;
+  cursor: pointer;
+}
+.display-enable-sound:focus-visible {
+  outline: 0.18rem solid var(--sun);
+  outline-offset: 0.15rem;
 }
 .display-player-list__item--offline {
   opacity: 0.56;
