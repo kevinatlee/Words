@@ -99,6 +99,10 @@ type InternalRound = {
     playerId: string;
     displayName: string;
   }[];
+  acceptedWordCounts: readonly {
+    playerId: string;
+    count: number;
+  }[];
   startedAt: number;
   deadlineAt: number;
   endedAt: number | null;
@@ -197,7 +201,7 @@ export type ControllerActionResult = {
 
 export type SubmitWordResult = {
   response: SubmitWordResponse;
-  reconciledRoom: RoomState | null;
+  roomUpdate: RoomState | null;
 };
 
 export type RoomStoreOptions = {
@@ -560,6 +564,11 @@ export class RoomStore {
         settings,
         board,
         participants,
+        acceptedWordCounts: Object.freeze(
+          participants.map((participant) =>
+            Object.freeze({ playerId: participant.playerId, count: 0 }),
+          ),
+        ),
         startedAt: now,
         deadlineAt: now + settings.roundDurationSeconds * 1_000,
         endedAt: null,
@@ -731,7 +740,7 @@ export class RoomStore {
     }
 
     const reconciled = this.reconcileRound(room, now);
-    const reconciledRoom = reconciled ? this.toRoomState(room) : null;
+    const roomUpdate = reconciled ? this.toRoomState(room) : null;
     const player = room.players.get(session.playerId);
     if (
       !player ||
@@ -739,7 +748,7 @@ export class RoomStore {
       player.socketId !== socketId ||
       player.id !== session.playerId
     ) {
-      return this.submissionFailure('UNAUTHORIZED', null, reconciledRoom);
+      return this.submissionFailure('UNAUTHORIZED', null, roomUpdate);
     }
 
     const currentState = this.getPlayerSubmissionState(room, player.id);
@@ -747,30 +756,22 @@ export class RoomStore {
       return this.submissionFailure(
         'ROUND_NOT_ACTIVE',
         currentState,
-        reconciledRoom,
+        roomUpdate,
       );
     }
     if (input.roundId !== room.round.id) {
-      return this.submissionFailure(
-        'ROUND_MISMATCH',
-        currentState,
-        reconciledRoom,
-      );
+      return this.submissionFailure('ROUND_MISMATCH', currentState, roomUpdate);
     }
 
     const internalState = room.roundSubmissions?.get(player.id);
     if (!internalState) {
-      return this.submissionFailure(
-        'NOT_ROUND_PARTICIPANT',
-        null,
-        reconciledRoom,
-      );
+      return this.submissionFailure('NOT_ROUND_PARTICIPANT', null, roomUpdate);
     }
     if (!allowAttempt()) {
       return this.submissionFailure(
         'RATE_LIMITED',
         this.copySubmissionState(internalState),
-        reconciledRoom,
+        roomUpdate,
       );
     }
 
@@ -787,7 +788,7 @@ export class RoomStore {
       return this.submissionFailure(
         'INTERNAL_ERROR',
         this.copySubmissionState(internalState),
-        reconciledRoom,
+        roomUpdate,
       );
     }
     if (!validated.valid) {
@@ -796,7 +797,7 @@ export class RoomStore {
       return this.submissionFailure(
         code,
         this.copySubmissionState(internalState),
-        reconciledRoom,
+        roomUpdate,
       );
     }
     if (
@@ -807,7 +808,7 @@ export class RoomStore {
       return this.submissionFailure(
         'ALREADY_SUBMITTED',
         this.copySubmissionState(internalState),
-        reconciledRoom,
+        roomUpdate,
       );
     }
     if (
@@ -817,7 +818,7 @@ export class RoomStore {
       return this.submissionFailure(
         'SUBMISSION_LIMIT_REACHED',
         this.copySubmissionState(internalState),
-        reconciledRoom,
+        roomUpdate,
       );
     }
 
@@ -828,14 +829,14 @@ export class RoomStore {
       return this.submissionFailure(
         'INTERNAL_ERROR',
         this.copySubmissionState(internalState),
-        reconciledRoom,
+        roomUpdate,
       );
     }
     if (!scored.valid || scored.word !== validated.word) {
       return this.submissionFailure(
         'INTERNAL_ERROR',
         this.copySubmissionState(internalState),
-        reconciledRoom,
+        roomUpdate,
       );
     }
 
@@ -857,7 +858,7 @@ export class RoomStore {
       return this.submissionFailure(
         'INTERNAL_ERROR',
         this.copySubmissionState(internalState),
-        reconciledRoom,
+        roomUpdate,
       );
     }
 
@@ -866,8 +867,22 @@ export class RoomStore {
       acceptedWords: Object.freeze([...parsed.data.acceptedWords]),
     });
     room.roundSubmissions?.set(player.id, committed);
+    room.round = Object.freeze({
+      ...room.round,
+      acceptedWordCounts: Object.freeze(
+        room.round.acceptedWordCounts.map((entry) =>
+          entry.playerId === player.id
+            ? Object.freeze({
+                playerId: entry.playerId,
+                count: committed.acceptedWords.length,
+              })
+            : entry,
+        ),
+      ),
+    });
+    this.touch(room, now);
     return {
-      reconciledRoom,
+      roomUpdate: this.toRoomState(room),
       response: {
         ok: true,
         acceptedWord: { ...acceptedWord },
@@ -1301,7 +1316,7 @@ export class RoomStore {
   private submissionFailure(
     code: SubmissionError['code'],
     state: PlayerRoundSubmissionState | null,
-    reconciledRoom: RoomState | null,
+    roomUpdate: RoomState | null,
   ): SubmitWordResult {
     const messages: Record<SubmissionError['code'], string> = {
       INVALID_PAYLOAD: 'Check that word and try again.',
@@ -1320,7 +1335,7 @@ export class RoomStore {
       INTERNAL_ERROR: 'That word could not be checked.',
     };
     return {
-      reconciledRoom,
+      roomUpdate,
       response: {
         ok: false,
         error: { code, message: messages[code] },
@@ -1340,6 +1355,9 @@ export class RoomStore {
       },
       participants: round.participants.map((participant) => ({
         ...participant,
+      })),
+      acceptedWordCounts: round.acceptedWordCounts.map((entry) => ({
+        ...entry,
       })),
       startedAt: new Date(round.startedAt).toISOString(),
       deadlineAt: new Date(round.deadlineAt).toISOString(),

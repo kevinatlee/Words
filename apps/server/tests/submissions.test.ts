@@ -146,6 +146,10 @@ describe('RoomStore private submissions', () => {
     expect(reconnected.room).not.toHaveProperty('acceptedWords');
     expect(reconnected.room).not.toHaveProperty('provisionalScore');
     expect(reconnected.room.round).not.toHaveProperty('submissions');
+    expect(reconnected.room.round?.acceptedWordCounts).toEqual([
+      { playerId: game.first.session.playerId, count: 0 },
+      { playerId: game.second.session.playerId, count: 0 },
+    ]);
   });
 
   it('accepts, scores, sequences, and privately returns a valid word', () => {
@@ -164,7 +168,15 @@ describe('RoomStore private submissions', () => {
       acceptedWord: { sequence: 1, word: 'CAT', points: 3 },
       state: { submissionVersion: 1, provisionalScore: 3 },
     });
-    expect(game.store.getRoomState(game.display.room.code)).toEqual(before);
+    const after = game.store.getRoomState(game.display.room.code);
+    expect(after?.stateVersion).toBe((before?.stateVersion ?? 0) + 1);
+    expect(after?.round?.acceptedWordCounts).toEqual([
+      { playerId: game.first.session.playerId, count: 1 },
+      { playerId: game.second.session.playerId, count: 0 },
+    ]);
+    expect(result.roomUpdate).toEqual(after);
+    expect(result.roomUpdate).not.toHaveProperty('acceptedWords');
+    expect(result.roomUpdate).not.toHaveProperty('provisionalScore');
   });
 
   it('returns copies that cannot mutate committed private state', () => {
@@ -202,12 +214,17 @@ describe('RoomStore private submissions', () => {
       );
 
     expect(submit().response.ok).toBe(true);
-    const duplicate = submit().response;
-    expect(duplicate).toMatchObject({
+    const afterAccepted = game.store.getRoomState(game.display.room.code);
+    const duplicate = submit();
+    expect(duplicate.response).toMatchObject({
       ok: false,
       error: { code: 'ALREADY_SUBMITTED' },
       state: { submissionVersion: 1, provisionalScore: 3 },
     });
+    expect(duplicate.roomUpdate).toBeNull();
+    expect(game.store.getRoomState(game.display.room.code)).toEqual(
+      afterAccepted,
+    );
   });
 
   it('allows two participants to submit the same word independently', () => {
@@ -277,6 +294,13 @@ describe('RoomStore private submissions', () => {
       error: { code: 'NOT_ROUND_PARTICIPANT' },
       state: null,
     });
+    expect(
+      game.store
+        .getRoomState(game.display.room.code)
+        ?.round?.acceptedWordCounts.some(
+          (entry) => entry.playerId === late.session.playerId,
+        ),
+    ).toBe(false);
   });
 
   it('restores only the reconnecting player private state and rejects the stale socket', () => {
@@ -296,6 +320,10 @@ describe('RoomStore private submissions', () => {
     expect(reconnected.submissionState).toMatchObject({
       playerId: game.first.session.playerId,
       acceptedWords: [{ word: 'CAT' }],
+    });
+    expect(reconnected.room.round?.acceptedWordCounts).toContainEqual({
+      playerId: game.first.session.playerId,
+      count: 1,
     });
     expect(
       game.store.submitWord(
@@ -379,7 +407,7 @@ describe('RoomStore private submissions', () => {
       },
       deadline,
     );
-    expect(result.reconciledRoom).toMatchObject({
+    expect(result.roomUpdate).toMatchObject({
       phase: 'ROUND_ENDED',
       round: { endedAt: new Date(deadline).toISOString() },
     });
@@ -530,6 +558,10 @@ describe('RoomStore private submissions', () => {
       provisionalScore: 0,
     });
     expect(next.room.round?.results).toBeNull();
+    expect(next.room.round?.acceptedWordCounts).toEqual([
+      { playerId: game.first.session.playerId, count: 0 },
+      { playerId: game.second.session.playerId, count: 0 },
+    ]);
   });
 
   it('finalizes unique and shared words into one authoritative public result', () => {
@@ -565,6 +597,10 @@ describe('RoomStore private submissions', () => {
       expiresAt: active?.expiresAt,
       round: {
         endedAt: active?.round?.deadlineAt,
+        acceptedWordCounts: [
+          { playerId: game.first.session.playerId, count: 2 },
+          { playerId: game.second.session.playerId, count: 1 },
+        ],
         results: {
           winnerPlayerIds: [game.first.session.playerId],
           players: [

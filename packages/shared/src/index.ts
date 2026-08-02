@@ -9,6 +9,7 @@ export { buildJoinUrl } from './join-url';
 export {
   createDisplayInputSchema,
   acceptedWordSchema,
+  acceptedWordCountEntrySchema,
   controllerActionResponseSchema,
   controllerStatusSchema,
   createEmptyRoomHighlights,
@@ -60,6 +61,7 @@ export {
   type ClientToServerEvents,
   type ConnectionStatus,
   type AcceptedWord,
+  type AcceptedWordCountEntry,
   type ControllerActionAcknowledgement,
   type ControllerActionResponse,
   type ControllerStatus,

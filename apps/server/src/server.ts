@@ -638,8 +638,8 @@ export function createWordsServer(
               ),
             receivedAt,
           );
-          if (result.reconciledRoom) {
-            io.to(session.roomCode).emit('room:state', result.reconciledRoom);
+          if (result.roomUpdate) {
+            io.to(session.roomCode).emit('room:state', result.roomUpdate);
           }
           sendAcknowledgement(result.response);
         } catch {

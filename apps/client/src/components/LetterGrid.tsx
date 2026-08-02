@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useEffect,
   useRef,
@@ -31,7 +32,7 @@ type LetterGridProps = {
   onTraceCancel?: () => void;
 };
 
-export function LetterGrid({
+export const LetterGrid = memo(function LetterGrid({
   letters,
   size,
   label,
@@ -360,4 +361,4 @@ export function LetterGrid({
       })}
     </div>
   );
-}
+});
