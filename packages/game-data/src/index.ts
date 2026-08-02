@@ -2,6 +2,8 @@ export {
   DEFAULT_BOARD_QUALITY_PROFILES,
   generateDefaultBoard,
   isDefaultBoardAcceptable,
+  measureBoardSpatialQuality,
+  type BoardSpatialQuality,
   type BoardQualityProfile,
   type GenerateDefaultBoardOptions,
 } from './board-profile.js';
