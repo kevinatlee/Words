@@ -67,10 +67,11 @@ export function DisplayJoinBoard({ joinUrl }: DisplayJoinBoardProps) {
               level="M"
               boostLevel={false}
               marginSize={4}
-              bgColor="transparent"
+              bgColor="#f5f1e7"
               fgColor="#000000"
               aria-hidden="true"
               focusable="false"
+              shapeRendering="crispEdges"
             />
           </QrBoundary>
         </div>

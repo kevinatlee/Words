@@ -4,7 +4,7 @@ import { createDemoBoard } from './demoBoard';
 
 const boards = {
   4: ['WORD', 'PLAY', 'FIND', 'FOUR'],
-  5: ['WORDS', 'ASDNH', 'NFIXA', 'NSFVR', 'ATLEE'],
+  5: ['WORDS', 'ASDNH', 'NFIXA', 'NSEVR', 'ATLEE'],
   6: ['WORDSL', 'PARTYE', 'FINDST', 'ATLEET', 'PLAYSE', 'SIXBYR'],
 } as const;
 
@@ -36,6 +36,7 @@ describe('createDemoBoard', () => {
     expect([4, 9, 14, 19, 24].map((index) => board[index]).join('')).toBe(
       'SHARE',
     );
+    expect(board[17]).toBe('E');
   });
 
   it('returns independent arrays rather than mutable shared board constants', () => {

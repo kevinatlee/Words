@@ -90,9 +90,12 @@ display-only rounding.
   presentation. The TV lobby demonstration board's perimeter spells `WORDS`,
   `ATLEE`, `WANNA`, and `SHARE` around its unchanged merged QR region.
 - Pre-round phone demonstration boards are explicit presentation-only 4 × 4,
-  5 × 5, and 6 × 6 layouts; official round boards remain server-generated.
-  The embedded QR retains its data and perimeter words while its square SVG
-  surface prevents fractional bottom/right edge seams.
+  5 × 5, and 6 × 6 layouts; the 5 × 5 fourth row is `NSEVR`. Official round
+  boards remain server-generated. The embedded QR retains its data and
+  perimeter words while its square SVG surface has an opaque `#f5f1e7`
+  viewport background and crisp module rendering. The prior square-sizing-only
+  correction did not eliminate the physical Safari artifact; repeat validation
+  on the test channel remains required.
 - Phones do not show provisional scores or accepted-word counts. A possible
   active-TV word-count presentation remains deferred to the separate TV
   redesign because it needs an aggregate-display decision.

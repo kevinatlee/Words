@@ -1,5 +1,21 @@
 # Development log
 
+## 2026-08-02 — Lobby demonstration board and QR boundary correction (draft)
+
+- Corrected the presentation-only 5 × 5 demonstration board's fourth row to
+  `NSEVR`, preserving its `WORDS` / `ATLEE` / `WANNA` / `SHARE` perimeter and
+  the unchanged explicit 4 × 4 and 6 × 6 boards. Official round generation is
+  unchanged.
+- The earlier square-SVG sizing change did not resolve the physical Safari
+  artifact. Inspection established that `qrcode.react` emitted a transparent
+  background path over the whole fractional-size SVG viewport, leaving its
+  bottom/right viewport edge subject to compositing. The QR now supplies the
+  established opaque paper `#f5f1e7` background and crisp SVG rendering while
+  retaining its quiet zone, payload, merged placement, and error boundary.
+- The updated test image still requires repeat physical validation on
+  `WordsTest`; no claim of physical artifact elimination is made from automated
+  checks alone.
+
 ## 2026-08-01 — Explicit test-container release channel (draft)
 
 - Added a separately dispatched, confirmation-protected test-image workflow

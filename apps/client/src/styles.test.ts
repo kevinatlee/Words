@@ -167,6 +167,9 @@ describe('tile typography', () => {
     expect(styles).toMatch(
       /\.display-join-board__qr svg\s*\{[^}]*display: block;[^}]*width: 100%;[^}]*height: 100%;[^}]*max-width: 100%;[^}]*max-height: 100%;/s,
     );
+    expect(styles).toMatch(
+      /\.display-join-board__qr svg\s*\{[^}]*border: 0;[^}]*outline: 0;/s,
+    );
     expect(styles).not.toMatch(
       /\.display-join-board__qr svg\s*\{[^}]*height: auto;/s,
     );

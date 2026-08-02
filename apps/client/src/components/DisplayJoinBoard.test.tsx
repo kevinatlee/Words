@@ -101,11 +101,16 @@ describe('DisplayJoinBoard', () => {
       expect.objectContaining({
         value: joinUrl,
         size: 320,
-        bgColor: 'transparent',
+        bgColor: '#f5f1e7',
         fgColor: '#000000',
         marginSize: 4,
+        shapeRendering: 'crispEdges',
       }),
     );
+    const qrProps = qrCodeSvgMock.mock.calls[0]?.[0];
+    expect(qrProps).not.toHaveProperty('stroke');
+    expect(qrProps).not.toHaveProperty('border');
+    expect(qrProps).not.toHaveProperty('outline');
   });
 
   it('uses the exact QR unavailable fallback', () => {
