@@ -72,6 +72,9 @@ type WordsSocket = Socket<
 
 type FailureAcknowledgement = (response: RoomActionFailure) => void;
 
+const displayProgressChannel = (roomCode: string): string =>
+  `internal:display-progress:${roomCode}`;
+
 export type WordsServer = ReturnType<typeof createWordsServer>;
 
 type LifecycleTimer = ReturnType<typeof setInterval>;
@@ -276,6 +279,9 @@ export function createWordsServer(
 
       roomSocket.emit('room:error', error);
       if (roomSocket.data.session?.roomCode === roomCode) {
+        if (roomSocket.data.session.role === 'display') {
+          void roomSocket.leave(displayProgressChannel(roomCode));
+        }
         delete roomSocket.data.session;
       }
       void roomSocket.leave(roomCode);
@@ -299,6 +305,9 @@ export function createWordsServer(
       code: 'RECONNECT_FAILED',
       message: 'This temporary session was resumed in another browser tab.',
     });
+    if (replacedSocket.data.session?.role === 'display') {
+      void replacedSocket.leave(displayProgressChannel(roomCode));
+    }
     delete replacedSocket.data.session;
     void replacedSocket.leave(roomCode);
   };
@@ -373,6 +382,7 @@ export function createWordsServer(
             displaySessionId: result.session.displaySessionId,
           };
           void socket.join(result.room.code);
+          void socket.join(displayProgressChannel(result.room.code));
           acknowledge({
             ok: true,
             room: result.room,
@@ -418,6 +428,7 @@ export function createWordsServer(
             displaySessionId: result.session.displaySessionId,
           };
           void socket.join(result.room.code);
+          void socket.join(displayProgressChannel(result.room.code));
           acknowledge({
             ok: true,
             room: result.room,
@@ -639,7 +650,10 @@ export function createWordsServer(
             receivedAt,
           );
           if (result.roomUpdate) {
-            io.to(session.roomCode).emit('room:state', result.roomUpdate);
+            io.to(displayProgressChannel(session.roomCode)).emit(
+              'room:state',
+              result.roomUpdate,
+            );
           }
           sendAcknowledgement(result.response);
         } catch {
@@ -850,6 +864,7 @@ export function createWordsServer(
 
         delete socket.data.session;
         void socket.leave(session.roomCode);
+        void socket.leave(displayProgressChannel(session.roomCode));
         acknowledge({ ok: true });
         socket.to(result.roomCode).emit('display:disconnected', result.display);
         io.to(result.roomCode).emit('room:state', result.room);

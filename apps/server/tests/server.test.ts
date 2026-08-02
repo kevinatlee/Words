@@ -44,7 +44,22 @@ const successfulDictionaryLoad: Extract<
 > = {
   success: true,
   dictionary: {
-    has: (word: string) => ['ABC', 'CAT', 'DOG', 'QUIZ'].includes(word),
+    has: (word: string) =>
+      [
+        'ABC',
+        'ABG',
+        'AFK',
+        'AGM',
+        'BCH',
+        'BGL',
+        'CAT',
+        'CHM',
+        'DIN',
+        'DOG',
+        'FGH',
+        'KLM',
+        'QUIZ',
+      ].includes(word),
   },
   wordCount: 79_370,
   manifest: PRODUCTION_DICTIONARY_IDENTITY as never,
@@ -1969,7 +1984,7 @@ describe('Words Stage 4B server', () => {
     });
   });
 
-  it('broadcasts one count-only progress snapshot while keeping accepted words private', async () => {
+  it('sends count-only progress to the display without waking either phone', async () => {
     const display = await connectClient();
     const created = await emitCreateDisplay(display);
     if (!created.ok) throw new Error('Display creation failed.');
@@ -1987,56 +2002,111 @@ describe('Words Stage 4B server', () => {
       display,
       (room) => room.phase === 'ROUND_ACTIVE',
     );
+    const firstActiveBroadcast = nextRoomState(
+      first,
+      (room) => room.phase === 'ROUND_ACTIVE',
+    );
+    const secondActiveBroadcast = nextRoomState(
+      second,
+      (room) => room.phase === 'ROUND_ACTIVE',
+    );
     const started = await emitStartRound(first);
     if (!started.ok || !started.room.round || !firstJoin.ok || !secondJoin.ok) {
       throw new Error('Round setup failed.');
     }
-    await activeBroadcast;
+    await Promise.all([
+      activeBroadcast,
+      firstActiveBroadcast,
+      secondActiveBroadcast,
+    ]);
     const publicVersion = started.room.stateVersion;
-    const publicBroadcasts: RoomState[] = [];
-    display.on('room:state', (room) => publicBroadcasts.push(room));
+    const displayBroadcasts: RoomState[] = [];
+    const firstPhoneBroadcasts: RoomState[] = [];
+    const secondPhoneBroadcasts: RoomState[] = [];
+    display.on('room:state', (room) => displayBroadcasts.push(room));
+    first.on('room:state', (room) => firstPhoneBroadcasts.push(room));
+    second.on('room:state', (room) => secondPhoneBroadcasts.push(room));
 
-    const response = await emitSubmitWord(first, {
-      roundId: started.room.round.id,
-      word: 'ABC',
-      path: [0, 1, 2],
-    });
-    expect(response).toMatchObject({
-      ok: true,
-      acceptedWord: { word: 'ABC', points: 3 },
-      state: {
-        playerId: firstJoin.session.playerId,
-        submissionVersion: 1,
-        provisionalScore: 3,
-      },
-    });
-    expect(response).not.toHaveProperty('room');
+    const submissions = [
+      { word: 'ABC', path: [0, 1, 2] },
+      { word: 'ABG', path: [0, 1, 6] },
+      { word: 'AFK', path: [0, 5, 10] },
+      { word: 'AGM', path: [0, 6, 12] },
+      { word: 'BCH', path: [1, 2, 7] },
+      { word: 'BGL', path: [1, 6, 11] },
+      { word: 'CHM', path: [2, 7, 12] },
+      { word: 'DIN', path: [3, 8, 13] },
+      { word: 'FGH', path: [5, 6, 7] },
+      { word: 'KLM', path: [10, 11, 12] },
+    ];
+    for (const [index, submission] of submissions.entries()) {
+      const response = await emitSubmitWord(first, {
+        roundId: started.room.round.id,
+        ...submission,
+      });
+      if (!response.ok) {
+        throw new Error(`${submission.word}: ${response.error.code}`);
+      }
+      expect(response).toMatchObject({
+        ok: true,
+        acceptedWord: { word: submission.word, points: 3 },
+        state: {
+          playerId: firstJoin.session.playerId,
+          submissionVersion: index + 1,
+        },
+      });
+      expect(response).not.toHaveProperty('room');
+    }
     await new Promise<void>((resolve) => setImmediate(resolve));
-    expect(publicBroadcasts).toHaveLength(1);
-    expect(publicBroadcasts[0]).toMatchObject({
-      stateVersion: publicVersion + 1,
+    expect(displayBroadcasts).toHaveLength(submissions.length);
+    expect(firstPhoneBroadcasts).toHaveLength(0);
+    expect(secondPhoneBroadcasts).toHaveLength(0);
+    expect(displayBroadcasts.at(-1)).toMatchObject({
+      stateVersion: publicVersion + submissions.length,
       round: {
         acceptedWordCounts: [
-          { playerId: firstJoin.session.playerId, count: 1 },
+          { playerId: firstJoin.session.playerId, count: submissions.length },
           { playerId: secondJoin.session.playerId, count: 0 },
         ],
       },
     });
-    expect(JSON.stringify(publicBroadcasts[0])).not.toContain('"word":"ABC"');
-    expect(JSON.stringify(publicBroadcasts[0])).not.toContain('acceptedAt');
+    expect(JSON.stringify(displayBroadcasts)).not.toContain('"word":"ABC"');
+    expect(JSON.stringify(displayBroadcasts)).not.toContain('acceptedAt');
     expect(server.roomStore.getRoomState(created.room.code)?.stateVersion).toBe(
-      publicVersion + 1,
+      publicVersion + submissions.length,
     );
 
     expect(
-      await emitSubmitWord(first, {
+      await emitSubmitWord(second, {
         roundId: started.room.round.id,
-        word: 'ABC',
+        word: 'ABD',
         path: [0, 1, 2],
       }),
-    ).toMatchObject({ ok: false, error: { code: 'ALREADY_SUBMITTED' } });
+    ).toMatchObject({ ok: false, error: { code: 'PATH_WORD_MISMATCH' } });
     await new Promise<void>((resolve) => setImmediate(resolve));
-    expect(publicBroadcasts).toHaveLength(1);
+    expect(displayBroadcasts).toHaveLength(submissions.length);
+    expect(firstPhoneBroadcasts).toHaveLength(0);
+    expect(secondPhoneBroadcasts).toHaveLength(0);
+
+    const transferredState = nextRoomState(
+      first,
+      (room) => room.controllerPlayerId === secondJoin.session.playerId,
+    );
+    expect(
+      await emitTransferController(first, {
+        targetPlayerId: secondJoin.session.playerId,
+      }),
+    ).toMatchObject({ ok: true });
+    expect(await transferredState).toMatchObject({
+      stateVersion: publicVersion + submissions.length + 1,
+      controllerPlayerId: secondJoin.session.playerId,
+      round: {
+        acceptedWordCounts: [
+          { playerId: firstJoin.session.playerId, count: submissions.length },
+          { playerId: secondJoin.session.playerId, count: 0 },
+        ],
+      },
+    });
 
     second.disconnect();
     const reconnectedSecond = await connectClient();
@@ -2050,6 +2120,39 @@ describe('Words Stage 4B server', () => {
         playerId: secondJoin.session.playerId,
         submissionVersion: 0,
         acceptedWords: [],
+      },
+      room: {
+        round: {
+          acceptedWordCounts: [
+            {
+              playerId: firstJoin.session.playerId,
+              count: submissions.length,
+            },
+            { playerId: secondJoin.session.playerId, count: 0 },
+          ],
+        },
+      },
+    });
+
+    display.disconnect();
+    const reconnectedDisplay = await connectClient();
+    expect(
+      await emitReconnectDisplay(reconnectedDisplay, {
+        roomCode: created.room.code,
+        displayReconnectToken: created.session.displayReconnectToken,
+      }),
+    ).toMatchObject({
+      ok: true,
+      room: {
+        round: {
+          acceptedWordCounts: [
+            {
+              playerId: firstJoin.session.playerId,
+              count: submissions.length,
+            },
+            { playerId: secondJoin.session.playerId, count: 0 },
+          ],
+        },
       },
     });
   });

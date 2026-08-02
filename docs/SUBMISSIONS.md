@@ -50,8 +50,11 @@ transition.
 
 Success returns the accepted word and complete private state only to the
 requesting socket, increments that participant's public count, advances the room
-version exactly once, and broadcasts one authoritative room snapshot. Authorized
-failures may return the unchanged private state
+version exactly once, and sends one authoritative count-only snapshot to the
+display-only internal channel. Neither the submitting phone nor other phones
+receive a public room snapshot solely for that acceptance. Ordinary room-wide
+updates remain room-wide, and player/display reconnect responses include the
+latest count state. Authorized failures may return the unchanged private state
 to recover from a lost earlier acknowledgement. Unbound, display-bound, stale,
 removed, or unrelated requests return `state: null`. There is no room-wide
 word event.
@@ -76,13 +79,14 @@ Native buttons remain inside accessible
 grid cells for keyboard activation, and selection stops with local feedback
 before the derived candidate exceeds the 64-letter wire bound.
 
-During the active round, the phone shows only **Your accepted words** and
-**Provisional points**. Provisional totals are not final scores. At the
-automatic `ROUND_ENDED` transition, Stage 4D makes only the result projection
-public to the room: canonical words, shared/unique status, point treatment,
-final totals, ranks, and winners. `acceptedAt`, private sequence and version,
-paths, rejected attempts, and rate-limit state remain private. The owner can
-still recover their unchanged private state on reconnect until the next round.
+During the active round, accepted feedback is local to the submitting phone;
+the phone does not display a running accepted count or provisional total. At
+the automatic `ROUND_ENDED` transition, Stage 4D makes only the result
+projection public to the room: canonical words, shared/unique status, point
+treatment, final totals, ranks, and winners. `acceptedAt`, private sequence and
+version, paths, rejected attempts, and rate-limit state remain private. The
+owner can still recover their unchanged private state on reconnect until the
+next round.
 
 The accepted-count list follows immutable `round.participants` order. It starts
 at zero each round, survives disconnect/reconnect, excludes late joiners, and

@@ -1,5 +1,47 @@
 # Development log
 
+## 2026-08-02 — Stage 4H first-playtest follow-up (draft)
+
+- Lifted display audio above the round-keyed room view into the stable App
+  session. It now arms immediately, keeps one AudioContext through every phase
+  and later rounds, follows context suspension, retries on ordinary display
+  interaction or visibility restoration, and disposes only with the display
+  session.
+- Replaced the Room Highlights text button with a compact mint speaker key in a
+  zero-height upper-right layer below the display header. The key appears only
+  while supported audio remains blocked or suspended.
+- Raised accepted chimes to a `0.08` root peak with a quieter fifth 50 ms later,
+  and replaced the winner sound with a 1.16-second rising major phrase and
+  final chord peaking at `0.10`. Hidden or blocked changes never create a
+  replay backlog.
+- Kept the phone Tap/Trace selector visible through lobby, active play, results,
+  lobby return, and later rounds by owning its stored preference above
+  round-keyed room remounts.
+- Added exact-token spatial board rejection: no eight-direction identical
+  component above two, no identical straight run of three, no four-vowel 2 × 2
+  window, and no 3 × 3 window above six vowels. Deterministic evidence required
+  bounded 16/32/64 attempt ceilings for 4 × 4, 5 × 5, and 6 × 6 boards.
+- Moved accepted-count snapshots to an internal display-only Socket.IO channel.
+  A ten-acceptance integration guard observes ten display snapshots and zero
+  callbacks on both phones; private acknowledgements and all ordinary room-wide
+  lifecycle updates remain unchanged.
+- Rechecked the active phone path. The established deadline-aligned timer,
+  hidden-page pausing, one-frame Trace work, geometry cache, stable board
+  references, event-driven networking, and zero phone AudioContext behavior
+  remain intact. No additional demonstrated recurring phone waste was found;
+  battery improvement still requires a controlled-enough physical comparison.
+- Focused verification passed 299 tests across 15 files. Full verification
+  passed privacy and all data audits, format, lint, typecheck, 745 tests across
+  45 files, all builds, client data exclusion, the production smoke test, and
+  dependency audit with zero vulnerabilities. The spatial audit accepted
+  10,000 boards per size with zero failures or violations and deterministic
+  report SHA-256
+  `e466c4fc76ee4dbd786a5f92aaea133dcf846dd2437c39b72c0bef02758cc6ae`.
+- Automated 1280 × 720 and 1920 × 1080 browser checks found no horizontal or
+  vertical overflow and no overlap between the speaker key and the header,
+  side panels, Puzzle, or footer. Physical sound, board, control, and battery
+  validation remains required on the updated test candidate.
+
 ## 2026-08-02 — Stage 4H TV feedback and celebration (draft)
 
 - Removed deployment-specific origins, addresses, container names, registry

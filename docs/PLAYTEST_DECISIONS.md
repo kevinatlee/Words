@@ -71,8 +71,9 @@ display-only rounding.
 - New temporary rooms default to a 5 × 5 grid and a two-minute round; all
   existing supported sizes and durations remain available to the controller.
 - Puzzle bubbles have no visible heading on phones but retain an accessible
-  puzzle label. During active participation, the headingless Tap/Trace control
-  is a separate bubble directly below the puzzle.
+  puzzle label. The headingless Tap/Trace control stays centred in the phone
+  header throughout lobby, active play, and results; its one local stored
+  preference configures the current or next round.
 - Ordinary players see only the puzzle preview between rounds and never see
   settings, controller delegation, or a waiting message.
 - The controller sees three distinct sibling bubbles in the lobby and after
@@ -107,5 +108,6 @@ display-only rounding.
 
 ## Current boundary
 
-Stage 4H adds no phase or separate score stream. Its count progress travels in
-the existing authoritative room snapshot.
+Stage 4H adds no phase or separate score stream. Its count progress uses the
+existing authoritative room snapshot shape but each accepted-word update is
+delivered only to the display; ordinary room-wide updates still reach phones.

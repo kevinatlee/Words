@@ -366,8 +366,13 @@ runtime. A new round creates one empty state for each participant. `RoomState`
 serialization cannot reach this map; reconnect selects it only through the
 bound player ID. Display acknowledgements and room broadcasts never carry it.
 Successful words update only the corresponding public accepted-word count,
-increment the room version once, and broadcast one count-only snapshot. The
-private word identity remains absent.
+increment the room version once, and send one count-only `room:state` snapshot
+to an internal display-only Socket.IO channel. Player sockets never join that
+channel, so a word acceptance does not wake either the submitting phone or
+other phones. Ordinary phase, presence, reconnect, controller, settings, and
+lifecycle snapshots remain room-wide; later versions can therefore jump safely
+on phones. Reconnect acknowledgements carry the current authoritative counts.
+The private word identity remains absent.
 
 `player:submit-word` carries only a round UUID, derived word, and bounded path.
 One captured server receipt time controls deadline acceptance and
@@ -539,7 +544,10 @@ and lifecycle work; a restart intentionally ends temporary rooms. The
 multi-stage Node 24 image copies only the production artifact, runs as the
 non-root `node` user, and requires no writable data volume.
 
-Stages 4G and 5A are complete. Stage 4H adds event-driven count-only TV progress,
-one lazy display AudioContext, stable participant tones, a transition-only
-winner tune, and flow-safe rank-based result positioning. Deployment steps and
-generic production/test channel guidance are in [`DEPLOYMENT.md`](DEPLOYMENT.md).
+Stages 4G and 5A are complete. Stage 4H adds event-driven display-only TV
+progress, one default-armed AudioContext owned by the stable App display
+session, participant-specific two-part chimes, a transition-only winner phrase,
+spatial board rejection, and flow-safe rank-based result positioning. The
+audio context survives round-keyed RoomLobby phase changes and is disposed only
+when the display session ends. Deployment steps and generic production/test
+channel guidance are in [`DEPLOYMENT.md`](DEPLOYMENT.md).
