@@ -32,7 +32,10 @@ export function RoundResults({ results }: RoundResultsProps) {
             );
           const winner = results.winnerPlayerIds.includes(player.playerId);
           return (
-            <li className="result-player-card" key={player.playerId}>
+            <li
+              className={`result-player-card${winner ? ' result-player-card--winner' : ''}`}
+              key={player.playerId}
+            >
               <h2>
                 {winner && <span aria-label="Game Host winner">♛ </span>}
                 {player.displayName}

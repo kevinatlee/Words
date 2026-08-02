@@ -51,8 +51,12 @@ display-only rounding.
   hidden words are represented as “+N more”.
 - The TV result-card group is intrinsically sized and centred; individual cards
   use bounded readable widths rather than consuming the entire display.
+- TV result cards use the established dark Words panel surface, muted labels,
+  mint scores, and a restrained winner accent.
 - The TV will not scroll. Phones show a concise round summary with only the
-  player's final score and the winning score; detailed results remain TV-only.
+  player's final score and winning score. A positive winner name or all tied
+  winner names appear beneath that score in authoritative result order; a
+  zero-score round retains `No scoring winner`. Detailed results remain TV-only.
 - During the 20-second `ROUND_ENDED` presentation, phones will not
   show game-host controls. After the authoritative return to `LOBBY`, Game
   Settings and game-host delegation reappear for the current controller only.
@@ -78,8 +82,9 @@ display-only rounding.
   bubbles are absent during active gameplay for every phone.
 - Phone active timers use the concise `Timer` label. After a round, the Puzzle
   bubble is replaced by a concise `ROUND OVER` / `Look at the TV!` summary of
-  the player's own final score and the winning score. It has no board, timer,
-  word-entry controls, rankings, detailed word review, or opponent scores.
+  the player's own final score, winning score, and authoritative winner names.
+  It has no board, timer, word-entry controls, rankings, detailed word review,
+  or opponent scores.
   The shared display retains its results presentation.
 - Official 4 × 4, 5 × 5, and 6 × 6 grids use the same gap token for each
   presentation. The TV lobby demonstration board's perimeter spells `WORDS`,

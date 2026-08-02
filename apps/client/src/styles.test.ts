@@ -129,13 +129,28 @@ describe('tile typography', () => {
     );
     expect(styles).not.toMatch(/\.display-results__cards\s*\{[^}]*\b1fr\b/s);
     expect(styles).toMatch(
-      /\.result-player-card\s*\{[^}]*border-radius: var\(--radius-md\);[^}]*color: var\(--ink-950\);/s,
+      /\.result-player-card\s*\{[^}]*border: 1px solid var\(--line-strong\);[^}]*border-radius: var\(--radius-md\);[^}]*background: rgba\(16, 38, 58, 0\.72\);[^}]*box-shadow: var\(--shadow\);[^}]*color: var\(--paper\);/s,
     );
     expect(styles).toMatch(
       /\.result-player-card\s*\{[^}]*min-width: 16rem;[^}]*max-width: 24rem;[^}]*overflow-wrap: anywhere;/s,
     );
     expect(styles).toMatch(
       /\.result-player-card h2,\s*\.result-player-card li\s*\{[^}]*overflow-wrap: anywhere;/s,
+    );
+    expect(styles).toMatch(
+      /\.result-player-card--winner\s*\{[^}]*border-color: rgba\(112, 231, 162, 0\.72\);[^}]*background:/s,
+    );
+    expect(styles).toMatch(
+      /\.result-player-card--winner h2 \[aria-label='Game Host winner'\]\s*\{[^}]*color: var\(--sun\);/s,
+    );
+    expect(styles).toMatch(
+      /\.result-player-card__points\s*\{[^}]*color: var\(--mint-strong\);/s,
+    );
+    expect(styles).toMatch(
+      /\.result-player-card__stats dt\s*\{[^}]*color: var\(--paper-muted\);/s,
+    );
+    expect(styles).toMatch(
+      /\.result-player-card ul\s*\{[^}]*border-top: 1px solid var\(--line\);[^}]*background: rgba\(6, 16, 27, 0\.28\);[^}]*color: var\(--mint\);/s,
     );
     expect(styles).toMatch(
       /\.result-player-card__stats\s*\{[^}]*display: grid;[^}]*gap: 0\.15rem;[^}]*margin: 0\.45rem 0 0;/s,
@@ -148,6 +163,9 @@ describe('tile typography', () => {
     );
     expect(styles).toMatch(
       /\.phone-round-summary\s*\{[^}]*min-height: min\(17rem, 52vh\);[^}]*place-content: center;/s,
+    );
+    expect(styles).toMatch(
+      /\.phone-round-summary__winner-names\s*\{[^}]*color: var\(--paper-muted\);[^}]*overflow-wrap: anywhere;/s,
     );
   });
 

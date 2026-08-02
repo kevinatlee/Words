@@ -210,17 +210,30 @@ button:disabled {
   min-width: 16rem;
   max-width: 24rem;
   padding: 1rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-md);
-  background: var(--paper);
-  color: var(--ink-950);
+  background: rgba(16, 38, 58, 0.72);
+  box-shadow: var(--shadow);
+  color: var(--paper);
   overflow-wrap: anywhere;
+}
+.result-player-card--winner {
+  border-color: rgba(112, 231, 162, 0.72);
+  background:
+    linear-gradient(135deg, rgba(112, 231, 162, 0.16), transparent 58%),
+    rgba(16, 38, 58, 0.8);
+}
+.result-player-card--winner h2 [aria-label='Game Host winner'] {
+  color: var(--sun);
 }
 .result-player-card h2,
 .result-player-card li {
   overflow-wrap: anywhere;
 }
 .result-player-card__points {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--mint-strong);
   font-size: 1.5rem;
 }
 .result-player-card__stats {
@@ -239,12 +252,24 @@ button:disabled {
   margin: 0;
 }
 .result-player-card__stats dt {
-  color: var(--ink-700);
+  color: var(--paper-muted);
   font-size: 0.8rem;
   font-weight: 800;
 }
 .result-player-card__stats dd {
+  color: var(--paper);
   font-weight: 900;
+}
+.result-player-card ul {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.8rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border-top: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(6, 16, 27, 0.28);
+  color: var(--mint);
+  list-style-position: inside;
 }
 
 .connection-status--phone {
@@ -1881,10 +1906,20 @@ button:disabled {
 }
 
 .phone-round-summary dd {
+  display: grid;
+  gap: 0.2rem;
   margin: 0;
   color: var(--paper);
   font-size: clamp(1.35rem, 6vw, 1.8rem);
   font-weight: 900;
+}
+
+.phone-round-summary__winner-names {
+  color: var(--paper-muted);
+  font-size: 0.78em;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .room-dashboard--phone .board-panel__heading {

@@ -16,6 +16,23 @@ function winningScore(results: RoundResults): number | null {
   return winner?.finalScore ?? null;
 }
 
+function winnerNames(results: RoundResults): string | null {
+  const names = results.players
+    .filter((player) => results.winnerPlayerIds.includes(player.playerId))
+    .map((player) => player.displayName);
+
+  if (names.length === 0) {
+    return null;
+  }
+  if (names.length === 1) {
+    return names[0]!;
+  }
+  if (names.length === 2) {
+    return names.join(' & ');
+  }
+  return `${names.slice(0, -1).join(', ')} & ${names.at(-1)}`;
+}
+
 function scoreLabel(score: number | null): string {
   return score === null
     ? 'No scoring winner'
@@ -30,6 +47,19 @@ export function PhoneRoundSummary({
     (player) => player.playerId === currentPlayerId,
   );
   const topScore = results ? winningScore(results) : null;
+  const winners = results ? winnerNames(results) : null;
+
+  const winningScoreSummary = (
+    <>
+      <dt>Winning Score</dt>
+      <dd>
+        <span>{scoreLabel(topScore)}</span>
+        {winners && (
+          <span className="phone-round-summary__winner-names">{winners}</span>
+        )}
+      </dd>
+    </>
+  );
 
   return (
     <section
@@ -44,19 +74,13 @@ export function PhoneRoundSummary({
             <dt>Your Score</dt>
             <dd>{scoreLabel(playerResult.finalScore)}</dd>
           </div>
-          <div>
-            <dt>Winning Score</dt>
-            <dd>{scoreLabel(topScore)}</dd>
-          </div>
+          <div>{winningScoreSummary}</div>
         </dl>
       ) : (
         <>
           <p>You joined after this round began.</p>
           <dl>
-            <div>
-              <dt>Winning Score</dt>
-              <dd>{scoreLabel(topScore)}</dd>
-            </div>
+            <div>{winningScoreSummary}</div>
           </dl>
         </>
       )}

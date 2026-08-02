@@ -1376,3 +1376,14 @@ player are separate roles, and neither socket alone owns room lifetime.
   production release channel changed. Local visual server startup could not
   claim port 6532 in this environment; final physical review is reserved for
   the deployed test container.
+
+## 2026-08-01 — Stage 4G result presentation refinement (draft)
+
+- Extended the phone `ROUND_ENDED` summary with authoritative winner names
+  directly below the winning score. Ties retain result order and use readable
+  ampersand punctuation; no-winner rounds still show `No scoring winner` only.
+- Restyled the display result cards with the established dark Words surface,
+  paper and muted text, mint score emphasis, inset word lists, and a restrained
+  winner border/crown accent. The compact centred intrinsic layout is unchanged.
+- No result projection, scoring, lifecycle, authority, Socket.IO, deployment,
+  or production channel behavior changed.
