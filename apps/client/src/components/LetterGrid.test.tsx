@@ -135,6 +135,24 @@ afterEach(() => {
 });
 
 describe('LetterGrid accepted feedback', () => {
+  it.each([4, 5, 6])(
+    'uses the shared official-grid structure at %i by %i',
+    (size) => {
+      render(
+        <LetterGrid
+          letters={Array.from({ length: size * size }, () => 'A')}
+          size={size}
+          label={`${size} by ${size} official letter grid`}
+        />,
+      );
+
+      const grid = screen.getByRole('grid');
+      expect(grid).toHaveClass('letter-grid');
+      expect(grid).toHaveStyle({ '--grid-size': String(size) });
+      expect(within(grid).getAllByRole('gridcell')).toHaveLength(size * size);
+    },
+  );
+
   it('marks only accepted indexes and lets accepted feedback override selection styling', () => {
     render(
       <LetterGrid

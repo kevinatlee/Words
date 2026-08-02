@@ -20,6 +20,7 @@ export function RoundResults({ results }: RoundResultsProps) {
       <h1 id="round-results-title">Round Results</h1>
       <ol
         className={`display-results__cards display-results__cards--${results.players.length}`}
+        data-result-card-count={results.players.length}
       >
         {results.players.map((player) => {
           const uniqueWords = [...player.words]
@@ -31,7 +32,10 @@ export function RoundResults({ results }: RoundResultsProps) {
             );
           const winner = results.winnerPlayerIds.includes(player.playerId);
           return (
-            <li className="result-player-card" key={player.playerId}>
+            <li
+              className={`result-player-card${winner ? ' result-player-card--winner' : ''}`}
+              key={player.playerId}
+            >
               <h2>
                 {winner && <span aria-label="Game Host winner">♛ </span>}
                 {player.displayName}

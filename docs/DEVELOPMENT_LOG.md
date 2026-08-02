@@ -1,5 +1,36 @@
 # Development log
 
+## 2026-08-02 — Lobby QR canvas renderer replacement (draft)
+
+- Replaced the TV lobby QR SVG with `qrcode.react`'s existing canvas renderer
+  at a 640px integer source size, an opaque `#f5f1e7` background, black modules,
+  error correction M, disabled boost, and the same four-module quiet zone.
+- Physical testing established that square SVG sizing did not resolve the
+  original artifact, and that an opaque SVG background reduced but did not
+  eliminate lower/right quiet-zone marks. The QR now renders directly in its
+  one paper-coloured tile; the nested QR surface and QR-only inset shadow are
+  removed to eliminate their compositing layers.
+- The join payload, central merged placement, `WORDS` / `ATLEE` / `WANNA` /
+  `SHARE` perimeter, and all presentation boards remain unchanged. The current
+  JSDOM environment mocks the QR canvas and does not expose its pixel buffer,
+  so physical validation on `WordsTest` remains required.
+
+## 2026-08-02 — Lobby demonstration board and QR boundary correction (draft)
+
+- Corrected the presentation-only 5 × 5 demonstration board's fourth row to
+  `NSEVR`, preserving its `WORDS` / `ATLEE` / `WANNA` / `SHARE` perimeter and
+  the unchanged explicit 4 × 4 and 6 × 6 boards. Official round generation is
+  unchanged.
+- The earlier square-SVG sizing change did not resolve the physical Safari
+  artifact. Inspection established that `qrcode.react` emitted a transparent
+  background path over the whole fractional-size SVG viewport, leaving its
+  bottom/right viewport edge subject to compositing. The QR now supplies the
+  established opaque paper `#f5f1e7` background and crisp SVG rendering while
+  retaining its quiet zone, payload, merged placement, and error boundary.
+- The updated test image still requires repeat physical validation on
+  `WordsTest`; no claim of physical artifact elimination is made from automated
+  checks alone.
+
 ## 2026-08-01 — Explicit test-container release channel (draft)
 
 - Added a separately dispatched, confirmation-protected test-image workflow
@@ -1356,3 +1387,46 @@ player are separate roles, and neither socket alone owns room lifetime.
 
 - No TV redesign, results timeout, lifecycle transition, server contract,
   scoring, persistence, or later-stage work was added.
+
+## 2026-08-01 — Stage 4G round polish (draft)
+
+- Restored Trace as the fresh-client word-entry default while preserving an
+  explicit, client-only Tap preference and the existing path reset on mode
+  change.
+- Replaced the ended-phone puzzle contents with an authoritative personal round
+  summary: the player's final score and winning score only, with a clear
+  late-joiner and no-scoring-winner state. Detailed result cards remain TV-only.
+- Replaced full-width result-card tracks with a centred, bounded intrinsic grid
+  so one-player results remain geometrically centred and multi-player columns
+  no longer expand to fill the display.
+- Centralized the official LetterGrid gap token across 4 × 4, 5 × 5, and 6 × 6
+  boards without changing board geometry, hit testing, or the lobby QR grid.
+- Replaced the lobby QR-board placeholder perimeter with the exact `WORDS` /
+  `ATLEE` / `WANNA` / `SHARE` mapping around the unchanged merged QR region.
+- No server authority, phases, scoring, Socket.IO contract, deployment, or
+  production release channel changed. Local visual server startup could not
+  claim port 6532 in this environment; final physical review is reserved for
+  the deployed test container.
+
+## 2026-08-01 — Stage 4G result presentation refinement (draft)
+
+- Extended the phone `ROUND_ENDED` summary with authoritative winner names
+  directly below the winning score. Ties retain result order and use readable
+  ampersand punctuation; no-winner rounds still show `No scoring winner` only.
+- Restyled the display result cards with the established dark Words surface,
+  paper and muted text, mint score emphasis, inset word lists, and a restrained
+  winner border/crown accent. The compact centred intrinsic layout is unchanged.
+- No result projection, scoring, lifecycle, authority, Socket.IO, deployment,
+  or production channel behavior changed.
+
+## 2026-08-02 — Stage 4G lobby demonstration refinement (draft)
+
+- Replaced the generic pre-round character stream with explicit static 4 × 4,
+  5 × 5, and 6 × 6 presentation boards. They are client-only demonstrations
+  and never participate in server-generated official rounds.
+- Matched the embedded lobby QR SVG height to its width within an explicitly
+  square, clipped surface. This removes fractional auto-height divergence that
+  could expose a thin bottom/right seam while retaining the QR payload, quiet
+  zone, and `WORDS` / `ATLEE` / `WANNA` / `SHARE` perimeter.
+- No scoring, authority, phases, result behavior, Socket.IO, deployment, or
+  production channel behavior changed.

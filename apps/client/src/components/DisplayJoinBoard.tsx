@@ -1,5 +1,5 @@
 import { Component, type ReactNode } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeCanvas } from 'qrcode.react';
 
 type DisplayJoinBoardProps = { readonly joinUrl: string };
 
@@ -22,23 +22,23 @@ class QrBoundary extends Component<
   }
 }
 
+const perimeterWords = {
+  top: 'WORDS',
+  bottom: 'ATLEE',
+  left: 'WANNA',
+  right: 'SHARE',
+} as const;
+
+// The top and bottom words include the intentionally shared corner tiles.
 const perimeter = [
-  'W',
-  'O',
-  'R',
-  'D',
-  'S',
-  'A',
-  'B',
-  'C',
-  'D',
-  'E',
-  'F',
-  'G',
-  'H',
-  'I',
-  'J',
-  'K',
+  ...perimeterWords.top,
+  perimeterWords.left[1],
+  perimeterWords.right[1],
+  perimeterWords.left[2],
+  perimeterWords.right[2],
+  perimeterWords.left[3],
+  perimeterWords.right[3],
+  ...perimeterWords.bottom,
 ];
 
 export function DisplayJoinBoard({ joinUrl }: DisplayJoinBoardProps) {
@@ -59,21 +59,20 @@ export function DisplayJoinBoard({ joinUrl }: DisplayJoinBoardProps) {
         className="display-join-board__qr display-join-board__qr--rounded"
         aria-label="Room joining QR code"
       >
-        <div className="display-join-board__qr-surface">
-          <QrBoundary key={joinUrl}>
-            <QRCodeSVG
-              value={joinUrl}
-              size={320}
-              level="M"
-              boostLevel={false}
-              marginSize={4}
-              bgColor="transparent"
-              fgColor="#000000"
-              aria-hidden="true"
-              focusable="false"
-            />
-          </QrBoundary>
-        </div>
+        <QrBoundary key={joinUrl}>
+          <QRCodeCanvas
+            className="display-join-board__qr-canvas"
+            value={joinUrl}
+            size={640}
+            level="M"
+            boostLevel={false}
+            marginSize={4}
+            bgColor="#f5f1e7"
+            fgColor="#000000"
+            aria-hidden="true"
+            style={{ width: '100%', height: '100%' }}
+          />
+        </QrBoundary>
       </div>
     </section>
   );

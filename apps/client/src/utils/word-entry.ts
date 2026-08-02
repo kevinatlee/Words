@@ -64,11 +64,11 @@ export function updateWordPath(
 
 export function loadWordEntryMode(): WordEntryMode {
   try {
-    return window.localStorage.getItem(wordEntryModeStorageKey) === 'trace'
-      ? 'trace'
-      : 'touch';
+    return window.localStorage.getItem(wordEntryModeStorageKey) === 'touch'
+      ? 'touch'
+      : 'trace';
   } catch {
-    return 'touch';
+    return 'trace';
   }
 }
 

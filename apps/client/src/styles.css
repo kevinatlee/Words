@@ -177,37 +177,63 @@ button:disabled {
 }
 .display-results {
   min-height: 70vh;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding-inline: 2vw;
 }
 .display-results__cards {
   display: grid;
-  width: min(96vw, 110rem);
+  width: fit-content;
+  max-width: 96vw;
   gap: 1rem;
+  margin: 0;
   list-style: none;
   padding: 0;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(16rem, max-content));
 }
 .display-results__cards--1 {
-  grid-template-columns: minmax(18rem, 28rem);
-  justify-content: center;
+  grid-template-columns: minmax(16rem, max-content);
 }
 .display-results__cards--5,
 .display-results__cards--6 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(16rem, max-content));
 }
 .display-results__cards--7,
 .display-results__cards--8 {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(16rem, max-content));
 }
 .result-player-card {
+  box-sizing: border-box;
+  min-width: 16rem;
+  max-width: 24rem;
   padding: 1rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-md);
-  background: var(--paper);
-  color: var(--ink-950);
+  background: rgba(16, 38, 58, 0.72);
+  box-shadow: var(--shadow);
+  color: var(--paper);
+  overflow-wrap: anywhere;
+}
+.result-player-card--winner {
+  border-color: rgba(112, 231, 162, 0.72);
+  background:
+    linear-gradient(135deg, rgba(112, 231, 162, 0.16), transparent 58%),
+    rgba(16, 38, 58, 0.8);
+}
+.result-player-card--winner h2 [aria-label='Game Host winner'] {
+  color: var(--sun);
+}
+.result-player-card h2,
+.result-player-card li {
+  overflow-wrap: anywhere;
 }
 .result-player-card__points {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--mint-strong);
   font-size: 1.5rem;
 }
 .result-player-card__stats {
@@ -226,12 +252,24 @@ button:disabled {
   margin: 0;
 }
 .result-player-card__stats dt {
-  color: var(--ink-700);
+  color: var(--paper-muted);
   font-size: 0.8rem;
   font-weight: 800;
 }
 .result-player-card__stats dd {
+  color: var(--paper);
   font-weight: 900;
+}
+.result-player-card ul {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.8rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border-top: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(6, 16, 27, 0.28);
+  color: var(--mint);
+  list-style-position: inside;
 }
 
 .connection-status--phone {
@@ -708,6 +746,7 @@ button:disabled {
 .letter-grid,
 .display-join-board {
   --letter-tile-font-size: clamp(1.8rem, 8vw, 2.75rem);
+  --letter-grid-gap: clamp(0.35rem, 1.2vw, 0.75rem);
 }
 
 .display-join-board {
@@ -716,7 +755,7 @@ button:disabled {
   aspect-ratio: 1;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   grid-template-rows: repeat(5, minmax(0, 1fr));
-  gap: clamp(0.35rem, 1.2vw, 0.75rem);
+  gap: var(--letter-grid-gap);
 }
 .display-join-board__tile {
   display: grid;
@@ -781,26 +820,17 @@ button:disabled {
   border-radius: clamp(0.5rem, 1.4vw, 1rem);
   padding: clamp(0.18rem, 0.5vw, 0.45rem);
   background: var(--paper);
-  box-shadow: inset 0 -0.32rem 0 rgba(6, 16, 27, 0.1);
   color: var(--ink-950);
 }
-.display-join-board__qr-surface {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  place-items: center;
-  border-radius: calc(clamp(0.5rem, 1.4vw, 1rem) - 0.18rem);
-  background: var(--paper);
-  color: var(--ink-950);
-}
-.display-join-board__qr svg {
+.display-join-board__qr-canvas {
   display: block;
   width: 100%;
+  height: 100%;
   max-width: 100%;
-  height: auto;
+  max-height: 100%;
+  border: 0;
+  outline: 0;
+  image-rendering: pixelated;
 }
 .display-room-footer {
   overflow-wrap: anywhere;
@@ -1170,7 +1200,7 @@ button:disabled {
   width: min(100%, 40rem);
   margin-inline: auto;
   grid-template-columns: repeat(var(--grid-size), minmax(0, 1fr));
-  gap: clamp(0.35rem, 1.2vw, 0.75rem);
+  gap: var(--letter-grid-gap);
 }
 
 .letter-grid__cell {
@@ -1824,15 +1854,74 @@ button:disabled {
   padding: 0.75rem;
 }
 
+.phone-round-summary {
+  display: grid;
+  min-height: min(17rem, 52vh);
+  place-content: center;
+  gap: 0.8rem;
+  padding: 1rem;
+  text-align: center;
+}
+
+.phone-round-summary .eyebrow,
+.phone-round-summary h2,
+.phone-round-summary p {
+  margin: 0;
+}
+
+.phone-round-summary h2 {
+  color: var(--mint-strong);
+  font-size: clamp(2rem, 10vw, 3rem);
+  line-height: 1;
+}
+
+.phone-round-summary > p:not(.eyebrow) {
+  color: var(--paper-muted);
+}
+
+.phone-round-summary dl {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0.55rem 0 0;
+}
+
+.phone-round-summary dl > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.phone-round-summary dt {
+  color: var(--paper-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.phone-round-summary dd {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  color: var(--paper);
+  font-size: clamp(1.35rem, 6vw, 1.8rem);
+  font-weight: 900;
+}
+
+.phone-round-summary__winner-names {
+  color: var(--paper-muted);
+  font-size: 0.78em;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
 .room-dashboard--phone .board-panel__heading {
   margin-bottom: 0.5rem;
 }
 
 .room-dashboard--phone .letter-grid {
   --letter-tile-font-size: clamp(1.35rem, 8.5vw, 2.3rem);
+  --letter-grid-gap: clamp(0.22rem, 1vw, 0.45rem);
 
   width: min(100%, 26rem);
-  gap: clamp(0.22rem, 1vw, 0.45rem);
 }
 
 @media (max-width: 430px) and (max-height: 760px) {

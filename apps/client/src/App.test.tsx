@@ -332,6 +332,13 @@ function createStatefulSessionStore(
   };
 }
 
+async function chooseTap(user: ReturnType<typeof userEvent.setup>) {
+  const tap = await screen.findByRole('button', { name: 'Tap' });
+  if (tap.getAttribute('aria-pressed') !== 'true') {
+    await user.click(tap);
+  }
+}
+
 describe('Stage 4B display and player room routes', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/');
@@ -378,8 +385,8 @@ describe('Stage 4B display and player room routes', () => {
     );
     expect(within(demonstrationBoard).getByText('W')).toBeVisible();
     expect(within(demonstrationBoard).getByText('O')).toBeVisible();
-    expect(within(demonstrationBoard).getByText('R')).toBeVisible();
-    expect(within(demonstrationBoard).getAllByText('D')).toHaveLength(2);
+    expect(within(demonstrationBoard).getAllByText('R')).toHaveLength(2);
+    expect(within(demonstrationBoard).getByText('D')).toBeVisible();
     expect(within(demonstrationBoard).getByText('S')).toBeVisible();
     expect(screen.getByText('http://localhost:3000/join/ABC234')).toBeVisible();
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -1695,7 +1702,7 @@ describe('Stage 4B display and player room routes', () => {
         })}
       />,
     );
-    expect(await screen.findByText('Round Complete')).toBeVisible();
+    expect(await screen.findByText('Look at the TV!')).toBeVisible();
 
     act(() =>
       reportRoomState?.({
@@ -1715,7 +1722,7 @@ describe('Stage 4B display and player room routes', () => {
       }),
     );
 
-    expect(screen.getByText('Round Complete')).toBeVisible();
+    expect(screen.getByText('Look at the TV!')).toBeVisible();
     expect(
       screen.queryByRole('heading', { name: 'Silver Owl wins' }),
     ).toBeNull();
@@ -1750,7 +1757,7 @@ describe('Stage 4B display and player room routes', () => {
     );
     await screen.findByRole('button', { name: 'Submit' });
     act(() => reportRoomState?.(createEndedRoom(activeRoom)));
-    expect(await screen.findByText('Round Complete')).toBeVisible();
+    expect(await screen.findByText('Look at the TV!')).toBeVisible();
 
     act(() =>
       reportRoomState?.({
@@ -1758,7 +1765,7 @@ describe('Stage 4B display and player room routes', () => {
         serverTime: '2026-07-27T20:04:00.000Z',
       }),
     );
-    expect(screen.getByText('Round Complete')).toBeVisible();
+    expect(screen.getByText('Look at the TV!')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Submit' })).toBeNull();
   });
 
@@ -1801,14 +1808,14 @@ describe('Stage 4B display and player room routes', () => {
         })}
       />,
     );
-    expect(await screen.findByText('Round Complete')).toBeVisible();
+    expect(await screen.findByText('Look at the TV!')).toBeVisible();
     act(() => reportRoomState?.(secondRound));
     expect(await screen.findByRole('button', { name: 'Submit' })).toBeVisible();
-    expect(screen.queryByText('Round Complete')).toBeNull();
+    expect(screen.queryByText('Look at the TV!')).toBeNull();
 
     act(() => reportRoomState?.(endedRoom));
     expect(screen.getByRole('button', { name: 'Submit' })).toBeVisible();
-    expect(screen.queryByText('Round Complete')).toBeNull();
+    expect(screen.queryByText('Look at the TV!')).toBeNull();
   });
 
   it('starts an authoritative round and renders the exact server board', async () => {
@@ -1909,6 +1916,7 @@ describe('Stage 4B display and player room routes', () => {
       />,
     );
 
+    await chooseTap(user);
     await user.click(await screen.findByRole('button', { name: 'QU, tile 1' }));
     await user.click(screen.getByRole('button', { name: 'A, tile 2' }));
     await user.click(screen.getByRole('button', { name: 'B, tile 3' }));
@@ -2040,7 +2048,7 @@ describe('Stage 4B display and player room routes', () => {
     expect(screen.queryByText('1 accepted')).toBeNull();
   });
 
-  it('prevents client-side non-adjacent selection and supports Undo and Clear', async () => {
+  it('prevents client-side non-adjacent selection and supports Tap backtracking', async () => {
     const activeRoom = createRoundRoom();
     const client = createFakeClient({
       reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
@@ -2071,6 +2079,7 @@ describe('Stage 4B display and player room routes', () => {
       />,
     );
 
+    await chooseTap(user);
     await user.click(await screen.findByRole('button', { name: 'QU, tile 1' }));
     await user.click(screen.getByRole('button', { name: 'F, tile 7' }));
     expect(screen.getByRole('heading', { name: 'QU' })).toBeVisible();
@@ -2185,6 +2194,7 @@ describe('Stage 4B display and player room routes', () => {
       />,
     );
 
+    await chooseTap(user);
     const path = [0, 1, 2, 3, 4, 5, 11, 10, 9, 8, 7, 6, 12, 13, 14, 15];
     for (const tileIndex of path) {
       await user.click(
@@ -2291,7 +2301,7 @@ describe('Stage 4B display and player room routes', () => {
     expect(screen.queryByLabelText('Room joining QR code')).toBeNull();
   });
 
-  it('keeps the completed board visible without controller administration', async () => {
+  it('replaces the completed phone board with an authoritative summary', async () => {
     const activeRoom = createRoundRoom();
     const endedRoom: RoomState = {
       ...activeRoom,
@@ -2338,11 +2348,14 @@ describe('Stage 4B display and player room routes', () => {
     );
 
     expect(
-      await screen.findByRole('region', { name: 'Puzzle' }),
+      await screen.findByRole('region', { name: 'Round summary' }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('gridcell', { name: 'QU' })).toBeInTheDocument();
-    expect(screen.getByText('Round Complete')).toBeInTheDocument();
-    expect(screen.getByRole('timer')).toHaveAttribute('aria-live', 'polite');
+    expect(screen.getByText('Look at the TV!')).toBeInTheDocument();
+    expect(screen.getByText('Your Score')).toBeInTheDocument();
+    expect(screen.getByText('No scoring winner')).toBeInTheDocument();
+    expect(screen.queryByRole('grid')).toBeNull();
+    expect(screen.queryByRole('timer')).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Word entry mode' })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Start Round' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Make Game Host' })).toBeNull();
@@ -2403,7 +2416,9 @@ describe('Stage 4B display and player room routes', () => {
       />,
     );
 
-    expect(await screen.findByRole('region', { name: 'Puzzle' })).toBeVisible();
+    expect(
+      await screen.findByRole('region', { name: 'Round summary' }),
+    ).toBeVisible();
     expect(
       screen.queryByText('Round complete — results are on the TV.'),
     ).toBeNull();
@@ -2412,10 +2427,9 @@ describe('Stage 4B display and player room routes', () => {
     ).toBeNull();
     expect(screen.queryByText('<Bright Fox> (You)')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Start Round' })).toBeNull();
-    expect(
-      screen.getByRole('grid', { name: '4 by 4 official letter grid' }),
-    ).toBeVisible();
-    expect(screen.getByText('Round Complete')).toBeVisible();
+    expect(screen.getByText('Look at the TV!')).toBeVisible();
+    expect(screen.queryByRole('grid')).toBeNull();
+    expect(screen.queryByRole('timer')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Make Game Host' })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
   });

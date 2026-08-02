@@ -36,7 +36,34 @@ describe('RoundResults', () => {
     expect(
       screen.getAllByRole('heading', { level: 2 }).map((x) => x.textContent),
     ).toEqual(expect.arrayContaining(['♛ Bright Fox', 'Amber Kite']));
+    expect(document.querySelector('.display-results__cards')).toHaveAttribute(
+      'data-result-card-count',
+      '2',
+    );
+    expect(
+      document.querySelectorAll('.result-player-card--winner'),
+    ).toHaveLength(1);
+    expect(
+      screen.getByRole('heading', { name: /Bright Fox/ }).closest('li'),
+    ).toHaveClass('result-player-card--winner');
+    expect(
+      screen.getByRole('heading', { name: 'Amber Kite' }).closest('li'),
+    ).not.toHaveClass('result-player-card--winner');
   });
+
+  it.each([1, 2, 3, 4, 6, 8])(
+    'keeps %i result cards in an explicit intrinsic-width layout variant',
+    (count) => {
+      render(<RoundResults results={result(count)} />);
+
+      expect(document.querySelector('.display-results__cards')).toHaveClass(
+        `display-results__cards--${count}`,
+      );
+      expect(document.querySelectorAll('.result-player-card')).toHaveLength(
+        count,
+      );
+    },
+  );
   it('shows integer points and separate Words and Unique words rows', () => {
     render(<RoundResults results={result()} />);
     expect(screen.getByText('7 points')).toBeVisible();
@@ -63,6 +90,9 @@ describe('RoundResults', () => {
     const x: R = { ...result(), winnerPlayerIds: [] };
     render(<RoundResults results={x} />);
     expect(screen.queryByLabelText('Game Host winner')).toBeNull();
+    expect(document.querySelector('.result-player-card')).not.toHaveClass(
+      'result-player-card--winner',
+    );
   });
   it.each([
     [2, 5],
@@ -119,5 +149,31 @@ describe('RoundResults', () => {
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.queryByText('Participant word review')).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('keeps long player names and unique words inside the card contract', () => {
+    const longName = 'A very long player name that must wrap safely on a card';
+    const longWord = 'EXTRAORDINARILYLONGUNIQUEWORD';
+    const base = result(1);
+    render(
+      <RoundResults
+        results={{
+          ...base,
+          players: [
+            {
+              ...base.players[0]!,
+              displayName: longName,
+              words: [word(longWord)],
+            },
+          ],
+        }}
+      />,
+    );
+
+    const card = screen
+      .getByRole('heading', { name: /A very long/ })
+      .closest('li');
+    expect(card).toHaveClass('result-player-card');
+    expect(within(card!).getByText(longWord)).toBeVisible();
   });
 });

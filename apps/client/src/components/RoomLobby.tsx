@@ -26,6 +26,7 @@ import { ControllerPanel } from './ControllerPanel';
 import { GameSettings } from './GameSettings';
 import { DisplayJoinBoard } from './DisplayJoinBoard';
 import { LetterGrid } from './LetterGrid';
+import { PhoneRoundSummary } from './PhoneRoundSummary';
 import { PrototypeNotice } from './PrototypeNotice';
 import { RoundClock } from './RoundClock';
 import { RoundResults } from './RoundResults';
@@ -428,6 +429,7 @@ export function RoomLobby({
       )}
       {!isDisplay &&
         sessionRole === 'player' &&
+        !roundIsEnded &&
         document.getElementById('phone-entry-mode-slot') &&
         createPortal(
           <div
@@ -462,80 +464,93 @@ export function RoomLobby({
           <section
             className="panel board-panel"
             aria-labelledby={isDisplay ? 'board-title' : undefined}
-            aria-label={isDisplay ? undefined : 'Puzzle'}
+            aria-label={
+              isDisplay ? undefined : roundIsEnded ? 'Round summary' : 'Puzzle'
+            }
             data-round-id={room.round?.id}
             data-round-deadline-at={room.round?.deadlineAt}
           >
-            {room.round && <RoundClock room={room} presentation="phone" />}
-            <LetterGrid
-              letters={letters}
-              size={boardSize}
-              label={`${boardSize} by ${boardSize} ${room.round ? 'official' : 'demonstration'} letter grid`}
-              selectedIndices={selectedPath}
-              acceptedIndices={
-                sessionRole === 'player' && roundIsActive && isRoundParticipant
-                  ? acceptedPath
-                  : []
-              }
-              interactive={
-                sessionRole === 'player' &&
-                roundIsActive &&
-                Boolean(isRoundParticipant)
-              }
-              disabled={!canBuildWord || submissionPending}
-              onSelect={selectTile}
-              entryMode={entryMode}
-              traceResetKey={`${room.round?.id ?? 'no-round'}:${room.phase}:${entryMode}`}
-              onTraceStart={selectTile}
-              onTraceMove={selectTile}
-              onTraceEnd={submitTrace}
-              onTraceCancel={cancelTrace}
-            />
-            {roundIsActive && !isDisplay && !isRoundParticipant && (
-              <PrototypeNotice
-                title="Waiting this round."
-                ariaLabel="Round participation status"
-              >
-                You joined after this round began. You can watch this board and
-                will join the next round.
-              </PrototypeNotice>
-            )}
-            {sessionRole === 'player' &&
-              roundIsActive &&
-              isRoundParticipant && (
-                <section
-                  className="word-entry"
-                  aria-labelledby="word-entry-title"
-                >
-                  <div className="word-entry__content">
-                    <span className="eyebrow">Your Word</span>
-                    <h3 id="word-entry-title">
-                      {candidateWord || 'Select adjacent tiles'}
-                    </h3>
-                  </div>
-                  <p
-                    className="word-entry__message"
-                    role="status"
-                    aria-live={submissionMessage ? 'polite' : 'off'}
+            {roundIsEnded ? (
+              <PhoneRoundSummary
+                results={room.round?.results ?? null}
+                currentPlayerId={currentPlayerId}
+              />
+            ) : (
+              <>
+                {room.round && <RoundClock room={room} presentation="phone" />}
+                <LetterGrid
+                  letters={letters}
+                  size={boardSize}
+                  label={`${boardSize} by ${boardSize} ${room.round ? 'official' : 'demonstration'} letter grid`}
+                  selectedIndices={selectedPath}
+                  acceptedIndices={
+                    sessionRole === 'player' &&
+                    roundIsActive &&
+                    isRoundParticipant
+                      ? acceptedPath
+                      : []
+                  }
+                  interactive={
+                    sessionRole === 'player' &&
+                    roundIsActive &&
+                    Boolean(isRoundParticipant)
+                  }
+                  disabled={!canBuildWord || submissionPending}
+                  onSelect={selectTile}
+                  entryMode={entryMode}
+                  traceResetKey={`${room.round?.id ?? 'no-round'}:${room.phase}:${entryMode}`}
+                  onTraceStart={selectTile}
+                  onTraceMove={selectTile}
+                  onTraceEnd={submitTrace}
+                  onTraceCancel={cancelTrace}
+                />
+                {roundIsActive && !isDisplay && !isRoundParticipant && (
+                  <PrototypeNotice
+                    title="Waiting this round."
+                    ariaLabel="Round participation status"
                   >
-                    {submissionMessage}
-                  </p>
-                  <div className="word-entry__actions">
-                    <button
-                      className="button button--primary"
-                      type="button"
-                      disabled={
-                        !canBuildWord ||
-                        submissionPending ||
-                        selectedPath.length === 0
-                      }
-                      onClick={() => void submitSelection()}
+                    You joined after this round began. You can watch this board
+                    and will join the next round.
+                  </PrototypeNotice>
+                )}
+                {sessionRole === 'player' &&
+                  roundIsActive &&
+                  isRoundParticipant && (
+                    <section
+                      className="word-entry"
+                      aria-labelledby="word-entry-title"
                     >
-                      {submissionPending ? 'Checking…' : 'Submit'}
-                    </button>
-                  </div>
-                </section>
-              )}
+                      <div className="word-entry__content">
+                        <span className="eyebrow">Your Word</span>
+                        <h3 id="word-entry-title">
+                          {candidateWord || 'Select adjacent tiles'}
+                        </h3>
+                      </div>
+                      <p
+                        className="word-entry__message"
+                        role="status"
+                        aria-live={submissionMessage ? 'polite' : 'off'}
+                      >
+                        {submissionMessage}
+                      </p>
+                      <div className="word-entry__actions">
+                        <button
+                          className="button button--primary"
+                          type="button"
+                          disabled={
+                            !canBuildWord ||
+                            submissionPending ||
+                            selectedPath.length === 0
+                          }
+                          onClick={() => void submitSelection()}
+                        >
+                          {submissionPending ? 'Checking…' : 'Submit'}
+                        </button>
+                      </div>
+                    </section>
+                  )}
+              </>
+            )}
           </section>
           {isConnectedController && room.phase === 'LOBBY' && (
             <div className="round-action">

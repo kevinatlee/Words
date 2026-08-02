@@ -36,8 +36,17 @@ describe('tile typography', () => {
     expect(sharedTileSizingRule).toContain(
       '--letter-tile-font-size: clamp(1.8rem, 8vw, 2.75rem);',
     );
+    expect(sharedTileSizingRule).toContain(
+      '--letter-grid-gap: clamp(0.35rem, 1.2vw, 0.75rem);',
+    );
     expect(styles).toMatch(
-      /\.display-join-board\s*\{[^}]*gap: clamp\(0\.35rem, 1\.2vw, 0\.75rem\);/s,
+      /\.display-join-board\s*\{[^}]*gap: var\(--letter-grid-gap\);/s,
+    );
+    expect(styles).toMatch(
+      /\.letter-grid\s*\{[^}]*gap: var\(--letter-grid-gap\);/s,
+    );
+    expect(styles).toMatch(
+      /\.room-dashboard--phone \.letter-grid\s*\{[^}]*--letter-grid-gap: clamp\(0\.22rem, 1vw, 0\.45rem\);/s,
     );
   });
 
@@ -110,10 +119,38 @@ describe('tile typography', () => {
       /\.display-player-list__name\s*\{[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/s,
     );
     expect(styles).toMatch(
-      /\.display-results__cards--7,\s*\.display-results__cards--8\s*\{[^}]*repeat\(4, minmax\(0, 1fr\)\);/s,
+      /\.display-results__cards\s*\{[^}]*width: fit-content;[^}]*max-width: 96vw;[^}]*grid-template-columns: repeat\(2, minmax\(16rem, max-content\)\);/s,
     );
     expect(styles).toMatch(
-      /\.result-player-card\s*\{[^}]*border-radius: var\(--radius-md\);[^}]*color: var\(--ink-950\);/s,
+      /\.display-results__cards--1\s*\{[^}]*grid-template-columns: minmax\(16rem, max-content\);/s,
+    );
+    expect(styles).toMatch(
+      /\.display-results__cards--7,\s*\.display-results__cards--8\s*\{[^}]*repeat\(4, minmax\(16rem, max-content\)\);/s,
+    );
+    expect(styles).not.toMatch(/\.display-results__cards\s*\{[^}]*\b1fr\b/s);
+    expect(styles).toMatch(
+      /\.result-player-card\s*\{[^}]*border: 1px solid var\(--line-strong\);[^}]*border-radius: var\(--radius-md\);[^}]*background: rgba\(16, 38, 58, 0\.72\);[^}]*box-shadow: var\(--shadow\);[^}]*color: var\(--paper\);/s,
+    );
+    expect(styles).toMatch(
+      /\.result-player-card\s*\{[^}]*min-width: 16rem;[^}]*max-width: 24rem;[^}]*overflow-wrap: anywhere;/s,
+    );
+    expect(styles).toMatch(
+      /\.result-player-card h2,\s*\.result-player-card li\s*\{[^}]*overflow-wrap: anywhere;/s,
+    );
+    expect(styles).toMatch(
+      /\.result-player-card--winner\s*\{[^}]*border-color: rgba\(112, 231, 162, 0\.72\);[^}]*background:/s,
+    );
+    expect(styles).toMatch(
+      /\.result-player-card--winner h2 \[aria-label='Game Host winner'\]\s*\{[^}]*color: var\(--sun\);/s,
+    );
+    expect(styles).toMatch(
+      /\.result-player-card__points\s*\{[^}]*color: var\(--mint-strong\);/s,
+    );
+    expect(styles).toMatch(
+      /\.result-player-card__stats dt\s*\{[^}]*color: var\(--paper-muted\);/s,
+    );
+    expect(styles).toMatch(
+      /\.result-player-card ul\s*\{[^}]*border-top: 1px solid var\(--line\);[^}]*background: rgba\(6, 16, 27, 0\.28\);[^}]*color: var\(--mint\);/s,
     );
     expect(styles).toMatch(
       /\.result-player-card__stats\s*\{[^}]*display: grid;[^}]*gap: 0\.15rem;[^}]*margin: 0\.45rem 0 0;/s,
@@ -124,15 +161,29 @@ describe('tile typography', () => {
     expect(styles).toMatch(
       /\.display-join-board__qr\s*\{[^}]*grid-area: 2 \/ 2 \/ 5 \/ 5;/s,
     );
+    expect(styles).toMatch(
+      /\.display-join-board__qr-canvas\s*\{[^}]*display: block;[^}]*width: 100%;[^}]*height: 100%;[^}]*max-width: 100%;[^}]*max-height: 100%;[^}]*border: 0;[^}]*outline: 0;[^}]*image-rendering: pixelated;/s,
+    );
+    expect(styles).not.toContain('.display-join-board__qr-surface');
+    expect(styles).not.toMatch(
+      /\.display-join-board__qr\s*\{[^}]*box-shadow:/s,
+    );
+    expect(styles).toMatch(
+      /\.phone-round-summary\s*\{[^}]*min-height: min\(17rem, 52vh\);[^}]*place-content: center;/s,
+    );
+    expect(styles).toMatch(
+      /\.phone-round-summary__winner-names\s*\{[^}]*color: var\(--paper-muted\);[^}]*overflow-wrap: anywhere;/s,
+    );
   });
 
   it('keeps the embedded TV QR on the letter-tile background', () => {
-    const qrSurfaceRule = styles.match(
-      /\.display-join-board__qr-surface\s*\{[^}]*\}/s,
+    const qrTileRule = styles.match(
+      /\.display-join-board__qr\s*\{[^}]*\}/s,
     )?.[0];
 
-    expect(qrSurfaceRule).toContain('background: var(--paper);');
-    expect(qrSurfaceRule).not.toMatch(/#fff|#ffffff/i);
+    expect(qrTileRule).toContain('background: var(--paper);');
+    expect(qrTileRule).not.toMatch(/#fff|#ffffff/i);
+    expect(qrTileRule).not.toContain('box-shadow:');
   });
 
   it('keeps the display footer URL dark green, unadorned, and keyboard-visible', () => {

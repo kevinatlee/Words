@@ -185,10 +185,15 @@ not publish obsolete results.
 phase. The display replaces its header with redesigned result cards for every
 authoritative participant, including departed players, plus the join URL footer.
 Cards show final integer points, separate Words and Unique words counts, and a
-bounded unique-word list; there is no board, QR, timer, side bubble, control, table, or
-word review. Phones retain only their completed board, `Round Complete`,
-Tap/Trace, and connection status; they receive no administration or detailed
-results.
+bounded unique-word list; their bounded intrinsic columns form a centred group
+rather than stretching across the display. There is no board, QR, timer, side
+bubble, control, table, or word review. Phones replace their puzzle with a
+concise `ROUND OVER` / `Look at the TV!` summary showing only their own final
+score and the winning score (or `No scoring winner`). Below a positive winning
+score, it shows the authoritative winner name or tied winner names in result
+order; they receive no administration or detailed opponent results. Result
+cards use the established dark Words panel treatment while retaining their
+centred intrinsic layout.
 
 The client rejects lower state versions, older timestamps at the same version,
 and same-version changes to the finalized result projection. This prevents a

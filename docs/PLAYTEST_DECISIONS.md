@@ -15,6 +15,9 @@ product changes.
 ## Input
 
 - The input modes are **Touch** and **Trace**.
+- Fresh clients default to **Trace**. An explicit Tap choice remains a
+  client-only persisted preference; clearing or losing that preference restores
+  Trace.
 - Undo and Clear controls are removed.
 - Submit clears a candidate after acceptance or an expected rejection.
 - An unexpected transport or client failure retains the selected path for a
@@ -38,19 +41,23 @@ display-only rounding.
 | 5 letters |      5 |      7 |
 | 8 letters |      8 |     10 |
 
-## Future TV result presentation
+## TV result presentation
 
-This is planned, not implemented by Stage 4F:
-
-- A TV-only dedicated result presentation will last 20 seconds.
+- A TV-only dedicated result presentation lasts 20 seconds.
 - During it, the board and QR code disappear; every competitor has an
   individual card or column, and every tied winner receives a crown.
 - It will show integer points, accepted-word count, unique-word count, and up
   to five unique words where space permits. The cap reduces responsively and
   hidden words are represented as “+N more”.
-- The TV will not scroll. Phones remain on a simple puzzle/lobby-style waiting
-  view, with detailed results focused on the TV.
-- During this planned 20-second `ROUND_ENDED` presentation, phones will not
+- The TV result-card group is intrinsically sized and centred; individual cards
+  use bounded readable widths rather than consuming the entire display.
+- TV result cards use the established dark Words panel surface, muted labels,
+  mint scores, and a restrained winner accent.
+- The TV will not scroll. Phones show a concise round summary with only the
+  player's final score and winning score. A positive winner name or all tied
+  winner names appear beneath that score in authoritative result order; a
+  zero-score round retains `No scoring winner`. Detailed results remain TV-only.
+- During the 20-second `ROUND_ENDED` presentation, phones will not
   show game-host controls. After the authoritative return to `LOBBY`, Game
   Settings and game-host delegation reappear for the current controller only.
 - After 20 seconds, the server will authoritatively return to `LOBBY`, using
@@ -73,11 +80,23 @@ This is planned, not implemented by Stage 4F:
   results: Puzzle (including Start Round or Start Next Round), accessible Game
   Settings controls, then accessible Game Host controls. Those administration
   bubbles are absent during active gameplay for every phone.
-- Phone active timers use the concise `Timer` label. After a round, phones show
-  the completed Puzzle bubble only (plus the controller's two administration
-  bubbles) instead of rankings, scores, winner copy, detailed word review, or
-  a redundant TV-results message. The shared display retains its existing
-  results presentation.
+- Phone active timers use the concise `Timer` label. After a round, the Puzzle
+  bubble is replaced by a concise `ROUND OVER` / `Look at the TV!` summary of
+  the player's own final score, winning score, and authoritative winner names.
+  It has no board, timer, word-entry controls, rankings, detailed word review,
+  or opponent scores.
+  The shared display retains its results presentation.
+- Official 4 × 4, 5 × 5, and 6 × 6 grids use the same gap token for each
+  presentation. The TV lobby demonstration board's perimeter spells `WORDS`,
+  `ATLEE`, `WANNA`, and `SHARE` around its unchanged merged QR region.
+- Pre-round phone demonstration boards are explicit presentation-only 4 × 4,
+  5 × 5, and 6 × 6 layouts; the 5 × 5 fourth row is `NSEVR`. Official round
+  boards remain server-generated. The embedded QR retains its data and
+  perimeter words while its opaque `#f5f1e7` canvas retains the same quiet zone.
+  Square SVG sizing and then an opaque SVG background reduced but did not
+  eliminate physical Safari quiet-zone marks, so the nested QR surface and QR
+  inset shadow were removed with the canvas replacement. Repeat validation on
+  the test channel remains required.
 - Phones do not show provisional scores or accepted-word counts. A possible
   active-TV word-count presentation remains deferred to the separate TV
   redesign because it needs an aggregate-display decision.
