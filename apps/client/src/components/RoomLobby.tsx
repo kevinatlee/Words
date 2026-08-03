@@ -14,7 +14,6 @@ import {
 } from '@words/shared';
 
 import { useRoundDeadlineReached } from '../useRoundCountdown';
-import { useDisplayAudio } from '../hooks/useDisplayAudio';
 import { createDemoBoard } from '../utils/demoBoard';
 import {
   isExpectedSubmissionRejection,
@@ -80,7 +79,6 @@ export function RoomLobby({
     (player) => player.id === currentPlayerId,
   );
   const isDisplay = sessionRole === 'display';
-  const displayAudio = useDisplayAudio(room, isDisplay);
   const isConnectedController =
     sessionRole === 'player' &&
     connectionStatus === 'connected' &&
@@ -415,15 +413,6 @@ export function RoomLobby({
                 <RoundClock room={room} presentation="display" />
               )}
               <h2 id="display-highlights-title">Room Highlights</h2>
-              {!displayAudio.enabled && (
-                <button
-                  className="display-enable-sound"
-                  type="button"
-                  onClick={() => void displayAudio.enable()}
-                >
-                  Enable sound
-                </button>
-              )}
               <section>
                 <h3>Last Round</h3>
                 {lastRound === null ? (

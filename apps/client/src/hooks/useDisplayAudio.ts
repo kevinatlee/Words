@@ -23,21 +23,34 @@ function trackedRoom(room: RoomState): TrackedRoom {
   };
 }
 
-export function useDisplayAudio(room: RoomState, isDisplay: boolean) {
+export type DisplayAudioState = Readonly<{
+  enable: () => Promise<void>;
+}>;
+
+export function useDisplayAudio(
+  room: RoomState | null,
+  isDisplay: boolean,
+): DisplayAudioState {
   const [enabled, setEnabled] = useState(false);
+  const [supported] = useState(() => DisplayAudioEngine.isSupported);
   const engineRef = useRef<DisplayAudioEngine | null>(null);
   const previousRef = useRef<TrackedRoom | null>(null);
-  const roomRef = useRef(room);
+  const roomRef = useRef<RoomState | null>(room);
 
   useEffect(() => {
     roomRef.current = room;
   }, [room]);
 
   const enable = useCallback(async () => {
-    if (!isDisplay) return;
+    if (!isDisplay || !supported) return;
     engineRef.current ??= new DisplayAudioEngine();
     if (await engineRef.current.enable()) setEnabled(true);
-  }, [isDisplay]);
+  }, [isDisplay, supported]);
+
+  useEffect(() => {
+    if (!isDisplay || !supported) return;
+    void enable();
+  }, [enable, isDisplay, supported]);
 
   useEffect(() => {
     if (!isDisplay || enabled) return;
@@ -48,10 +61,10 @@ export function useDisplayAudio(room: RoomState, isDisplay: boolean) {
       window.removeEventListener('pointerdown', attempt);
       window.removeEventListener('keydown', attempt);
     };
-  }, [enable, enabled, isDisplay]);
+  }, [enable, enabled, isDisplay, supported]);
 
   useEffect(() => {
-    if (!isDisplay) return;
+    if (!isDisplay || !room) return;
     const current = trackedRoom(room);
     const previous = previousRef.current;
     previousRef.current = current;
@@ -96,11 +109,21 @@ export function useDisplayAudio(room: RoomState, isDisplay: boolean) {
       if (document.visibilityState === 'hidden') {
         engineRef.current?.cancelAcceptedTones();
       }
-      previousRef.current = trackedRoom(roomRef.current);
+      if (roomRef.current) previousRef.current = trackedRoom(roomRef.current);
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () =>
       document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [isDisplay]);
+
+  useEffect(() => {
+    if (!isDisplay) return;
+    return () => {
+      previousRef.current = null;
+      void engineRef.current?.dispose();
+      engineRef.current = null;
+      setEnabled(false);
+    };
   }, [isDisplay]);
 
   useEffect(
@@ -111,5 +134,5 @@ export function useDisplayAudio(room: RoomState, isDisplay: boolean) {
     [],
   );
 
-  return { enabled, enable };
+  return { enable };
 }

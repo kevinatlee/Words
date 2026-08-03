@@ -24,6 +24,7 @@ import { LobbyError } from './components/LobbyError';
 import { NotFound } from './components/NotFound';
 import { PlayerPrototype } from './components/PlayerPrototype';
 import { RoomLobby } from './components/RoomLobby';
+import { useDisplayAudio } from './hooks/useDisplayAudio';
 import {
   lobbyClient as defaultLobbyClient,
   type LobbyClient,
@@ -290,6 +291,7 @@ export function App({
     useState<PlayerRoundSubmissionState | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
   const [displayStarting, setDisplayStarting] = useState(false);
+  useDisplayAudio(room, currentPath === '/' && session?.role === 'display');
   const sessionRef = useRef<StoredLobbySession | null>(null);
   const roomRef = useRef<RoomState | null>(null);
   const reconnectNeededRef = useRef(false);

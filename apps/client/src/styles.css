@@ -782,20 +782,6 @@ button:disabled {
   font-weight: 900;
   text-align: right;
 }
-.display-enable-sound {
-  margin: 0 0 0.85rem;
-  padding: 0.35rem 0.55rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--paper-muted);
-  font: inherit;
-  cursor: pointer;
-}
-.display-enable-sound:focus-visible {
-  outline: 0.18rem solid var(--sun);
-  outline-offset: 0.15rem;
-}
 .display-player-list__item--offline {
   opacity: 0.56;
 }
