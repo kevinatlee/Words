@@ -911,7 +911,7 @@ export function App({
         <>
           <LobbyError error={roomError} />
           <RoomLobby
-            key={`${room.code}:${room.round?.id ?? 'lobby'}:${session.role}:${session.role === 'player' ? session.playerId : 'display'}`}
+            key={`${room.code}:${session.role}:${session.role === 'player' ? session.playerId : 'display'}`}
             room={room}
             sessionRole={session.role}
             currentPlayerId={

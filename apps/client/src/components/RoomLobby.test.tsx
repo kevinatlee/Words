@@ -289,7 +289,7 @@ describe('RoomLobby word entry', () => {
     );
   });
 
-  it('keeps the header mode control available through active and lobby player phases', () => {
+  it('keeps the header mode control available through every connected player phase', () => {
     const activeView = renderLobby();
     expect(
       screen.getByRole('group', { name: 'Word entry mode' }),
@@ -303,6 +303,123 @@ describe('RoomLobby word entry', () => {
       screen.getByRole('group', { name: 'Word entry mode' }),
     ).toBeVisible();
     lobbyView.unmount();
+
+    renderLobby(undefined, {
+      room: createRoom({ phase: 'ROUND_ENDED' }),
+    });
+    expect(
+      screen.getByRole('group', { name: 'Word entry mode' }),
+    ).toBeVisible();
+  });
+
+  it('keeps the selected mode through active, ended, and next lobby phases', async () => {
+    const user = userEvent.setup();
+    const view = renderLobby();
+    const mode = screen.getByRole('group', { name: 'Word entry mode' });
+
+    await user.click(within(mode).getByRole('button', { name: 'Tap' }));
+    expect(within(mode).getByRole('button', { name: 'Tap' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    for (const phase of ['ROUND_ENDED', 'LOBBY'] as const) {
+      view.rerender(
+        <RoomLobby
+          {...lobbyProps(undefined, {
+            room: createRoom({
+              phase,
+              round: phase === 'LOBBY' ? null : createRoom().round,
+            }),
+          })}
+        />,
+      );
+      expect(
+        screen.getByRole('group', { name: 'Word entry mode' }),
+      ).toBeVisible();
+      expect(screen.getByRole('button', { name: 'Tap' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+    }
+  });
+
+  it('allows changing mode during results for the next round', async () => {
+    const user = userEvent.setup();
+    const view = renderLobby(undefined, {
+      room: createRoom({ phase: 'ROUND_ENDED' }),
+    });
+    await user.click(screen.getByRole('button', { name: 'Tap' }));
+
+    view.rerender(
+      <RoomLobby
+        {...lobbyProps(undefined, {
+          room: createRoom({ phase: 'LOBBY', round: null }),
+        })}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Tap' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('hides the selector on the display and when the player is not connected', () => {
+    const displayView = renderLobby(undefined, {
+      sessionRole: 'display',
+      currentPlayerId: null,
+    });
+    expect(screen.queryByRole('group', { name: 'Word entry mode' })).toBeNull();
+    displayView.unmount();
+
+    renderLobby(undefined, {
+      room: createRoom({
+        players: [{ ...createRoom().players[0]!, connected: false }],
+      }),
+    });
+    expect(screen.queryByRole('group', { name: 'Word entry mode' })).toBeNull();
+  });
+
+  it('does not allow tile input or submission outside an active round', () => {
+    const onSubmitWord = vi.fn(async (): Promise<SubmitWordResponse> =>
+      acceptedSubmission(),
+    );
+
+    for (const phase of ['LOBBY', 'ROUND_ENDED'] as const) {
+      const view = renderLobby(onSubmitWord, {
+        room: createRoom({
+          phase,
+          round: phase === 'LOBBY' ? null : createRoom().round,
+        }),
+      });
+      expect(screen.queryByRole('button', { name: 'Submit' })).toBeNull();
+      expect(screen.queryByRole('button', { name: /tile/i })).toBeNull();
+      view.unmount();
+    }
+
+    expect(onSubmitWord).not.toHaveBeenCalled();
+  });
+
+  it('keeps Trace selected through the same phase transitions', () => {
+    window.localStorage.setItem('words:word-entry-mode', 'trace');
+    const view = renderLobby();
+
+    for (const phase of ['ROUND_ENDED', 'LOBBY', 'ROUND_ACTIVE'] as const) {
+      view.rerender(
+        <RoomLobby
+          {...lobbyProps(undefined, {
+            room: createRoom({
+              phase,
+              round: phase === 'LOBBY' ? null : createRoom().round,
+            }),
+          })}
+        />,
+      );
+      expect(screen.getByRole('button', { name: 'Trace' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+    }
   });
 
   it('keeps the phone timer markup and prominent label unchanged', () => {
@@ -521,7 +638,9 @@ describe('RoomLobby word entry', () => {
     expect(screen.getByRole('region', { name: 'Round summary' })).toBeVisible();
     expect(screen.getByText('Look at the TV!')).toBeVisible();
     expect(screen.queryByRole('grid')).toBeNull();
-    expect(screen.queryByRole('group', { name: 'Word entry mode' })).toBeNull();
+    expect(
+      screen.getByRole('group', { name: 'Word entry mode' }),
+    ).toBeVisible();
     expect(
       screen.queryByRole('region', { name: 'Game host controls' }),
     ).toBeNull();
@@ -631,7 +750,9 @@ describe('RoomLobby word entry', () => {
     expect(screen.queryByRole('grid')).toBeNull();
     expect(screen.queryByRole('timer')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Submit' })).toBeNull();
-    expect(screen.queryByRole('group', { name: 'Word entry mode' })).toBeNull();
+    expect(
+      screen.getByRole('group', { name: 'Word entry mode' }),
+    ).toBeVisible();
     expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
     expect(
       screen.queryByRole('region', { name: 'Game host controls' }),
@@ -641,7 +762,11 @@ describe('RoomLobby word entry', () => {
     view.rerender(
       <RoomLobby
         {...lobbyProps(undefined, {
-          room: createRoom({ phase: 'LOBBY', round: null }),
+          room: createRoom({
+            phase: 'LOBBY',
+            round: null,
+            players: room.players,
+          }),
           currentPlayerId: ordinaryPlayerId,
         })}
       />,

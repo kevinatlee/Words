@@ -1462,3 +1462,15 @@ player are separate roles, and neither socket alone owns room lifetime.
   zone, and `WORDS` / `ATLEE` / `WANNA` / `SHARE` perimeter.
 - No scoring, authority, phases, result behavior, Socket.IO, deployment, or
   production channel behavior changed.
+
+## 2026-08-02 — Stage 4H persistent phone entry mode (draft)
+
+- Kept the connected-player Tap/Trace selector visible in the lobby, active
+  round, and ended-round views while keeping it out of display and
+  disconnected-session views.
+- Preserved the existing local preference and mode-change path clearing, and
+  kept tile input and submission restricted to active play.
+- Stabilized the player room component key across round transitions so the
+  selected mode does not reset between rounds.
+- No server, networking, scoring, lifecycle, display behavior, or production
+  release channel changed.
