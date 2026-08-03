@@ -2359,7 +2359,9 @@ describe('Stage 4B display and player room routes', () => {
     expect(screen.getByText('No scoring winner')).toBeInTheDocument();
     expect(screen.queryByRole('grid')).toBeNull();
     expect(screen.queryByRole('timer')).toBeNull();
-    expect(screen.queryByRole('group', { name: 'Word entry mode' })).toBeNull();
+    expect(
+      screen.getByRole('group', { name: 'Word entry mode' }),
+    ).toBeVisible();
     expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Start Round' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Make Game Host' })).toBeNull();

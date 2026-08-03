@@ -476,7 +476,8 @@ export function RoomLobby({
       )}
       {!isDisplay &&
         sessionRole === 'player' &&
-        !roundIsEnded &&
+        connectionStatus === 'connected' &&
+        currentPlayer?.connected === true &&
         document.getElementById('phone-entry-mode-slot') &&
         createPortal(
           <div
