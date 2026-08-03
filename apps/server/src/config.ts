@@ -34,6 +34,12 @@ function readInteger(
 export function createServerConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): ServerConfig {
+  const port = readInteger(
+    environment.PORT,
+    productConfig.productionPort,
+    0,
+    65_535,
+  );
   const roomTtlMinutes = readInteger(
     environment.ROOM_TTL_MINUTES,
     productConfig.roomTtlMinutes,
@@ -48,13 +54,9 @@ export function createServerConfig(
   );
 
   return {
-    port: readInteger(
-      environment.PORT,
-      productConfig.productionPort,
-      0,
-      65_535,
-    ),
-    publicBaseUrl: environment.PUBLIC_BASE_URL ?? productConfig.publicUrl,
+    port,
+    publicBaseUrl:
+      environment.PUBLIC_BASE_URL ?? `http://localhost:${String(port)}`,
     maxPlayers: readInteger(
       environment.MAX_PLAYERS,
       productConfig.maxPlayers,

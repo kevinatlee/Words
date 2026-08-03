@@ -17,6 +17,7 @@ import {
   transferControllerInputSchema,
   updateRoomSettingsInputSchema,
 } from './lobby';
+import { productConfig } from './config';
 
 const controllerPlayerId = '00000000-0000-4000-8000-000000000001';
 const ordinaryPlayerId = '00000000-0000-4000-8000-000000000002';
@@ -92,6 +93,7 @@ function roundStateFixture() {
         displayName: 'Bright Fox',
       },
     ],
+    acceptedWordCounts: [{ playerId: controllerPlayerId, count: 0 }],
     startedAt: '2026-07-27T20:00:00.000Z',
     deadlineAt: '2026-07-27T20:00:30.000Z',
     endedAt: null,
@@ -474,6 +476,82 @@ describe('lobby contracts', () => {
           playerId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
           displayName: `Player ${index + 1}`,
         })),
+      }).success,
+    ).toBe(false);
+  });
+
+  it('bounds strict accepted-word count entries without exposing private fields', () => {
+    expect(
+      roundStateSchema.safeParse({
+        ...roundStateFixture(),
+        acceptedWordCounts: [
+          {
+            playerId: controllerPlayerId,
+            count: productConfig.maximumAcceptedWordsPerPlayerPerRound,
+          },
+        ],
+      }).success,
+    ).toBe(true);
+    for (const count of [
+      -1,
+      0.5,
+      productConfig.maximumAcceptedWordsPerPlayerPerRound + 1,
+    ]) {
+      expect(
+        roundStateSchema.safeParse({
+          ...roundStateFixture(),
+          acceptedWordCounts: [{ playerId: controllerPlayerId, count }],
+        }).success,
+      ).toBe(false);
+    }
+    expect(
+      roundStateSchema.safeParse({
+        ...roundStateFixture(),
+        acceptedWordCounts: [
+          { playerId: controllerPlayerId, count: 1, word: 'PRIVATE' },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('requires accepted-word counts once each in exact participant order', () => {
+    const participants = [
+      ...roundStateFixture().participants,
+      { playerId: ordinaryPlayerId, displayName: 'Amber Kite' },
+    ];
+    const validCounts = [
+      { playerId: controllerPlayerId, count: 2 },
+      { playerId: ordinaryPlayerId, count: 1 },
+    ];
+    expect(
+      roundStateSchema.safeParse({
+        ...roundStateFixture(),
+        participants,
+        acceptedWordCounts: validCounts,
+      }).success,
+    ).toBe(true);
+    for (const acceptedWordCounts of [
+      validCounts.slice(0, 1),
+      [...validCounts].reverse(),
+      [validCounts[0], validCounts[0]],
+    ]) {
+      expect(
+        roundStateSchema.safeParse({
+          ...roundStateFixture(),
+          participants,
+          acceptedWordCounts,
+        }).success,
+      ).toBe(false);
+    }
+  });
+
+  it('requires ended accepted counts to match finalized word counts', () => {
+    expect(
+      roundStateSchema.safeParse({
+        ...roundStateFixture(),
+        acceptedWordCounts: [{ playerId: controllerPlayerId, count: 1 }],
+        endedAt: roundStateFixture().deadlineAt,
+        results: zeroResults(),
       }).success,
     ).toBe(false);
   });

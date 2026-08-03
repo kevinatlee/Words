@@ -14,15 +14,17 @@ network event or room-state field.
 The room phase is exactly `LOBBY`, `ROUND_ACTIVE`, or `ROUND_ENDED`. A serialized
 room includes a server-owned state version and clock snapshot, authoritative
 settings, and at most one current round. Round state contains an immutable
-board and connected-player snapshot, server UUID and number, official
+board and participant snapshot, an ordered count-only accepted-word entry for
+each participant, server UUID and number, official
 timestamps, bounded generation attempts, and nullable finalized results.
 `results` is null while active and required when ended. Strict cross-field
-validation checks participant identity, score order, competition ranks,
-shared-word status, exact quarter-point totals, and every tied positive winner.
+validation checks participant identity, accepted-count completeness and order,
+score order, competition ranks, shared-word status, exact integer totals, and
+every tied positive winner.
 Every public word retains traditional `basePoints`; a unique word carries a
 integer `uniqueBonusPoints` value (+1 or +2), while a shared word has zero bonus and keeps its
 base as `finalPoints`. Player entries expose exact base, bonus, and final
-totals. Runtime parsing rejects non-quarter values, non-finite values, negative
+totals. Runtime parsing rejects non-integer values, non-finite values, negative
 values, and negative zero.
 
 The only Stage 4B controller actions are:
@@ -32,8 +34,9 @@ The only Stage 4B controller actions are:
 
 The shared package defines shapes; the server still performs authorization and
 owns every official value. `player:submit-word` returns separately versioned
-private state only through player acknowledgements. That private state never
-enters `RoomState`; after the deadline, a detached minimal result projection
+private state only through player acknowledgements. That private state's word
+identities never enter active `RoomState`; only bounded accepted counts do.
+After the deadline, a detached minimal result projection
 does. No result event was added: the existing `room:state` snapshot carries the
 ended result. See [`../../docs/SUBMISSIONS.md`](../../docs/SUBMISSIONS.md) and
 [`../../docs/RESULTS.md`](../../docs/RESULTS.md).

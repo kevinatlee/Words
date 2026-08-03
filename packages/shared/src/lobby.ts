@@ -135,6 +135,18 @@ export const roundParticipantSchema = z
   .strict()
   .readonly();
 
+export const acceptedWordCountEntrySchema = z
+  .object({
+    playerId: playerIdSchema,
+    count: z
+      .number()
+      .int()
+      .min(0)
+      .max(productConfig.maximumAcceptedWordsPerPlayerPerRound),
+  })
+  .strict()
+  .readonly();
+
 export const roundBoardSchema = z
   .object({
     size: z.union([z.literal(4), z.literal(5), z.literal(6)]),
@@ -403,6 +415,11 @@ export const roundStateSchema = z
       .min(1)
       .max(productConfig.maxPlayers)
       .readonly(),
+    acceptedWordCounts: z
+      .array(acceptedWordCountEntrySchema)
+      .min(1)
+      .max(productConfig.maxPlayers)
+      .readonly(),
     startedAt: z.string().datetime(),
     deadlineAt: z.string().datetime(),
     endedAt: z.string().datetime().nullable(),
@@ -470,6 +487,31 @@ export const roundStateSchema = z
       });
     }
 
+    if (
+      round.acceptedWordCounts.length !== round.participants.length ||
+      round.acceptedWordCounts.some(
+        (entry, index) =>
+          entry.playerId !== round.participants[index]?.playerId,
+      )
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Accepted-word counts must contain every participant exactly once in participant order.',
+        path: ['acceptedWordCounts'],
+      });
+    }
+    if (
+      new Set(round.acceptedWordCounts.map((entry) => entry.playerId)).size !==
+      round.acceptedWordCounts.length
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Accepted-word counts must have unique player IDs.',
+        path: ['acceptedWordCounts'],
+      });
+    }
+
     if (round.results !== null) {
       const participantIndex = new Map(
         round.participants.map((participant, index) => [
@@ -495,6 +537,17 @@ export const roundStateSchema = z
             message:
               'Result identity must match the immutable participant snapshot.',
             path: ['results', 'players', index],
+          });
+        }
+        const acceptedCount = round.acceptedWordCounts.find(
+          (entry) => entry.playerId === player.playerId,
+        );
+        if (acceptedCount?.count !== player.words.length) {
+          context.addIssue({
+            code: 'custom',
+            message:
+              'Final accepted-word counts must match finalized result word counts.',
+            path: ['acceptedWordCounts', index, 'count'],
           });
         }
       });
@@ -965,6 +1018,9 @@ export type DisplayState = z.infer<typeof displayStateSchema>;
 export type PlayerState = z.infer<typeof playerStateSchema>;
 export type ControllerStatus = z.infer<typeof controllerStatusSchema>;
 export type RoomState = z.infer<typeof roomStateSchema>;
+export type AcceptedWordCountEntry = z.infer<
+  typeof acceptedWordCountEntrySchema
+>;
 export type DisplaySessionCredentials = z.infer<
   typeof displaySessionCredentialsSchema
 >;

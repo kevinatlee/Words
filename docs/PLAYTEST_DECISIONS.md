@@ -1,8 +1,7 @@
 # Playtest decisions
 
-This document records the product decisions locked through Stage 4F playtesting
-and the phone-interface cleanup. It distinguishes that focused work from later
-product changes.
+This document records the product decisions locked through Stage 4G playtesting
+and the Stage 5A deployment boundary. Stage 4H is the current test candidate.
 
 ## General layout
 
@@ -97,9 +96,9 @@ display-only rounding.
   eliminate physical Safari quiet-zone marks, so the nested QR surface and QR
   inset shadow were removed with the canvas replacement. Repeat validation on
   the test channel remains required.
-- Phones do not show provisional scores or accepted-word counts. A possible
-  active-TV word-count presentation remains deferred to the separate TV
-  redesign because it needs an aggregate-display decision.
+- Phones do not show provisional scores or accepted-word counts. During an
+  active round, the TV Players panel shows only authoritative accepted-word
+  counts; detailed words remain private until final results.
 - The production UI does not display a development-stage identifier.
 - Phone connection status includes safe-area-aware right-side breathing room.
   The settings and host-control bubbles use non-visible accessible labels with
@@ -108,5 +107,5 @@ display-only rounding.
 
 ## Current boundary
 
-The phone cleanup does not implement the TV results lifecycle, a display
-redesign, a new phase, or a new network event.
+Stage 4H adds no phase or separate score stream. Its count progress travels in
+the existing authoritative room snapshot.

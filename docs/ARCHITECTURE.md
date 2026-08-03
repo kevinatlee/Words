@@ -1,16 +1,15 @@
 # Architecture
 
 This document describes the completed lobby, engine, CI, production game data,
-authoritative rounds, private submissions, Stage 4D final results, and the
-merged Stage 4E display-only QR joining change. Stage 4F Touch/Trace entry is
-the current draft work.
+authoritative rounds, private submissions, final results, the production
+boundary, and the active Stage 4H candidate.
 
 ## Runtime pieces
 
 **React browser client (`apps/client`):** Provides display, player join,
 live-lobby, and retained static preview screens. It renders server state but is
 never the source of truth for membership or controller authority. The display
-locally renders the already-built public join URL as a QR SVG.
+locally renders the already-built public join URL as a QR canvas.
 
 **Node.js server (`apps/server`):** Runs Express and Socket.IO in one process.
 It owns active rooms, display sessions, players, `controllerPlayerId`,
@@ -220,7 +219,7 @@ state.
 ## Authoritative settings and round flow
 
 Settings updates are strict complete replacements accepted only from the bound,
-connected controller in `LOBBY` or `ROUND_ENDED`. A round start accepts an
+connected controller in `LOBBY`. A round start accepts an
 empty object, snapshots settings and connected players, generates a bounded
 server-only board, creates the official deadline, increments the round number,
 and broadcasts one state.
@@ -264,6 +263,7 @@ Rooms are keyed by normalized room code. Each internal room holds:
 - a bounded map of zero to eight players
 - authoritative next-round settings
 - at most one current immutable round snapshot
+- one ordered bounded accepted-word count per immutable round participant
 - one bounded private submission map for current-round participants
 - a nullable bounded public result projection inside the current round
 
@@ -307,15 +307,13 @@ the current browser origin. `/join/:roomCode` locks the prefilled code while
 to `/`.
 
 Stage 4E passes that same completed URL to one display-only `JoinQrCode`
-component. It adds no field to room state and no display request. The component
-renders synchronously with `qrcode.react` 4.2.0, uses a black-on-white SVG,
-level-M error correction, and a four-module quiet zone, and keeps the exact URL
-and room code as accessible text. Lobby and ended states use a prominent
-presentation; active rounds use a compact presentation in the normal layout
-rather than overlaying the board.
+component. It adds no field to room state and no display request. The current
+component renders synchronously with `qrcode.react` 4.2.0, uses a black-on-white
+canvas, level-M error correction, and a four-module quiet zone. It appears only
+in the lobby's merged demonstration-board tile; active and ended phases omit it.
 
 The QR is not rendered on player, join, demo, error, or reconnect-failure
-routes. An unexpected SVG-renderer exception is contained around only the
+routes. An unexpected canvas-renderer exception is contained around only the
 visual encoding, so the textual URL, code, room, and reconnect flow remain
 available. See [`QR_JOINING.md`](QR_JOINING.md).
 
@@ -367,7 +365,9 @@ Immutable public round metadata is separate from mutable private submission
 runtime. A new round creates one empty state for each participant. `RoomState`
 serialization cannot reach this map; reconnect selects it only through the
 bound player ID. Display acknowledgements and room broadcasts never carry it.
-Successful words do not change public state version, activity, or TTL.
+Successful words update only the corresponding public accepted-word count,
+increment the room version once, and broadcast one count-only snapshot. The
+private word identity remains absent.
 
 `player:submit-word` carries only a round UUID, derived word, and bounded path.
 One captured server receipt time controls deadline acceptance and
@@ -383,7 +383,7 @@ snapshotted display names, sorts final scores with participant order as the tie
 stabilizer, assigns competition ranks and tied positive winners, validates the
 complete ended-round candidate, and only then commits one public transition.
 
-The public result contains words, traditional base values, shared/unique
+The public result contains words, length-based base values, shared/unique
 status, integer unique bonuses, final values, base/bonus/final player totals,
 ranks, and winner IDs. Shared words retain base points without a bonus. It
 excludes accepted timestamps, paths, private sequence/version data, sockets,
@@ -511,7 +511,7 @@ decision can be revisited if measured needs change.
 ## Production request path
 
 Stage 5A packages one direct Node.js process on port `6532`. It verifies the
-server-only 79,370-word dictionary before binding `0.0.0.0`, then serves the
+server-only 79,370-word dictionary before binding `<server address>`, then serves the
 built client, health API, Socket.IO, game engine, and dictionary from one
 origin:
 
@@ -519,10 +519,10 @@ origin:
 Public HTTPS browser
   |
   v
-Cloudflare Tunnel (TLS terminates at Cloudflare)
+Reverse proxy or tunnel (public TLS terminates here)
   |
   v
-Words container :6532
+Production container :6532
   |-- GET /api/health
   |-- /socket.io (unchanged Socket.IO path)
   |-- /assets/* (immutable hashed Vite assets)
@@ -539,6 +539,7 @@ and lifecycle work; a restart intentionally ends temporary rooms. The
 multi-stage Node 24 image copies only the production artifact, runs as the
 non-root `node` user, and requires no writable data volume.
 
-Stage 4G remains later focused real-party and release-candidate testing without
-feature expansion. Deployment steps, update/rollback, GHCR access, and Unraid
-and Cloudflare Tunnel configuration are in [`DEPLOYMENT.md`](DEPLOYMENT.md).
+Stages 4G and 5A are complete. Stage 4H adds event-driven count-only TV progress,
+one lazy display AudioContext, stable participant tones, a transition-only
+winner tune, and flow-safe rank-based result positioning. Deployment steps and
+generic production/test channel guidance are in [`DEPLOYMENT.md`](DEPLOYMENT.md).

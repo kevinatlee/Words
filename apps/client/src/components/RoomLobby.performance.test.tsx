@@ -11,12 +11,15 @@ const renderMetrics = vi.hoisted(() => ({ letterGrid: 0 }));
 
 vi.mock('./LetterGrid', async (importOriginal) => {
   const original = await importOriginal<typeof import('./LetterGrid')>();
+  const { memo } = await import('react');
   return {
     ...original,
-    LetterGrid: (props: React.ComponentProps<typeof original.LetterGrid>) => {
-      renderMetrics.letterGrid += 1;
-      return <original.LetterGrid {...props} />;
-    },
+    LetterGrid: memo(
+      (props: React.ComponentProps<typeof original.LetterGrid>) => {
+        renderMetrics.letterGrid += 1;
+        return <original.LetterGrid {...props} />;
+      },
+    ),
   };
 });
 
@@ -68,6 +71,7 @@ function createRoom(overrides: Partial<RoomState> = {}): RoomState {
         ),
       },
       participants: [{ playerId, displayName: 'Bright Fox' }],
+      acceptedWordCounts: [{ playerId, count: 0 }],
       startedAt: '2026-07-31T00:00:00.000Z',
       deadlineAt: '2026-07-31T00:02:00.000Z',
       endedAt: null,
@@ -131,6 +135,27 @@ describe('RoomLobby runtime isolation', () => {
     }
 
     expect(screen.getByText('100 seconds')).toBeVisible();
+    expect(renderMetrics.letterGrid).toBe(initialGridRenders);
+  });
+
+  it('does not rerender the phone LetterGrid for a count-only room update', () => {
+    const room = createRoom();
+    const stableProps = props(room);
+    const view = render(<RoomLobby {...stableProps} />);
+    const initialGridRenders = renderMetrics.letterGrid;
+    const updated: RoomState = {
+      ...room,
+      stateVersion: room.stateVersion + 1,
+      round: room.round
+        ? {
+            ...room.round,
+            acceptedWordCounts: [{ playerId, count: 1 }],
+          }
+        : null,
+    };
+
+    view.rerender(<RoomLobby {...stableProps} room={updated} />);
+
     expect(renderMetrics.letterGrid).toBe(initialGridRenders);
   });
 

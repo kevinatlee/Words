@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { productConfig } from './config';
 import { buildJoinUrl } from './join-url';
 
 describe('player join URLs', () => {
@@ -13,33 +12,33 @@ describe('player join URLs', () => {
     },
     {
       label: 'LAN IPv4 origin and port',
-      baseUrl: 'http://192.168.1.42:5173',
+      baseUrl: 'http://192.0.2.42:5173',
       roomCode: 'ABC234',
-      expected: 'http://192.168.1.42:5173/join/ABC234',
+      expected: 'http://192.0.2.42:5173/join/ABC234',
     },
     {
       label: 'ordinary hostname origin',
-      baseUrl: 'https://party.example',
+      baseUrl: 'https://party.example.invalid',
       roomCode: 'abc234',
-      expected: 'https://party.example/join/ABC234',
+      expected: 'https://party.example.invalid/join/ABC234',
     },
     {
       label: 'base URL with an unrelated path',
-      baseUrl: 'https://party.example/old/path',
+      baseUrl: 'https://party.example.invalid/old/path',
       roomCode: 'ABC234',
-      expected: 'https://party.example/join/ABC234',
+      expected: 'https://party.example.invalid/join/ABC234',
     },
     {
       label: 'base URL with query parameters and a fragment',
-      baseUrl: 'https://party.example/old?token=secret#private',
+      baseUrl: 'https://party.example.invalid/old?token=secret#private',
       roomCode: ' ABC-234 ',
-      expected: 'https://party.example/join/ABC234',
+      expected: 'https://party.example.invalid/join/ABC234',
     },
     {
       label: 'base URL with embedded URL credentials',
-      baseUrl: 'https://user:password@party.example/old',
+      baseUrl: 'https://user:password@party.example.invalid/old',
       roomCode: 'ABC234',
-      expected: 'https://party.example/join/ABC234',
+      expected: 'https://party.example.invalid/join/ABC234',
     },
   ])('uses the $label', ({ baseUrl, roomCode, expected }) => {
     const result = buildJoinUrl(baseUrl, roomCode);
@@ -54,8 +53,8 @@ describe('player join URLs', () => {
   });
 
   it('uses the configured public origin in production', () => {
-    expect(buildJoinUrl(productConfig.publicUrl, ' ABC 234 ')).toBe(
-      'https://words.atlee.io/join/ABC234',
+    expect(buildJoinUrl('https://public.example.invalid', ' ABC 234 ')).toBe(
+      'https://public.example.invalid/join/ABC234',
     );
   });
 

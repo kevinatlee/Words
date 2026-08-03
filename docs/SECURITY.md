@@ -181,10 +181,15 @@ Socket.IO currently allows the two standard local Vite origins and the
 configured public base URL. The Vite server proxies `/api` and `/socket.io` in
 development.
 
-Public deployment must provide HTTPS at `https://words.atlee.io`, verify
+Public deployment must provide HTTPS at `<public origin>`, verify
 WebSocket forwarding, and narrow the production origin policy to actual
 deployment needs. Reconnect tokens are application credentials and must never
 be sent over unencrypted public HTTP.
+
+Active-room snapshots disclose only bounded accepted-word counts in immutable
+round-participant order. Word identities, paths, provisional scores, acceptance
+times, private sequence/version data, and shared status remain absent until the
+existing finalized result projection permits the intended fields.
 
 ## Stage 4B round authority
 
@@ -266,7 +271,7 @@ payload in Stage 4B.
 - QR markup contains no session ID, reconnect token, player or controller ID,
   socket ID, room snapshot, settings, board, result, accepted word, state
   version, dictionary value, analytics identifier, or authentication value.
-- `qrcode.react` 4.2.0 runs synchronously in the client, renders SVG, and has no
+- `qrcode.react` 4.2.0 runs synchronously in the client, renders a canvas, and has no
   runtime dependencies, network request, install script, native binary,
   filesystem access, telemetry, or remote code.
 - The published ISC licence notice is preserved in
@@ -276,7 +281,7 @@ payload in Stage 4B.
   level M with boosting disabled, and a four-module quiet zone. There is no
   image, logo, overlay, gradient, transparency, animation, or decorative
   module style.
-- The SVG and wrapper are hidden from the accessibility tree. A semantic
+- The canvas and wrapper are hidden from the accessibility tree. A semantic
   region supplies the heading, instructions, visible room code, and exact
   keyboard-focusable URL instead.
 - A renderer exception is contained around only the visual QR. It cannot

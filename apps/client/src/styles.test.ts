@@ -119,6 +119,12 @@ describe('tile typography', () => {
       /\.display-player-list__name\s*\{[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/s,
     );
     expect(styles).toMatch(
+      /\.display-player-list__primary\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\) 3ch;[^}]*gap: 0\.55rem;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-player-list__count\s*\{[^}]*justify-self: end;[^}]*min-width: 3ch;[^}]*color: var\(--mint-strong\);[^}]*font-size: clamp\(1rem, 1\.5vw, 1\.25rem\);[^}]*font-variant-numeric: tabular-nums;[^}]*font-weight: 900;[^}]*text-align: right;/s,
+    );
+    expect(styles).toMatch(
       /\.display-results__cards\s*\{[^}]*width: fit-content;[^}]*max-width: 96vw;[^}]*grid-template-columns: repeat\(2, minmax\(16rem, max-content\)\);/s,
     );
     expect(styles).toMatch(
@@ -140,6 +146,16 @@ describe('tile typography', () => {
     expect(styles).toMatch(
       /\.result-player-card--winner\s*\{[^}]*border-color: rgba\(112, 231, 162, 0\.72\);[^}]*background:/s,
     );
+    expect(styles).toMatch(
+      /\.result-player-card\[data-podium-level='2'\]\s*\{[^}]*margin-top: clamp\(0\.5rem, 1\.5vh, 1rem\);/s,
+    );
+    expect(styles).toMatch(
+      /\.result-player-card\[data-podium-level='4'\]\s*\{[^}]*margin-top: clamp\(1\.35rem, 4vh, 2\.75rem\);/s,
+    );
+    expect(styles).toMatch(
+      /\.result-player-card--celebrate\s*\{[^}]*animation: result-winner-arrival 1\.2s ease-out both;/s,
+    );
+    expect(styles).toMatch(/@keyframes result-winner-arrival\s*\{/);
     expect(styles).toMatch(
       /\.result-player-card--winner h2 \[aria-label='Game Host winner'\]\s*\{[^}]*color: var\(--sun\);/s,
     );

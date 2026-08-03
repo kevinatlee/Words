@@ -7,9 +7,10 @@ shared-screen browser creates and presents a temporary room. Phone players join
 without accounts, and the first player becomes the initial game host
 (controller).
 
-**The current interface uses the authoritative three-phase lifecycle. Stage 5A
-adds a reviewed one-container production boundary; Stage 4G remains later
-real-party release-candidate work.**
+**The current interface uses the authoritative three-phase lifecycle. Stage 4G
+playtest polish and the Stage 5A one-container production boundary are complete.
+Stage 4H is the active test candidate for count-only TV progress, sounds, and
+winner presentation.**
 The secure lobby, isolated game engine, read-only hosted CI, reproducible
 server-only game data, authoritative rounds, private submissions, and final
 round results and display-only QR joining are complete. Stage 4F adds local
@@ -26,7 +27,7 @@ contract.
   `/join/:roomCode` link or enter a six-character code manually at `/join`.
 - In `LOBBY`, the shared display uses four equal header regions (Words, Game
   Host, settings, and connection), Players and Room Highlights bubbles, a
-  centered demonstration board with its rounded QR tile merged into the
+  centered demonstration board with its rounded canvas QR tile merged into the
   middle 3 × 3 region, and the exact join URL in the footer.
 - The first player becomes the server-assigned controller; later players join
   without gaining controller authority.
@@ -53,8 +54,9 @@ contract.
   the derived word and path before the server deadline.
 - The server validates against the official board and private dictionary,
   rejects personal duplicates, and calculates length-based provisional points.
-- Accepted words recover only for that player and never enter `RoomState` or a
-  display broadcast while the round is active.
+- Accepted word identities recover only for that player and never enter an
+  active public snapshot. `RoomState` exposes only each immutable participant's
+  authoritative accepted-word count so the TV can show count-only progress.
 - At the deadline, the server marks words shared across distinct participants,
   awards one point per word letter, adds +1 to unique three- or four-letter
   words and +2 to longer unique words, and publishes one immutable result
@@ -62,15 +64,15 @@ contract.
 - Final results show deterministic competition ranks, every tied positive
   winner, or no winner when no participant submitted a scoring word.
 - In `ROUND_ACTIVE`, the display keeps its Players and Room Highlights bubbles
-  beside the complete official board, with compact Timer in Room Highlights; it has no QR or
-  submission totals. In `ROUND_ENDED`, it shows only redesigned result cards
-  and the footer. Phones keep their completed board, Round Complete, Tap/Trace,
-  and connection state without administration or detailed results.
+  beside the complete official board, with a compact timer and accepted-word
+  counts; it has no QR, word identities, or provisional scores. In
+  `ROUND_ENDED`, compact dark result cards use authoritative podium levels and
+  the footer remains. Phones show only their personal score summary without
+  administration or detailed opponent results.
 - Phone puzzle bubbles use semantic labels without a visible puzzle heading.
   The compact Tap/Trace control stays centred in the phone header throughout
-  lobby, active, and ended phases; phones do not show provisional scores or
-  accepted-word counts. Any active-TV word-count presentation remains deferred
-  to the future TV redesign.
+  lobby and active phases; phones do not show provisional scores or accepted-word
+  counts.
 - Between rounds, controller settings use an accessible local-draft
   30–180-second slider with a compact seconds readout and distinct settings and
   host-control bubbles; ordinary player phones retain only the puzzle preview.
@@ -138,14 +140,14 @@ The server owns room membership, roles, settings, boards, participant
 snapshots, deadlines, phases, and expiration. No database, Redis instance,
 account provider, or paid service is used.
 
-The intended public URL remains `https://words.atlee.io`. The server’s default
-port remains `6532`.
+Deployments provide `PUBLIC_BASE_URL=<public origin>`. Local development derives
+a neutral localhost origin from the server port, which remains `6532` by default.
 
 ## Prerequisites
 
 Install:
 
-- [Node.js 24 LTS](https://nodejs.org/)
+- Node.js 24 LTS
 - npm, included with a normal Node.js installation
 - Git for branch and pull-request work
 
@@ -170,10 +172,10 @@ npm run dev
 
 One command starts both processes:
 
-| Process     | Default address         | Purpose                            |
-| ----------- | ----------------------- | ---------------------------------- |
-| Vite client | `http://localhost:5173` | React development and live refresh |
-| Node server | `http://localhost:6532` | Express health API and Socket.IO   |
+| Process     | Default port | Purpose                            |
+| ----------- | -----------: | ---------------------------------- |
+| Vite client |       `5173` | React development and live refresh |
+| Node server |       `6532` | Express health API and Socket.IO   |
 
 Vite proxies `/api` and `/socket.io` to the Node server.
 Client source changes continue to refresh through Vite. The in-memory Node
@@ -184,7 +186,7 @@ ends the combined command visibly.
 
 Try the lobby:
 
-1. Open `http://localhost:5173/` on the shared-screen browser. The room appears
+1. Open the Vite development origin on the shared-screen browser. The room appears
    automatically without a role-selection or creation step.
 2. Scan the displayed QR from another device, open the visible
    `/join/:roomCode` link, or enter the code manually at `/join`. For a real
@@ -219,7 +221,7 @@ Stop both processes with `Control+C`.
 - `/join/:roomCode` — room-specific phone join form with the code prefilled
 - `/room/:roomCode` — live player lobby or player reconnect flow
 - `/play/demo` — retained static Stage 1 round preview
-- `GET http://localhost:6532/api/health` — server health
+- `GET /api/health` on the server origin — server health
 
 ## Useful commands
 
@@ -246,7 +248,7 @@ npm audit --audit-level=high
 GitHub runs the same locked-install and verification boundary through
 [`CI`](docs/CI.md). The container check runs after Quality and Dependency audit;
 only a successful `main` push may publish the exact tested GHCR image. See
-[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the artifact, Unraid, tunnel,
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the artifact, container host, tunnel,
 update, and rollback procedure. Run the local commands before review even when
 hosted checks are green.
 
@@ -254,17 +256,17 @@ hosted checks are green.
 
 Production and test containers are deliberately separate:
 
-| Channel        | Mutable tag                       | Immutable audit/rollback tag                          |
-| -------------- | --------------------------------- | ----------------------------------------------------- |
-| Production     | `ghcr.io/kevinatlee/words:latest` | `ghcr.io/kevinatlee/words:sha-<full-main-sha>`        |
-| Test candidate | `ghcr.io/kevinatlee/words:test`   | `ghcr.io/kevinatlee/words:test-sha-<full-target-sha>` |
+| Channel        | Mutable tag               | Immutable audit/rollback tag                  |
+| -------------- | ------------------------- | --------------------------------------------- |
+| Production     | `<registry image>:latest` | `<registry image>:sha-<full-main-sha>`        |
+| Test candidate | `<registry image>:test`   | `<registry image>:test-sha-<full-target-sha>` |
 
 `latest` changes only after the normal successful `main` CI path. Test
 publication is never automatic: in GitHub Actions, choose **Publish Test
 Image**, run it from `main`, enter an exact repository branch, tag, or full
 commit SHA as `target_ref`, and enter `PUBLISH_TEST`. After validation,
-container smoke, and publication, update the separate Words-Test Unraid
-container, check health, and complete a real round. A test candidate may be
+container smoke, and publication, update the separate test container, check
+health, and complete a real round. A test candidate may be
 unmerged; it never changes production `latest`.
 
 ## Environment variables
@@ -272,15 +274,15 @@ unmerged; it never changes production `latest`.
 Safe defaults work without a `.env` file. `.env.example` documents optional
 overrides:
 
-| Variable                   |                  Default | Purpose                                     |
-| -------------------------- | -----------------------: | ------------------------------------------- |
-| `PORT`                     |                   `6532` | Node server port                            |
-| `PUBLIC_BASE_URL`          | `https://words.atlee.io` | Allowed future public origin                |
-| `MAX_PLAYERS`              |                      `8` | Phone players per room; display is excluded |
-| `MAX_ROOMS`                |                    `500` | In-memory room bound                        |
-| `ROOM_TTL_MINUTES`         |                    `120` | Sliding inactive-room lifetime              |
-| `RECONNECT_GRACE_SECONDS`  |                     `60` | Role-specific reconnect grace period        |
-| `CLEANUP_INTERVAL_SECONDS` |                     `30` | In-memory cleanup frequency                 |
+| Variable                   |           Default | Purpose                                     |
+| -------------------------- | ----------------: | ------------------------------------------- |
+| `PORT`                     |            `6532` | Node server port                            |
+| `PUBLIC_BASE_URL`          | `<public origin>` | Allowed future public origin                |
+| `MAX_PLAYERS`              |               `8` | Phone players per room; display is excluded |
+| `MAX_ROOMS`                |             `500` | In-memory room bound                        |
+| `ROOM_TTL_MINUTES`         |             `120` | Sliding inactive-room lifetime              |
+| `RECONNECT_GRACE_SECONDS`  |              `60` | Role-specific reconnect grace period        |
+| `CLEANUP_INTERVAL_SECONDS` |              `30` | In-memory cleanup frequency                 |
 
 Do not commit a real `.env` file.
 
@@ -376,7 +378,7 @@ derivation.
 │   └── game-data/    # Server-only licensed dictionary and generated defaults
 ├── docs/             # Product, architecture, security, and deployment status
 ├── tests/            # Reserved for future cross-package integration tests
-└── unraid/           # Reserved for optional future Unraid template files
+└── unraid/           # Historical placeholder; no host-specific template
 ```
 
 ## Troubleshooting
@@ -406,15 +408,15 @@ cannot recreate the display.
 
 - **Stage 4E — complete and merged:** display-only QR joining and the formal
   round-local casual-play product principle.
-- **Stage 4F — current draft work:** Touch and Trace word entry while preserving
-  tap/click and keyboard fallbacks.
-- **Stage 4G — later:** real-party and narrow-screen release-candidate testing, defect
-  correction, focused interaction polish, scoring-balance observation, and
-  stabilization—not feature expansion or cumulative scoring.
-- **Stage 5A — current review:** one-container Node 24 build, static-client
-  serving, health and graceful shutdown, GHCR publishing automation, and
-  Unraid/tunnel guidance. A final private-host and real-device deployment
-  review remains outside this draft.
+- **Stage 4F — complete:** Tap and Trace word entry with keyboard fallbacks.
+- **Stage 4G — complete:** real-party and narrow-screen defect correction,
+  scoring and result presentation, static 4 × 4, 5 × 5, and 6 × 6
+  demonstration boards, and release-candidate polish.
+- **Stage 5A — complete:** one-container Node 24 build, static-client serving,
+  health and graceful shutdown, and production/test image channels.
+- **Stage 4H — active candidate:** authoritative count-only TV progress,
+  display-only accepted tones, a one-shot winner tune, and rank-based result
+  presentation pending physical validation.
 
 ## License
 

@@ -9,10 +9,10 @@ points.
 ## Privacy boundary
 
 `RoomState` and `RoundState` remain public room snapshots. During
-`ROUND_ACTIVE`, they contain no submitted or accepted words, submission counts,
-personal scores, or cross-player duplicate information. A display and other
-players therefore cannot observe one player's submission activity while words
-can still be found.
+`ROUND_ACTIVE`, they contain no submitted or accepted word identities, paths,
+personal scores, or cross-player duplicate information. They contain one
+bounded accepted-word count for each immutable round participant. This
+count-only progress lets the TV react without revealing what anyone found.
 
 Each participant instead has one bounded `PlayerRoundSubmissionState` held
 privately beside the current round. It contains only canonical accepted words,
@@ -49,7 +49,9 @@ the submission. A rejected, malformed, or rate-limited request cannot hide the
 transition.
 
 Success returns the accepted word and complete private state only to the
-requesting socket. Authorized failures may return the unchanged private state
+requesting socket, increments that participant's public count, advances the room
+version exactly once, and broadcasts one authoritative room snapshot. Authorized
+failures may return the unchanged private state
 to recover from a lost earlier acknowledgement. Unbound, display-bound, stale,
 removed, or unrelated requests return `state: null`. There is no room-wide
 word event.
@@ -81,6 +83,10 @@ public to the room: canonical words, shared/unique status, point treatment,
 final totals, ranks, and winners. `acceptedAt`, private sequence and version,
 paths, rejected attempts, and rate-limit state remain private. The owner can
 still recover their unchanged private state on reconnect until the next round.
+
+The accepted-count list follows immutable `round.participants` order. It starts
+at zero each round, survives disconnect/reconnect, excludes late joiners, and
+must agree with finalized result word counts. Phones do not render it.
 
 See [`RESULTS.md`](RESULTS.md) for the timed visibility transition, integer
 unique-word bonus, rankings, and next-round lifecycle. Touch and Trace entry

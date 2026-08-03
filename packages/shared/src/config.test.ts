@@ -8,7 +8,6 @@ describe('product configuration', () => {
     expect(productConfig).toMatchObject({
       productName: 'Words',
       version: '0.2.5',
-      publicUrl: 'https://words.atlee.io',
       productionPort: 6532,
       defaultGridSize: 5,
       defaultRoundDurationSeconds: 120,

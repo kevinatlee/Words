@@ -1557,6 +1557,41 @@ describe('RoomStore authoritative settings and rounds', () => {
     });
   }
 
+  function setAcceptedWordCounts(
+    store: RoomStore,
+    roomCode: string,
+    counts: readonly number[],
+  ): void {
+    const internalRoom = (
+      store as unknown as {
+        rooms: Map<
+          string,
+          {
+            round: {
+              participants: readonly { playerId: string }[];
+              acceptedWordCounts: readonly {
+                playerId: string;
+                count: number;
+              }[];
+            } | null;
+          }
+        >;
+      }
+    ).rooms.get(roomCode);
+    if (!internalRoom?.round) throw new Error('Expected an active test round.');
+    internalRoom.round = Object.freeze({
+      ...internalRoom.round,
+      acceptedWordCounts: Object.freeze(
+        internalRoom.round.participants.map((participant, index) =>
+          Object.freeze({
+            playerId: participant.playerId,
+            count: counts[index] ?? 0,
+          }),
+        ),
+      ),
+    });
+  }
+
   it('lets only the connected controller update complete room settings', () => {
     const { store, display, controllerSession } = createRoundRoom();
     const ordinary = store.joinPlayer(
@@ -2303,6 +2338,12 @@ describe('RoomStore authoritative settings and rounds', () => {
       ).room;
       const activity = started.lastActivityAt;
       const expiry = started.expiresAt;
+      const currentPlan = scorePlans[finalizationIndex] ?? [];
+      setAcceptedWordCounts(
+        store,
+        display.room.code,
+        currentPlan.map((score) => score / 4),
+      );
       now += 120_000;
       expect(store.advanceDueRounds()).toEqual([display.room.code]);
       const ended = store.getRoomState(display.room.code);
@@ -2446,6 +2487,7 @@ describe('RoomStore authoritative settings and rounds', () => {
       'INTERNAL_ERROR',
     );
     returnValidResults = true;
+    setAcceptedWordCounts(store, display.room.code, [1]);
     const ended = store.reconcileDueRound(display.room.code, now);
 
     expect(ended?.phase).toBe('ROUND_ENDED');

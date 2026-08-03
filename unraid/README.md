@@ -1,8 +1,7 @@
-# Future Unraid packaging
+# Container-template boundary
 
-Stage 2 has a development lobby server but no production container or Unraid
-template. This directory is reserved for reviewed packaging after Express can
-serve the production client build and the container has been hardened and
-tested.
+Stage 5A provides a tested production container without committing a
+host-specific template. This historical directory remains only to document that
+boundary; deployment guidance uses neutral container-host terminology.
 
 The intended host and container port is `6532/tcp`.

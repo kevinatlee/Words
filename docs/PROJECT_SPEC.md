@@ -4,7 +4,7 @@
 
 - **Name:** Words
 - **Public description:** “A self-hosted real-time letter-grid party game.”
-- **Intended URL:** `https://words.atlee.io`
+- **Intended URL:** `<public origin>`
 - **Intended production port:** `6532/tcp`
 
 Words is a party game for people gathered around one shared television or
@@ -78,8 +78,9 @@ controller may still choose any supported 4 × 4, 5 × 5, or 6 × 6 grid and the
 existing allowed durations before starting a round. Phone puzzle bubbles retain
 an accessible label without a visible heading; active participants receive a
 separate Tap/Trace control bubble and no phone provisional score or accepted
-word count. Any aggregate active-TV word-count presentation is deferred to the
-future TV redesign. The production UI does not show a development-stage badge.
+word count. The active TV shows authoritative accepted-word counts only; word
+identities and provisional scores remain private. The production UI does not
+show a development-stage badge.
 Fresh clients default to Trace while an explicit local Tap choice remains
 persisted. During `ROUND_ENDED`, phones replace the board and word-entry UI
 with their own authoritative final score and the winning score; detailed
@@ -145,12 +146,11 @@ winners, no-winner handling when nobody scored, display/player result
 presentation, reconnect-safe results, and the controller-driven next round.
 See `SUBMISSIONS.md` and `RESULTS.md`.
 
-Stage 4E renders the exact existing public join URL as a locally generated SVG
-QR code on the display. It uses the current browser origin and normalized room
-code, remains prominent in the lobby and after results, becomes compact during
-an active round, and retains the visible URL and manual room-code fallback. It
-adds no server field, endpoint, event, credential, gameplay state, score, or
-lifecycle transition. See `QR_JOINING.md`.
+Stage 4E introduced the exact existing public join URL as a locally generated
+display QR. The current presentation uses one canvas in the lobby demonstration
+board and omits QR content during active and ended phases. It adds no server
+field, endpoint, event, credential, gameplay state, score, or lifecycle
+transition. See `QR_JOINING.md`.
 
 ## Current room model
 
@@ -238,9 +238,9 @@ causes exactly one replacement room to be created. Refreshing therefore
 reconnects the existing role instead of duplicating rooms, players, or sockets.
 
 The display shows an exact `/join/<CODE>` URL built from the current browser
-origin, which naturally becomes `https://words.atlee.io/join/<CODE>` at the
-intended public origin. The code is normalized before the link is built. Stage
-4E renders that exact string as a display-only QR SVG; neither representation
+origin. At deployment it therefore uses `<public origin>` plus the normalized
+join path. The code is normalized before the link is built. The
+display renders that exact string as a display-only QR canvas; neither representation
 contains a reconnect credential or private room state.
 
 Each successful reconnect rotates the credential. Tokens are scoped to one
@@ -254,20 +254,16 @@ authoritative countdown and round. The display remains the shared presentation
 surface. Stages 4C and 4D add player submissions, server-calculated validation,
 and final scoring. Stage 4E adds only the supplemental display QR.
 
-Planned rules remain:
+Current rules are:
 
-- Board sizes: 4 × 4, 5 × 5, and 6 × 6; default 4 × 4
-- Durations: 30, 60, 90, 120, 150, and 180 seconds; default 180 seconds
+- Board sizes: 4 × 4, 5 × 5, and 6 × 6; default 5 × 5
+- Durations: 30, 60, 90, 120, 150, and 180 seconds; default 120 seconds
 - Default scoring: length-plus-unique
 - Default shared-word handling: every accepted word keeps its length-based
   points; unique 3–4 letter words receive +1, unique 5+ letter words receive
   +2, and shared words receive no bonus
 - Default minimum word length: 3 letters
 - Adjacency: horizontal, vertical, and diagonal; no tile reuse within a word
-
-Traditional scoring gives 1 point for 3–4 letters, 2 for 5, 3 for 6, 5 for 7,
-and 11 for 8 or more. Stage 4C applies the base values and Stage 4D applies the
-unique-word bonus and final rankings.
 
 ## Intentional product non-goals
 
@@ -281,11 +277,9 @@ reverses this principle.
 
 ## Current technical non-goals
 
-Stage 5A does not add QR scanning, camera permissions, native or installable
-applications, persistence, accounts, telemetry, public hosting, Stage 4G work,
-sounds, or animations. It adds only the reviewed production-container boundary,
-GHCR publication automation after `main` checks pass, and private-host operator
-guidance.
+Stage 4H does not add QR scanning, camera permissions, native or installable
+applications, persistence, accounts, telemetry, public hosting, phone sounds,
+external audio files, cumulative scores, or a new game phase.
 
 The product also has no database, Redis, accounts, external authentication,
 microservices, paid APIs, analytics, advertisements, payments, unlocks, or
@@ -302,14 +296,14 @@ recorded attribution.
 
 ## Production environment
 
-Stage 5A uses one container running one direct Node.js process on a personal
-server. It serves the built React client, Express routes, Socket.IO, game
+Stage 5A uses one container running one direct Node.js process on a container
+host. It serves the built React client, Express routes, Socket.IO, game
 engine, and licensed dictionary from port `6532`; the client and real-time
 connection share one public origin. The final runtime artifact excludes source,
 tests, TypeScript, development dependencies, and dictionary data from the
 browser bundle. The container runs as non-root and starts only after the
-dictionary verifies. A Cloudflare Tunnel may provide the public HTTPS hostname
-without opening a public router port. See [`DEPLOYMENT.md`](DEPLOYMENT.md) for
+dictionary verifies. A reverse proxy or tunnel may provide the public HTTPS
+origin. See [`DEPLOYMENT.md`](DEPLOYMENT.md) for
 reviewed operator steps; no public deployment is created by this repository.
 
 ## Staged roadmap
@@ -338,19 +332,18 @@ reviewed operator steps; no public deployment is created by this repository.
 9. **Stage 4D — complete:** automatic shared-word reconciliation, final
    per-player scores, deterministic competition ranking, tied/no-winner state,
    public ended-round results, and controller-driven next rounds.
-10. **Stage 4E — complete and merged:** display-only local SVG QR joining,
+10. **Stage 4E — complete and merged:** display-only local QR joining,
     accessible manual fallbacks, and formal round-local casual play.
-11. **Stage 4F — complete and merged:** Touch and Trace word entry while preserving
-    tap/click and keyboard fallbacks.
-    Integer scoring is current focused draft work: length-based base points and
-    fixed integer unique-word bonuses.
-12. **Stage 4G — later:** structured real-party, narrow-phone, display, and
-    release-candidate testing with focused defect correction and interaction
-    polish—not feature expansion or cumulative scoring.
-13. **Stage 5A — current review:** one-container Node 24 build, Node static
-    serving, health and graceful shutdown, exact-SHA GHCR publishing after
-    checks, and Unraid/reverse-proxy/tunnel guidance. Final private-host and
-    real-device deployment validation remains outside this draft.
+11. **Stage 4F — complete and merged:** Tap and Trace word entry while preserving
+    keyboard fallbacks and server authority.
+12. **Stage 4G — complete:** structured real-party, narrow-phone, display, and
+    result-presentation polish, including intentional static demonstration
+    boards and personal phone result summaries.
+13. **Stage 5A — complete:** one-container Node 24 build, static serving,
+    health and graceful shutdown, and generic production/test image channels.
+14. **Stage 4H — active candidate:** authoritative count-only TV progress,
+    display-only participant tones and winner tune, and rank-based result-card
+    positioning pending physical validation.
 
 Each stage should remain independently reviewable and must not imply that later
 stages are ready.

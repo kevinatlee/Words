@@ -207,6 +207,13 @@ function roomSnapshotsMatch(left: RoomState, right: RoomState): boolean {
         (leftTile, rightTile) => leftTile === rightTile,
       ) &&
       peopleMatch(left.round.participants, right.round.participants) &&
+      arraysMatch(
+        left.round.acceptedWordCounts,
+        right.round.acceptedWordCounts,
+        (leftEntry, rightEntry) =>
+          leftEntry.playerId === rightEntry.playerId &&
+          leftEntry.count === rightEntry.count,
+      ) &&
       left.round.startedAt === right.round.startedAt &&
       left.round.deadlineAt === right.round.deadlineAt &&
       left.round.endedAt === right.round.endedAt &&
@@ -234,6 +241,35 @@ function roomSnapshotsMatch(left: RoomState, right: RoomState): boolean {
     roomRecordMatches &&
     roundsMatch
   );
+}
+
+function shareStableRoundReferences(
+  current: RoomState | null,
+  next: RoomState,
+): RoomState {
+  if (
+    !current?.round ||
+    !next.round ||
+    current.round.id !== next.round.id ||
+    current.round.board.size !== next.round.board.size ||
+    !arraysMatch(
+      current.round.board.tiles,
+      next.round.board.tiles,
+      (leftTile, rightTile) => leftTile === rightTile,
+    )
+  ) {
+    return next;
+  }
+  return {
+    ...next,
+    round: {
+      ...next.round,
+      board: {
+        ...next.round.board,
+        tiles: current.round.board.tiles,
+      },
+    },
+  };
 }
 
 export function App({
@@ -299,8 +335,9 @@ export function App({
         }
       }
 
-      roomRef.current = nextRoom;
-      setRoom(nextRoom);
+      const renderRoom = shareStableRoundReferences(currentRoom, nextRoom);
+      roomRef.current = renderRoom;
+      setRoom(renderRoom);
 
       if (currentSession.role === 'player' && nextRoom.round) {
         const currentRound = nextRoom.round;

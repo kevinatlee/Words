@@ -143,6 +143,10 @@ function createRoundRoom(
         playerId: player.id,
         displayName: player.displayName,
       })),
+      acceptedWordCounts: participants.map((player) => ({
+        playerId: player.id,
+        count: 0,
+      })),
       startedAt: '2026-07-27T20:03:00.000Z',
       deadlineAt: '2026-07-27T20:03:30.000Z',
       endedAt: null,

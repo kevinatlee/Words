@@ -1,5 +1,37 @@
 # Development log
 
+## 2026-08-02 — Stage 4H TV feedback and celebration (draft)
+
+- Removed deployment-specific origins, addresses, container names, registry
+  examples, user-home paths, and topology details from current public docs.
+  Added dependency-free `npm run privacy:check` coverage to normal Quality CI
+  and manual test-image validation. No real credential or private key was found;
+  removed current-tree values may remain in earlier public history because this
+  work does not rewrite history.
+- Replaced the source-code public-origin default with a localhost fallback
+  derived from the configured server port while preserving explicit
+  `PUBLIC_BASE_URL` deployment behavior.
+- Added strict ordered `round.acceptedWordCounts` progress. Every immutable
+  participant starts at zero; accepted submissions advance one count and room
+  version, then broadcast one count-only snapshot. Rejections remain quiet and
+  private words, paths, timestamps, provisional scores, and sequence data stay
+  absent.
+- Added active TV counts with stable right-aligned tabular columns, participant
+  identity mapping, disconnected-participant fallback, and a late-joiner waiting
+  indicator. Memoized phone grid props prevent count-only snapshots from
+  rerendering the LetterGrid.
+- Added one lazy display-only Web Audio context, eight deterministic triangle
+  tones in immutable participant order, autoplay-safe one-time enablement, and
+  replay protection for hydration, reconnect, hidden pages, missed jumps, round
+  changes, and cleanup.
+- Added a transition-only winner phrase, one-shot winner-card emphasis, and
+  flow-safe podium levels from authoritative competition ranks. Ties share a
+  level; all-zero rounds stay flat and silent.
+- Automated verification covers authority, privacy, count rendering, render
+  isolation, audio scheduling/cleanup, ties, repeated rounds, and 1–8 card
+  layouts. Physical TV audio, count, podium, and privacy review remains pending
+  on the test candidate.
+
 ## 2026-08-02 — Lobby QR canvas renderer replacement (draft)
 
 - Replaced the TV lobby QR SVG with `qrcode.react`'s existing canvas renderer
@@ -39,7 +71,7 @@
   mutable `test` without touching production `latest`.
 - Added stale-run cancellation, remote-digest comparison, ephemeral GHCR login
   cleanup, and OCI revision metadata tied to the resolved checked-out target.
-- Documented the isolated Words-Test Unraid container, LAN and later tunnel
+- Documented the isolated test container, LAN and later tunnel
   settings, updates, rollback tags, and the fact that active test rooms end on
   a test-container update.
 - Preserved gameplay, authority, lifecycle, networking, TV and phone UI, Stage
@@ -56,8 +88,8 @@
 - Added a multi-stage non-root Docker image, direct and container smoke checks,
   and CI sequencing that smoke-tests pull requests read-only while publishing
   only an exact tested SHA image and `latest` after successful `main` checks.
-- Added operator guidance for GHCR access, Unraid bridge configuration,
-  Cloudflare Tunnel, update, exact-SHA rollback, and deployment limitations.
+- Added operator guidance for registry access, bridge configuration, reverse
+  proxy or tunnel setup, update, exact-SHA rollback, and deployment limitations.
 - Preserved Stage 4G, gameplay, scoring, lifecycle, authority, phone, display,
   real-time protocol, and visual behavior. Final private-host and real-device
   deployment review remains outside this draft.
@@ -890,8 +922,8 @@ deployment, container, persistence, moderation, or repository-setting change.
 - `npm run build` — passed; Vite transformed 158 modules, and server and
   game-engine strict TypeScript build boundaries passed.
 - `npm audit --audit-level=high` — passed; 0 vulnerabilities.
-- `npm run dev` — passed; Vite started on `http://localhost:5173` and the Words
-  server started on `http://localhost:6532`, then both ports were released
+- `npm run dev` — passed; Vite started on `<public origin>` and the Words
+  server started on `<public origin>`, then both ports were released
   after shutdown.
 
 ## 2026-07-28 — Stage 3 game-engine foundation
@@ -972,8 +1004,8 @@ deployment, container, persistence, moderation, or repository-setting change.
 - `npm run build` — passed; Vite transformed 158 modules, and server and
   game-engine strict TypeScript build boundaries passed.
 - `npm audit --audit-level=high` — passed; 0 vulnerabilities.
-- `npm run dev` — passed; Vite started on `http://localhost:5173` and the Words
-  server started on `http://localhost:6532`, then both processes stopped
+- `npm run dev` — passed; Vite started on `<public origin>` and the Words
+  server started on `<public origin>`, then both processes stopped
   cleanly.
 - Manual engine invocation — passed; printed deterministic 4 × 4, 5 × 5, and
   6 × 6 boards, accepted `CAT` and `QUIZ`, and rejected tile reuse,
@@ -1011,7 +1043,7 @@ unnecessary display interaction.
 - Added `/join/:roomCode` with a normalized, locked room code while retaining
   `/join` as the manual-code fallback.
 - Added a shared join-URL helper that uses the current origin locally and
-  produces `https://words.atlee.io/join/<CODE>` at the configured public origin.
+  produces `<public origin><CODE>` at the configured public origin.
 - Kept the display passive by removing creation, role-selection, leave, and
   local settings interactions. `Start Round` remains disabled.
 - Added the exact join URL and a clearly labeled placeholder for a future
@@ -1047,7 +1079,7 @@ unnecessary display interaction.
   boundary passed strict TypeScript
 - `npm audit --audit-level=high` — passed; 0 vulnerabilities
 - Manual two-context isolation check — passed using storage-isolated
-  `localhost` and `127.0.0.1` browser origins
+  `localhost` and `<server address>` browser origins
 - Automatic root entry — passed; each context created a room without a
   role-selection or creation control, using distinct codes `73Y62C` and
   `MWDULJ`

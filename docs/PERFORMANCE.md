@@ -102,8 +102,26 @@ Normal active play remains event-driven. Pointer movement and provisional paths
 never leave the phone. A player emits a submission only on Trace lift or the
 existing Tap Submit action. The server sends no countdown ticks; clients derive
 the display from authoritative snapshot time and deadline fields. Socket
-listeners remain one stable subscription set and are removed on teardown. No
-new active-play messages, reconnect behavior, or protocol fields were added.
+listeners remain one stable subscription set and are removed on teardown.
+Stage 4H adds one existing `room:state` snapshot after each successful accepted
+submission so the TV receives authoritative count-only progress. Rejections,
+pointer movement, and provisional paths remain silent; there is no polling or
+separate score stream.
+
+### Stage 4H display feedback boundary
+
+Count-only snapshots preserve the official board-tile array when its contents
+are unchanged. The phone `LetterGrid` has a narrow memoized boundary with stable
+board and callback props, so an accepted-count update causes zero phone grid
+renders while selection, board, phase, deadline, and feedback changes remain
+immediate.
+
+Audio is display-only and event-driven. One AudioContext is created lazily after
+a display interaction, remains idle between notes, and is never created for a
+phone session. Accepted tones are scheduled only for newly observed count
+increases; hidden snapshots establish a new baseline without a backlog. Round
+changes, results, visibility loss, and unmount cancel or release pending nodes,
+listeners, and the context.
 
 ### Paint, layout, and memory
 

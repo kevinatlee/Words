@@ -47,6 +47,7 @@ function createRoom(overrides: Partial<RoomState> = {}): RoomState {
         tiles: Array.from({ length: 16 }, () => 'A'),
       },
       participants: [],
+      acceptedWordCounts: [],
       startedAt: '2026-07-29T20:00:00.000Z',
       deadlineAt: '2026-07-29T20:02:00.000Z',
       endedAt: null,

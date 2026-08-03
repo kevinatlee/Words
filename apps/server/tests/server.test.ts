@@ -1969,7 +1969,7 @@ describe('Words Stage 4B server', () => {
     });
   });
 
-  it('keeps successful submissions private to the requesting player', async () => {
+  it('broadcasts one count-only progress snapshot while keeping accepted words private', async () => {
     const display = await connectClient();
     const created = await emitCreateDisplay(display);
     if (!created.ok) throw new Error('Display creation failed.');
@@ -2012,10 +2012,31 @@ describe('Words Stage 4B server', () => {
     });
     expect(response).not.toHaveProperty('room');
     await new Promise<void>((resolve) => setImmediate(resolve));
-    expect(publicBroadcasts).toHaveLength(0);
+    expect(publicBroadcasts).toHaveLength(1);
+    expect(publicBroadcasts[0]).toMatchObject({
+      stateVersion: publicVersion + 1,
+      round: {
+        acceptedWordCounts: [
+          { playerId: firstJoin.session.playerId, count: 1 },
+          { playerId: secondJoin.session.playerId, count: 0 },
+        ],
+      },
+    });
+    expect(JSON.stringify(publicBroadcasts[0])).not.toContain('"word":"ABC"');
+    expect(JSON.stringify(publicBroadcasts[0])).not.toContain('acceptedAt');
     expect(server.roomStore.getRoomState(created.room.code)?.stateVersion).toBe(
-      publicVersion,
+      publicVersion + 1,
     );
+
+    expect(
+      await emitSubmitWord(first, {
+        roundId: started.room.round.id,
+        word: 'ABC',
+        path: [0, 1, 2],
+      }),
+    ).toMatchObject({ ok: false, error: { code: 'ALREADY_SUBMITTED' } });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(publicBroadcasts).toHaveLength(1);
 
     second.disconnect();
     const reconnectedSecond = await connectClient();
