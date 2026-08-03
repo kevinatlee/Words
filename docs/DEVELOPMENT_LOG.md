@@ -1479,7 +1479,8 @@ player are separate roles, and neither socket alone owns room lifetime.
 
 - Moved the display-only audio owner above the round-keyed display room so one
   context survives lobby, active, results, and later-round transitions.
-- Replaced the phase-local sound button with one compact display speaker key
+- Removed the visible display sound prompt after successful physical testing;
+  display audio still retries invisibly on ordinary pointer and keyboard input.
   below the header while audio is blocked or suspended.
 - Kept the existing synthesized pitches, envelopes, winner phrase, and sound
   transition rules unchanged.

@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyRoomHighlights, type RoomState } from '@words/shared';
 
 const audio = vi.hoisted(() => {
-  const enable = vi.fn(async () => true);
+  let enableResult = true;
+  const enable = vi.fn(async () => enableResult);
   const playAccepted = vi.fn();
   const playWinnerTune = vi.fn();
   const cancelAcceptedTones = vi.fn();
@@ -25,6 +26,9 @@ const audio = vi.hoisted(() => {
     playWinnerTune,
     cancelAcceptedTones,
     dispose,
+    setEnableResult: (value: boolean) => {
+      enableResult = value;
+    },
   };
 });
 
@@ -154,17 +158,15 @@ function Harness({
   isDisplay?: boolean;
 }) {
   const sound = useDisplayAudio(room, isDisplay);
-  return (
-    <button type="button" onClick={() => void sound.enable()}>
-      {sound.enabled ? 'Sound enabled' : 'Enable sound'}
-    </button>
-  );
+  void sound;
+  return <div data-testid="audio-harness" />;
 }
 
 let originalVisibility: PropertyDescriptor | undefined;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  audio.setEnableResult(true);
   originalVisibility = Object.getOwnPropertyDescriptor(
     document,
     'visibilityState',
@@ -183,10 +185,8 @@ afterEach(() => {
 
 async function enableSound() {
   await act(async () => Promise.resolve());
-  const button = screen.getByRole('button');
-  if (button.textContent === 'Enable sound') fireEvent.click(button);
+  fireEvent.pointerDown(window);
   await act(async () => Promise.resolve());
-  expect(screen.getByRole('button', { name: 'Sound enabled' })).toBeVisible();
 }
 
 describe('useDisplayAudio', () => {
@@ -195,6 +195,17 @@ describe('useDisplayAudio', () => {
     fireEvent.pointerDown(window);
     fireEvent.keyDown(window, { key: 'Enter' });
     expect(audio.Constructor).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['lobby', { ...activeRoom(), phase: 'LOBBY' as const, round: null }],
+    ['active play', activeRoom()],
+    ['results', endedRoom()],
+  ])('has no visible sound control during %s', (_phase, room) => {
+    render(<Harness room={room} />);
+    expect(screen.queryByText(/enable sound/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('does not replay hydration or enablement counts and creates one display engine', async () => {
@@ -326,9 +337,19 @@ describe('useDisplayAudio', () => {
     fireEvent.pointerDown(window);
     await act(async () => Promise.resolve());
     expect(audio.enable).toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Sound enabled' })).toBeVisible();
     view.unmount();
     expect(audio.dispose).toHaveBeenCalledOnce();
+  });
+
+  it('retries a blocked context after pointer and keyboard interaction', async () => {
+    audio.setEnableResult(false);
+    render(<Harness room={activeRoom()} />);
+    await act(async () => Promise.resolve());
+    const automaticAttempts = audio.enable.mock.calls.length;
+
+    fireEvent.pointerDown(window);
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(audio.enable.mock.calls.length).toBeGreaterThan(automaticAttempts);
   });
 
   it('keeps one display engine through lobby, results, and a later round', async () => {

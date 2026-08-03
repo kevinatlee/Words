@@ -24,8 +24,6 @@ function trackedRoom(room: RoomState): TrackedRoom {
 }
 
 export type DisplayAudioState = Readonly<{
-  enabled: boolean;
-  supported: boolean;
   enable: () => Promise<void>;
 }>;
 
@@ -136,5 +134,5 @@ export function useDisplayAudio(
     [],
   );
 
-  return { enabled, supported, enable };
+  return { enable };
 }

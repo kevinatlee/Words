@@ -291,10 +291,7 @@ export function App({
     useState<PlayerRoundSubmissionState | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
   const [displayStarting, setDisplayStarting] = useState(false);
-  const displayAudio = useDisplayAudio(
-    room,
-    currentPath === '/' && session?.role === 'display',
-  );
+  useDisplayAudio(room, currentPath === '/' && session?.role === 'display');
   const sessionRef = useRef<StoredLobbySession | null>(null);
   const roomRef = useRef<RoomState | null>(null);
   const reconnectNeededRef = useRef(false);
@@ -965,20 +962,6 @@ export function App({
         room && session?.role === 'display' ? connectionStatus : null
       }
     >
-      {room &&
-        session?.role === 'display' &&
-        displayAudio.supported &&
-        !displayAudio.enabled && (
-          <button
-            className="display-sound-key"
-            type="button"
-            aria-label="Enable sound"
-            title="Enable sound"
-            onClick={() => void displayAudio.enable()}
-          >
-            <span aria-hidden="true">🔊+</span>
-          </button>
-        )}
       {page}
     </AppShell>
   );
