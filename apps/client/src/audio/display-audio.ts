@@ -11,6 +11,16 @@ export class DisplayAudioEngine {
   private context: AudioContext | null = null;
   private readonly activeAcceptedNodes = new Set<OscillatorNode>();
 
+  get isRunning(): boolean {
+    return this.context?.state === 'running';
+  }
+
+  static get isSupported(): boolean {
+    return Boolean(
+      window.AudioContext ?? (window as AudioWindow).webkitAudioContext,
+    );
+  }
+
   async enable(): Promise<boolean> {
     const AudioContextConstructor =
       window.AudioContext ?? (window as AudioWindow).webkitAudioContext;

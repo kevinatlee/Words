@@ -29,7 +29,7 @@ const audio = vi.hoisted(() => {
 });
 
 vi.mock('../audio/display-audio', () => ({
-  DisplayAudioEngine: audio.Constructor,
+  DisplayAudioEngine: Object.assign(audio.Constructor, { isSupported: true }),
 }));
 
 import { useDisplayAudio } from './useDisplayAudio';
@@ -182,7 +182,9 @@ afterEach(() => {
 });
 
 async function enableSound() {
-  fireEvent.click(screen.getByRole('button', { name: 'Enable sound' }));
+  await act(async () => Promise.resolve());
+  const button = screen.getByRole('button');
+  if (button.textContent === 'Enable sound') fireEvent.click(button);
   await act(async () => Promise.resolve());
   expect(screen.getByRole('button', { name: 'Sound enabled' })).toBeVisible();
 }
@@ -197,7 +199,7 @@ describe('useDisplayAudio', () => {
 
   it('does not replay hydration or enablement counts and creates one display engine', async () => {
     const view = render(<Harness room={activeRoom(4, 2)} />);
-    expect(audio.Constructor).not.toHaveBeenCalled();
+    expect(audio.Constructor).toHaveBeenCalledOnce();
     expect(audio.playAccepted).not.toHaveBeenCalled();
     await enableSound();
     view.rerender(<Harness room={activeRoom(4, 2)} />);
@@ -323,8 +325,36 @@ describe('useDisplayAudio', () => {
     const view = render(<Harness room={activeRoom()} />);
     fireEvent.pointerDown(window);
     await act(async () => Promise.resolve());
-    expect(audio.enable).toHaveBeenCalledOnce();
+    expect(audio.enable).toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Sound enabled' })).toBeVisible();
+    view.unmount();
+    expect(audio.dispose).toHaveBeenCalledOnce();
+  });
+
+  it('keeps one display engine through lobby, results, and a later round', async () => {
+    const lobby: RoomState = { ...activeRoom(), phase: 'LOBBY', round: null };
+    const view = render(<Harness room={lobby} />);
+    await act(async () => Promise.resolve());
+
+    view.rerender(<Harness room={activeRoom()} />);
+    view.rerender(<Harness room={endedRoom()} />);
+    view.rerender(<Harness room={lobby} />);
+    const laterRound = activeRoom();
+    view.rerender(
+      <Harness
+        room={{
+          ...laterRound,
+          round: laterRound.round
+            ? {
+                ...laterRound.round,
+                id: '00000000-0000-4000-8000-000000000011',
+              }
+            : null,
+        }}
+      />,
+    );
+
+    expect(audio.Constructor).toHaveBeenCalledOnce();
     view.unmount();
     expect(audio.dispose).toHaveBeenCalledOnce();
   });

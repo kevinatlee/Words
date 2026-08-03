@@ -1474,3 +1474,12 @@ player are separate roles, and neither socket alone owns room lifetime.
   selected mode does not reset between rounds.
 - No server, networking, scoring, lifecycle, display behavior, or production
   release channel changed.
+
+## 2026-08-02 — Stage 4H display audio lifetime (draft)
+
+- Moved the display-only audio owner above the round-keyed display room so one
+  context survives lobby, active, results, and later-round transitions.
+- Replaced the phase-local sound button with one compact display speaker key
+  below the header while audio is blocked or suspended.
+- Kept the existing synthesized pitches, envelopes, winner phrase, and sound
+  transition rules unchanged.
