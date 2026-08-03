@@ -10,13 +10,6 @@ battery health, browser behavior, temperature, and background applications were
 not controlled. The changes below reduce code-proven client work; they do not
 establish a precise battery-percentage improvement.
 
-The first Stage 4H physical candidate was then played for roughly 50 rounds.
-The repeated rough observation was about one phone battery percentage point per
-two-minute round at half brightness. This is serious product evidence, but it
-still is not a controlled measurement: idle time, interaction intensity,
-network conditions, temperature, and battery reporting granularity were not
-held constant.
-
 This pass covers the active phone client only. It preserves the authoritative
 server lifecycle, game rules, submissions, timing, reconnect behavior, visual
 design, TV presentation, accessibility, and network contracts.
@@ -110,32 +103,25 @@ never leave the phone. A player emits a submission only on Trace lift or the
 existing Tap Submit action. The server sends no countdown ticks; clients derive
 the display from authoritative snapshot time and deadline fields. Socket
 listeners remain one stable subscription set and are removed on teardown.
-Stage 4H keeps authoritative accepted counts in room state but sends each
-accepted count change only to an internal display-only Socket.IO channel.
-Displays join that channel on create and reconnect; players never join it.
-Ten deterministic accepted submissions produced ten display snapshots, zero
-submitting-phone snapshots, and zero observing-phone snapshots. The private
-acknowledgement remains the submitting phone's only per-acceptance update.
-Rejections, pointer movement, and provisional paths remain silent; there is no
-polling or separate score stream. Ordinary room-wide state still reaches every
-role, and a tested controller-transfer snapshot safely moves phones over the
-versions used only by display progress.
+Stage 4H adds one existing `room:state` snapshot after each successful accepted
+submission so the TV receives authoritative count-only progress. Rejections,
+pointer movement, and provisional paths remain silent; there is no polling or
+separate score stream.
 
 ### Stage 4H display feedback boundary
 
-Because phones now receive no count-only callback, accepted words found by
-another player cause zero App state assignments, RoomLobby renders, or
-LetterGrid renders on an observing phone. The existing narrow LetterGrid
-boundary remains a defensive guard, while selection, board, phase, deadline,
-and accepted feedback changes remain immediate.
+Count-only snapshots preserve the official board-tile array when its contents
+are unchanged. The phone `LetterGrid` has a narrow memoized boundary with stable
+board and callback props, so an accepted-count update causes zero phone grid
+renders while selection, board, phase, deadline, and feedback changes remain
+immediate.
 
-Audio is display-only and event-driven. One AudioContext is owned above the
-round-keyed RoomLobby by the stable App display session, is armed immediately,
-and remains idle between notes. Phones create zero audio contexts. Browser
-blocking or later suspension retains the context and armed state; document
-pointer/keyboard interaction and visibility restoration retry it. Hidden
-snapshots establish a new baseline without a sound backlog. Phase and round
-changes preserve the context; only display-session teardown disposes it.
+Audio is display-only and event-driven. One AudioContext is created lazily after
+a display interaction, remains idle between notes, and is never created for a
+phone session. Accepted tones are scheduled only for newly observed count
+increases; hidden snapshots establish a new baseline without a backlog. Round
+changes, results, visibility loss, and unmount cancel or release pending nodes,
+listeners, and the context.
 
 ### Paint, layout, and memory
 
@@ -163,9 +149,6 @@ verify that new countdown timers and visibility listeners return to zero.
 | Geometry reads for the same tile in one gesture             |                   potentially repeated |             at most 1 until explicit invalidation |
 | React commits for an exact duplicate ACK/broadcast snapshot |                 2 assignments possible |                  second snapshot causes 0 commits |
 | Active-play network messages                                | event-driven submissions/state changes |                                         unchanged |
-| Player `room:state` callbacks for 10 other-player accepts   |                                     10 |                                                 0 |
-| App/RoomLobby/LetterGrid updates from those 10 accepts      |                               up to 10 |                                         0 / 0 / 0 |
-| Phone AudioContext creations                                |                                      0 |                                                 0 |
 
 ## Bundle comparison
 
@@ -186,23 +169,12 @@ explicit authoritative snapshot comparison, and Trace lifecycle handling.
   reconnect reliability.
 - Radio quality, screen brightness, display technology, device temperature,
   and battery health can dominate a short battery comparison.
-- The focused follow-up audit found no additional demonstrated recurring phone
-  hotspot beyond the now-removed accepted-count delivery. Deadline-aligned
-  one-second leaf updates, hidden-page pausing, one-frame Trace processing,
-  per-gesture geometry caching, stable board references, event-driven sockets,
-  and the absence of phone audio or continuous animation remain intact.
 
 ## Final practical phone validation
 
-Use one integrated comparison rather than separate long tests:
-
-1. play one two-minute active round mostly idle;
-2. play one two-minute round with heavy Tap input;
-3. play one two-minute round with heavy Trace input;
-4. continue for several consecutive normal rounds;
-5. keep the phone near half brightness and conditions as similar as practical;
-6. compare battery use before and after display-only count delivery.
-
-Record starting and ending battery percentages and note unusual heat, lag,
-missed Trace tiles, disconnects, timer errors, or sound-related phone behavior.
-These observations remain a practical comparison, not a precise battery claim.
+Run one normal 30–60 minute two-player session under conditions similar to the
+reported baseline. Keep the same device and roughly the same brightness when
+practical. Record starting and ending battery percentages, and note any unusual
+heat, lag, missed Trace tiles, disconnects, or timer errors. This one integrated
+session is the only long real-phone validation requested for the optimization
+pass.

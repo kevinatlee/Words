@@ -56,8 +56,7 @@ contract.
   rejects personal duplicates, and calculates length-based provisional points.
 - Accepted word identities recover only for that player and never enter an
   active public snapshot. `RoomState` exposes only each immutable participant's
-  authoritative accepted-word count; accepted progress is delivered to the TV
-  without waking phone clients for each word.
+  authoritative accepted-word count so the TV can show count-only progress.
 - At the deadline, the server marks words shared across distinct participants,
   awards one point per word letter, adds +1 to unique three- or four-letter
   words and +2 to longer unique words, and publishes one immutable result
@@ -72,12 +71,8 @@ contract.
   administration or detailed opponent results.
 - Phone puzzle bubbles use semantic labels without a visible puzzle heading.
   The compact Tap/Trace control stays centred in the phone header throughout
-  lobby, active play, and results; phones do not show provisional scores or
-  accepted-word counts.
-- Display sound is armed automatically in one session-stable AudioContext.
-  Browsers that require a local interaction expose a compact mint speaker key
-  below the upper-right header; accepted words use participant-specific
-  two-part chimes and positive results use one brief winner phrase.
+  lobby and active phases; phones do not show provisional scores or accepted-word
+  counts.
 - Between rounds, controller settings use an accessible local-draft
   30–180-second slider with a compact seconds readout and distinct settings and
   host-control bubbles; ordinary player phones retain only the puzzle preview.
@@ -99,8 +94,7 @@ contract.
   injected Set-backed dictionary lookup.
 - `@words/game-data` contains the pinned 79,370-word ESDB/SCOWL production
   dictionary, its applicable notice and manifest, an original
-  dictionary-derived token distribution, and bounded board-quality profiles
-  that reject dense identical-token and local vowel clumps.
+  dictionary-derived token distribution, and bounded board-quality profiles.
 - The default Q-bearing tile is `QU`; standalone `Q` is absent from the default
   distribution while Q-without-U words remain in the master dictionary.
 - The server-only loader verifies the dictionary checksum before constructing
@@ -421,9 +415,8 @@ cannot recreate the display.
 - **Stage 5A — complete:** one-container Node 24 build, static-client serving,
   health and graceful shutdown, and production/test image channels.
 - **Stage 4H — active candidate:** authoritative count-only TV progress,
-  stable default-armed display audio, display-only accepted progress, spatial
-  board quality, persistent phone Tap/Trace controls, and rank-based result
-  presentation pending repeat physical validation.
+  display-only accepted tones, a one-shot winner tune, and rank-based result
+  presentation pending physical validation.
 
 ## License
 
