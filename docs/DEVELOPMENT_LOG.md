@@ -1492,3 +1492,18 @@ player are separate roles, and neither socket alone owns room lifetime.
   and octave phrase followed by a brief resolving major chord.
 - Kept display-session ownership, automatic startup, invisible resume retry,
   round persistence, phone isolation, and display-session disposal unchanged.
+
+## 2026-08-03 — Board quality research tooling (draft)
+
+- Added a deterministic developer-only CLI that generates accepted boards
+  through the production distribution and quality profiles, then analyzes
+  5,000 boards each at 4 × 4, 5 × 5, and 6 × 6 with the production dictionary,
+  adjacency, and scoring definitions.
+- Recorded composition, spatial vowel spread, repeated-token clustering,
+  playable-word supply, score potential, cell coverage, correlations, three
+  offline acceptance-policy comparisons, and 36 stable review boards.
+- Verified independent runs with seed `board-quality-v1` produce byte-identical
+  summary and sample JSON artifacts.
+- Changed no production board rule, runtime path, networking behavior, or
+  deployment channel; the policy thresholds remain research hypotheses for a
+  future physical A/B study.
