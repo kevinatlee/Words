@@ -2,6 +2,18 @@ export const participantToneFrequencies = [
   261.63, 293.66, 329.63, 392, 440, 523.25, 587.33, 659.25,
 ] as const;
 
+export const acceptedChimeInterval = 1.5;
+export const acceptedChimeNoteDelaySeconds = 0.055;
+export const acceptedChimeNoteDurationSeconds = 0.16;
+export const acceptedChimeGain = 0.07;
+export const winnerPhraseIntervals = [1, 1.25, 1.5, 2] as const;
+export const winnerPhraseNoteSpacingSeconds = 0.18;
+export const winnerPhraseNoteDurationSeconds = 0.18;
+export const winnerPhraseGain = 0.075;
+export const winnerChordDelaySeconds = 0.72;
+export const winnerChordDurationSeconds = 0.24;
+export const winnerChordGain = 0.08;
+
 type AudioWindow = Window &
   typeof globalThis & {
     webkitAudioContext?: typeof AudioContext;
@@ -39,22 +51,48 @@ export class DisplayAudioEngine {
     if (!context || context.state !== 'running') return;
     const frequency = participantToneFrequencies[participantIndex];
     if (!frequency) return;
+    const start = context.currentTime + delaySeconds;
     this.scheduleNote(
       frequency,
-      context.currentTime + delaySeconds,
-      0.11,
-      0.035,
+      start,
+      acceptedChimeNoteDurationSeconds,
+      acceptedChimeGain,
+      true,
+    );
+    this.scheduleNote(
+      frequency * acceptedChimeInterval,
+      start + acceptedChimeNoteDelaySeconds,
+      acceptedChimeNoteDurationSeconds,
+      acceptedChimeGain,
       true,
     );
   }
 
-  playWinnerTune(): void {
+  playWinnerTune(winnerParticipantIndex: number): void {
     const context = this.context;
     if (!context || context.state !== 'running') return;
     this.stopAcceptedTones();
     const start = context.currentTime;
-    [523.25, 659.25, 783.99, 1046.5].forEach((frequency, index) => {
-      this.scheduleNote(frequency, start + index * 0.2, 0.32, 0.045, false);
+    const root =
+      participantToneFrequencies[winnerParticipantIndex] ??
+      participantToneFrequencies[0];
+    winnerPhraseIntervals.forEach((interval, index) => {
+      this.scheduleNote(
+        root * interval,
+        start + index * winnerPhraseNoteSpacingSeconds,
+        winnerPhraseNoteDurationSeconds,
+        winnerPhraseGain,
+        false,
+      );
+    });
+    [1, 1.25, 1.5].forEach((interval) => {
+      this.scheduleNote(
+        root * interval,
+        start + winnerChordDelaySeconds,
+        winnerChordDurationSeconds,
+        winnerChordGain,
+        false,
+      );
     });
   }
 

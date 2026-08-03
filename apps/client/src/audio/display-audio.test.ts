@@ -1,8 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  acceptedChimeGain,
+  acceptedChimeNoteDelaySeconds,
+  acceptedChimeNoteDurationSeconds,
   DisplayAudioEngine,
   participantToneFrequencies,
+  winnerChordDelaySeconds,
+  winnerChordDurationSeconds,
+  winnerPhraseGain,
+  winnerPhraseIntervals,
+  winnerPhraseNoteDurationSeconds,
+  winnerPhraseNoteSpacingSeconds,
 } from './display-audio';
 
 class FakeAudioParam {
@@ -128,22 +137,31 @@ describe('DisplayAudioEngine', () => {
     await expect(engine.enable()).resolves.toBe(false);
   });
 
-  it('uses the participant pitch with one identical subtle envelope', async () => {
+  it('uses the participant pitch as the root of a two-note chime', async () => {
     const engine = new DisplayAudioEngine();
     await engine.enable();
     engine.playAccepted(3, 0.06);
     const context = FakeAudioContext.instances[0]!;
+    expect(context.oscillators).toHaveLength(2);
+    expect(context.gains).toHaveLength(2);
     const oscillator = context.oscillators[0]!;
+    const fifthOscillator = context.oscillators[1]!;
     const gain = context.gains[0]!;
+    const fifthGain = context.gains[1]!;
 
     expect(oscillator.type).toBe('triangle');
+    expect(fifthOscillator?.type).toBe('triangle');
     expect(oscillator.frequency.setValueAtTime).toHaveBeenCalledWith(
       392,
       10.06,
     );
+    expect(fifthOscillator?.frequency.setValueAtTime).toHaveBeenCalledWith(
+      588,
+      10.06 + acceptedChimeNoteDelaySeconds,
+    );
     expect(gain.gain.setValueAtTime).toHaveBeenCalledWith(0.0001, 10.06);
     expect(gain.gain.exponentialRampToValueAtTime.mock.calls[0]?.[0]).toBe(
-      0.035,
+      acceptedChimeGain,
     );
     expect(
       gain.gain.exponentialRampToValueAtTime.mock.calls[0]?.[1],
@@ -153,8 +171,13 @@ describe('DisplayAudioEngine', () => {
     );
     expect(
       gain.gain.exponentialRampToValueAtTime.mock.calls[1]?.[1],
-    ).toBeCloseTo(10.17);
-    expect(oscillator.stop.mock.calls[0]?.[0]).toBeCloseTo(10.18);
+    ).toBeCloseTo(10.06 + acceptedChimeNoteDurationSeconds);
+    expect(
+      fifthGain?.gain.exponentialRampToValueAtTime.mock.calls[0]?.[0],
+    ).toBe(acceptedChimeGain);
+    expect(oscillator.stop.mock.calls[0]?.[0]).toBeCloseTo(
+      10.06 + acceptedChimeNoteDurationSeconds + 0.01,
+    );
   });
 
   it('cancels accepted tones before the deterministic winner phrase', async () => {
@@ -164,22 +187,42 @@ describe('DisplayAudioEngine', () => {
     const context = FakeAudioContext.instances[0]!;
     const accepted = context.oscillators[0]!;
 
-    engine.playWinnerTune();
+    engine.playWinnerTune(3);
 
-    expect(accepted.stop).toHaveBeenCalledTimes(2);
-    expect(context.oscillators).toHaveLength(5);
+    expect(accepted.stop).toHaveBeenCalled();
+    expect(context.oscillators[1]?.stop).toHaveBeenCalled();
+    expect(context.oscillators).toHaveLength(9);
     expect(
       context.oscillators
-        .slice(1)
+        .slice(2)
         .map((oscillator) =>
           oscillator.frequency.setValueAtTime.mock.calls[0]?.slice(0, 2),
         ),
     ).toEqual([
-      [523.25, 10],
-      [659.25, 10.2],
-      [783.99, 10.4],
-      [1046.5, 10.6],
+      [392, 10],
+      [490, 10 + winnerPhraseNoteSpacingSeconds],
+      [588, 10 + winnerPhraseNoteSpacingSeconds * 2],
+      [784, 10 + winnerPhraseNoteSpacingSeconds * 3],
+      [392, 10 + winnerChordDelaySeconds],
+      [490, 10 + winnerChordDelaySeconds],
+      [588, 10 + winnerChordDelaySeconds],
     ]);
+    expect(
+      context.oscillators
+        .slice(2)
+        .every((oscillator) =>
+          context.gains[
+            context.oscillators.indexOf(oscillator)
+          ]?.gain.exponentialRampToValueAtTime.mock.calls.every(
+            ([gain]) => gain <= 0.08,
+          ),
+        ),
+    ).toBe(true);
+    expect(winnerPhraseIntervals).toEqual([1, 1.25, 1.5, 2]);
+    expect(winnerPhraseGain).toBeGreaterThan(acceptedChimeGain);
+    expect(winnerPhraseNoteDurationSeconds).toBe(0.18);
+    expect(winnerPhraseNoteSpacingSeconds).toBe(0.18);
+    expect(winnerChordDurationSeconds).toBe(0.24);
   });
 
   it('releases completed nodes and closes the context on cleanup', async () => {

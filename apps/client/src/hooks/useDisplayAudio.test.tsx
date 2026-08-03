@@ -258,6 +258,7 @@ describe('useDisplayAudio', () => {
     await enableSound();
     view.rerender(<Harness room={endedRoom()} />);
     expect(audio.cancelAcceptedTones).toHaveBeenCalledOnce();
+    expect(audio.playWinnerTune).toHaveBeenCalledWith(0);
     expect(audio.playWinnerTune).toHaveBeenCalledOnce();
 
     view.rerender(<Harness room={{ ...endedRoom(), stateVersion: 99 }} />);

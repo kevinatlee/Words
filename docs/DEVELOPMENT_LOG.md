@@ -1481,6 +1481,14 @@ player are separate roles, and neither socket alone owns room lifetime.
   context survives lobby, active, results, and later-round transitions.
 - Removed the visible display sound prompt after successful physical testing;
   display audio still retries invisibly on ordinary pointer and keyboard input.
-  below the header while audio is blocked or suspended.
 - Kept the existing synthesized pitches, envelopes, winner phrase, and sound
   transition rules unchanged.
+
+## 2026-08-03 — Stage 4H display audio character (draft)
+
+- Replaced the accepted-word beep with a short triangle-wave root and perfect
+  fifth chime using the unchanged eight-player root-frequency mapping.
+- Replaced the winner tune with an ascending root, major-third, perfect-fifth,
+  and octave phrase followed by a brief resolving major chord.
+- Kept display-session ownership, automatic startup, invisible resume retry,
+  round persistence, phone isolation, and display-session disposal unchanged.
