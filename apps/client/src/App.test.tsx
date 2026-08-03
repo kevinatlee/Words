@@ -346,7 +346,6 @@ async function chooseTap(user: ReturnType<typeof userEvent.setup>) {
 describe('Stage 4B display and player room routes', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/');
-    window.localStorage.clear();
   });
 
   it('automatically creates one passive display room at the root', async () => {
@@ -2360,97 +2359,10 @@ describe('Stage 4B display and player room routes', () => {
     expect(screen.getByText('No scoring winner')).toBeInTheDocument();
     expect(screen.queryByRole('grid')).toBeNull();
     expect(screen.queryByRole('timer')).toBeNull();
-    expect(
-      screen.getByRole('group', { name: 'Word entry mode' }),
-    ).toBeVisible();
+    expect(screen.queryByRole('group', { name: 'Word entry mode' })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Start Round' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Make Game Host' })).toBeNull();
-  });
-
-  it('keeps one phone entry preference through every phase and a later round', async () => {
-    let receiveRoomState: ((room: RoomState) => void) | null = null;
-    const lobbyRoom = createRoom([controllerPlayer]);
-    const client = createFakeClient({
-      reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
-        ...controllerSuccess,
-        room: lobbyRoom,
-      })),
-      onRoomState: (listener) => {
-        receiveRoomState = listener;
-        return () => {
-          receiveRoomState = null;
-        };
-      },
-    });
-    const user = userEvent.setup();
-
-    render(
-      <App
-        routePath="/room/ABC234"
-        client={client}
-        sessionStore={createFakeSessionStore({
-          role: 'player',
-          roomCode: 'ABC234',
-          playerId: controllerPlayer.id,
-          playerReconnectToken: 'n'.repeat(43),
-          displayName: controllerPlayer.displayName,
-        })}
-      />,
-    );
-
-    const mode = await screen.findByRole('group', {
-      name: 'Word entry mode',
-    });
-    expect(within(mode).getByRole('button', { name: 'Trace' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    await user.click(within(mode).getByRole('button', { name: 'Tap' }));
-
-    const active = createRoundRoom([controllerPlayer]);
-    act(() => receiveRoomState?.(active));
-    expect(screen.getByRole('button', { name: 'Tap' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-
-    const ended = createEndedRoom(active);
-    act(() => receiveRoomState?.(ended));
-    expect(screen.getByRole('region', { name: 'Round summary' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Tap' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    await user.click(screen.getByRole('button', { name: 'Trace' }));
-
-    const returnedLobby = {
-      ...lobbyRoom,
-      stateVersion: ended.stateVersion + 1,
-    };
-    act(() => receiveRoomState?.(returnedLobby));
-    expect(screen.getByRole('button', { name: 'Trace' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-
-    const nextActive = createRoundRoom([controllerPlayer]);
-    if (!nextActive.round) throw new Error('Active round fixture is missing.');
-    const secondRound = nextActive.round;
-    const secondActiveRoom: RoomState = {
-      ...nextActive,
-      stateVersion: returnedLobby.stateVersion + 1,
-      round: {
-        ...secondRound,
-        id: '00000000-0000-4000-8000-000000000201',
-        number: 2,
-      },
-    };
-    act(() => receiveRoomState?.(secondActiveRoom));
-    expect(screen.getByRole('button', { name: 'Trace' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
   });
 
   it('shows ended results without a next-round control to the display or an ordinary player', async () => {

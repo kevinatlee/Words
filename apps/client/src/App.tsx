@@ -24,7 +24,6 @@ import { LobbyError } from './components/LobbyError';
 import { NotFound } from './components/NotFound';
 import { PlayerPrototype } from './components/PlayerPrototype';
 import { RoomLobby } from './components/RoomLobby';
-import { useDisplayAudio } from './hooks/useDisplayAudio';
 import {
   lobbyClient as defaultLobbyClient,
   type LobbyClient,
@@ -34,11 +33,6 @@ import {
   type LobbySessionStore,
   type StoredLobbySession,
 } from './session-store';
-import {
-  loadWordEntryMode,
-  saveWordEntryMode,
-  type WordEntryMode,
-} from './utils/word-entry';
 
 type AppProps = {
   routePath?: string;
@@ -296,7 +290,6 @@ export function App({
     useState<PlayerRoundSubmissionState | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
   const [displayStarting, setDisplayStarting] = useState(false);
-  const [entryMode, setEntryMode] = useState<WordEntryMode>(loadWordEntryMode);
   const sessionRef = useRef<StoredLobbySession | null>(null);
   const roomRef = useRef<RoomState | null>(null);
   const reconnectNeededRef = useRef(false);
@@ -304,14 +297,6 @@ export function App({
   const pendingReconnectRef = useRef<StoredLobbySession | null>(null);
   const displayStartupStartedRef = useRef(false);
   const attemptedRoomCodeRef = useRef<string | null>(null);
-  const isDisplaySession =
-    currentPath === '/' && room !== null && session?.role === 'display';
-  const displayAudio = useDisplayAudio(room, isDisplaySession);
-
-  const selectEntryMode = useCallback((mode: WordEntryMode) => {
-    saveWordEntryMode(mode);
-    setEntryMode(mode);
-  }, []);
 
   const acceptRoomSnapshot = useCallback(
     (nextRoom: RoomState, expectedSession?: StoredLobbySession) => {
@@ -874,8 +859,6 @@ export function App({
             onStartRound={startRound}
             submissionState={null}
             onSubmitWord={submitWord}
-            entryMode={entryMode}
-            onEntryModeChange={selectEntryMode}
           />
         </>
       );
@@ -940,8 +923,6 @@ export function App({
             onStartRound={startRound}
             submissionState={submissionState}
             onSubmitWord={submitWord}
-            entryMode={entryMode}
-            onEntryModeChange={selectEntryMode}
           />
         </>
       );
@@ -978,7 +959,6 @@ export function App({
       displayConnectionStatus={
         room && session?.role === 'display' ? connectionStatus : null
       }
-      displayAudio={isDisplaySession ? displayAudio : null}
     >
       {page}
     </AppShell>

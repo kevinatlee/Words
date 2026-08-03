@@ -1,6 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -13,11 +12,6 @@ import {
 } from '@words/shared';
 
 import { RoomLobby } from './RoomLobby';
-import {
-  loadWordEntryMode,
-  saveWordEntryMode,
-  type WordEntryMode,
-} from '../utils/word-entry';
 
 const playerId = '00000000-0000-4000-8000-000000000001';
 const roundId = '00000000-0000-4000-8000-000000000010';
@@ -157,24 +151,7 @@ function lobbyProps(
     onStartRound: async () => null,
     submissionState: createSubmissionState(),
     onSubmitWord,
-    entryMode: 'trace' as const,
-    onEntryModeChange: vi.fn(),
   };
-}
-
-function RoomLobbyHarness(props: ReturnType<typeof lobbyProps>) {
-  const [entryMode, setEntryMode] = useState<WordEntryMode>(loadWordEntryMode);
-  const onEntryModeChange = (mode: WordEntryMode) => {
-    saveWordEntryMode(mode);
-    setEntryMode(mode);
-  };
-  return (
-    <RoomLobby
-      {...props}
-      entryMode={entryMode}
-      onEntryModeChange={onEntryModeChange}
-    />
-  );
 }
 
 function renderLobby(
@@ -194,7 +171,7 @@ function renderLobby(
   const slot = document.createElement('div');
   slot.id = 'phone-entry-mode-slot';
   document.body.append(slot);
-  return render(<RoomLobbyHarness {...lobbyProps(onSubmitWord, options)} />);
+  return render(<RoomLobby {...lobbyProps(onSubmitWord, options)} />);
 }
 
 function tileButtons() {
@@ -544,9 +521,7 @@ describe('RoomLobby word entry', () => {
     expect(screen.getByRole('region', { name: 'Round summary' })).toBeVisible();
     expect(screen.getByText('Look at the TV!')).toBeVisible();
     expect(screen.queryByRole('grid')).toBeNull();
-    expect(
-      screen.getByRole('group', { name: 'Word entry mode' }),
-    ).toBeVisible();
+    expect(screen.queryByRole('group', { name: 'Word entry mode' })).toBeNull();
     expect(
       screen.queryByRole('region', { name: 'Game host controls' }),
     ).toBeNull();
@@ -656,9 +631,7 @@ describe('RoomLobby word entry', () => {
     expect(screen.queryByRole('grid')).toBeNull();
     expect(screen.queryByRole('timer')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Submit' })).toBeNull();
-    expect(
-      screen.getByRole('group', { name: 'Word entry mode' }),
-    ).toBeVisible();
+    expect(screen.queryByRole('group', { name: 'Word entry mode' })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
     expect(
       screen.queryByRole('region', { name: 'Game host controls' }),

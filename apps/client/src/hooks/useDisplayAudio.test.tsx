@@ -3,30 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createEmptyRoomHighlights, type RoomState } from '@words/shared';
 
-import type { DisplayAudioStatus } from '../audio/display-audio';
-
 const audio = vi.hoisted(() => {
-  let listener: ((status: DisplayAudioStatus) => void) | null = null;
-  let nextStatus: DisplayAudioStatus = 'running';
-  const enable = vi.fn(async () => {
-    listener?.(nextStatus);
-    return nextStatus;
-  });
+  const enable = vi.fn(async () => true);
   const playAccepted = vi.fn();
   const playWinnerTune = vi.fn();
   const cancelAcceptedTones = vi.fn();
   const dispose = vi.fn(async () => undefined);
-  const subscribe = vi.fn((next: (status: DisplayAudioStatus) => void) => {
-    listener = next;
-    next('checking');
-    return () => {
-      if (listener === next) listener = null;
-    };
-  });
   const Constructor = vi.fn(function DisplayAudioEngineMock() {
     return {
       enable,
-      subscribe,
       playAccepted,
       playWinnerTune,
       cancelAcceptedTones,
@@ -36,21 +21,10 @@ const audio = vi.hoisted(() => {
   return {
     Constructor,
     enable,
-    subscribe,
     playAccepted,
     playWinnerTune,
     cancelAcceptedTones,
     dispose,
-    setNextStatus(status: DisplayAudioStatus) {
-      nextStatus = status;
-    },
-    emitStatus(status: DisplayAudioStatus) {
-      listener?.(status);
-    },
-    reset() {
-      listener = null;
-      nextStatus = 'running';
-    },
   };
 });
 
@@ -63,11 +37,7 @@ import { useDisplayAudio } from './useDisplayAudio';
 const firstId = '00000000-0000-4000-8000-000000000001';
 const secondId = '00000000-0000-4000-8000-000000000002';
 
-function activeRoom(
-  firstCount = 0,
-  secondCount = 0,
-  roundId = '00000000-0000-4000-8000-000000000010',
-): RoomState {
+function activeRoom(firstCount = 0, secondCount = 0): RoomState {
   return {
     code: 'ABC234',
     phase: 'ROUND_ACTIVE',
@@ -103,8 +73,8 @@ function activeRoom(
       scoringMode: 'length-plus-unique',
     },
     round: {
-      id: roundId,
-      number: roundId.endsWith('10') ? 1 : 2,
+      id: '00000000-0000-4000-8000-000000000010',
+      number: 1,
       settings: {
         gridSize: 4,
         roundDurationSeconds: 120,
@@ -125,16 +95,6 @@ function activeRoom(
       results: null,
       generationAttempts: 1,
     },
-  };
-}
-
-function lobbyRoom(round: RoomState['round'] = null): RoomState {
-  const active = activeRoom();
-  return {
-    ...active,
-    phase: 'LOBBY',
-    round,
-    stateVersion: active.stateVersion + 1,
   };
 }
 
@@ -190,25 +150,14 @@ function Harness({
   room,
   isDisplay = true,
 }: {
-  room: RoomState | null;
+  room: RoomState;
   isDisplay?: boolean;
 }) {
   const sound = useDisplayAudio(room, isDisplay);
   return (
-    <div>
-      <output>{sound.status}</output>
-      {sound.showControl && (
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            void sound.enable();
-          }}
-        >
-          Enable sound
-        </button>
-      )}
-    </div>
+    <button type="button" onClick={() => void sound.enable()}>
+      {sound.enabled ? 'Sound enabled' : 'Enable sound'}
+    </button>
   );
 }
 
@@ -216,7 +165,6 @@ let originalVisibility: PropertyDescriptor | undefined;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  audio.reset();
   originalVisibility = Object.getOwnPropertyDescriptor(
     document,
     'visibilityState',
@@ -233,80 +181,46 @@ afterEach(() => {
   }
 });
 
-async function flushAudio() {
+async function enableSound() {
+  fireEvent.click(screen.getByRole('button', { name: 'Enable sound' }));
   await act(async () => Promise.resolve());
+  expect(screen.getByRole('button', { name: 'Sound enabled' })).toBeVisible();
 }
 
 describe('useDisplayAudio', () => {
-  it('arms immediately on display startup but never creates an engine for phones', async () => {
-    const phone = render(<Harness room={activeRoom()} isDisplay={false} />);
-    expect(audio.Constructor).not.toHaveBeenCalled();
-    phone.unmount();
-
-    render(<Harness room={activeRoom()} />);
-    await flushAudio();
-    expect(audio.Constructor).toHaveBeenCalledOnce();
-    expect(audio.enable).toHaveBeenCalledOnce();
-    expect(screen.getByText('running')).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Enable sound' })).toBeNull();
-  });
-
-  it('shows blocked startup and retries every pointer, click, key, and fallback action', async () => {
-    audio.setNextStatus('blocked');
-    render(<Harness room={activeRoom()} />);
-    await flushAudio();
-    expect(screen.getByRole('button', { name: 'Enable sound' })).toBeVisible();
-
+  it('never creates an AudioContext engine for phone sessions', () => {
+    render(<Harness room={activeRoom()} isDisplay={false} />);
     fireEvent.pointerDown(window);
-    fireEvent.click(window);
     fireEvent.keyDown(window, { key: 'Enter' });
-    fireEvent.click(screen.getByRole('button', { name: 'Enable sound' }));
-    await flushAudio();
-    expect(audio.enable).toHaveBeenCalledTimes(5);
-    expect(screen.getByRole('button', { name: 'Enable sound' })).toBeVisible();
-
-    audio.setNextStatus('running');
-    fireEvent.pointerDown(window);
-    await flushAudio();
-    expect(screen.queryByRole('button', { name: 'Enable sound' })).toBeNull();
+    expect(audio.Constructor).not.toHaveBeenCalled();
   });
 
-  it('preserves one engine across lobby, active, results, lobby, and later rounds', async () => {
-    const view = render(<Harness room={lobbyRoom()} />);
-    await flushAudio();
-    view.rerender(<Harness room={activeRoom()} />);
-    view.rerender(<Harness room={endedRoom()} />);
-    view.rerender(<Harness room={lobbyRoom()} />);
-    view.rerender(
-      <Harness
-        room={activeRoom(0, 0, '00000000-0000-4000-8000-000000000011')}
-      />,
-    );
-
-    expect(audio.Constructor).toHaveBeenCalledOnce();
-    expect(audio.dispose).not.toHaveBeenCalled();
-    expect(audio.playWinnerTune).toHaveBeenCalledOnce();
-    expect(audio.cancelAcceptedTones).toHaveBeenCalled();
+  it('does not replay hydration or enablement counts and creates one display engine', async () => {
+    const view = render(<Harness room={activeRoom(4, 2)} />);
+    expect(audio.Constructor).not.toHaveBeenCalled();
+    expect(audio.playAccepted).not.toHaveBeenCalled();
+    await enableSound();
+    view.rerender(<Harness room={activeRoom(4, 2)} />);
+    expect(audio.Constructor).toHaveBeenCalledTimes(1);
+    expect(audio.playAccepted).not.toHaveBeenCalled();
   });
 
-  it('plays one immutable-order indication per participant increase without backlog', async () => {
+  it('plays one stable participant tone per increase and staggers simultaneous deltas', async () => {
     const view = render(<Harness room={activeRoom()} />);
-    await flushAudio();
+    await enableSound();
+
     view.rerender(<Harness room={activeRoom(3, 1)} />);
     expect(audio.playAccepted.mock.calls).toEqual([
       [0, 0],
-      [1, 0.09],
+      [1, 0.06],
     ]);
     view.rerender(<Harness room={activeRoom(3, 1)} />);
     expect(audio.playAccepted).toHaveBeenCalledTimes(2);
   });
 
-  it('shows suspension, resumes on visibility or interaction, and never replays hidden changes', async () => {
+  it('creates no hidden backlog and resumes from the visible baseline', async () => {
     const view = render(<Harness room={activeRoom()} />);
-    await flushAudio();
-    act(() => audio.emitStatus('suspended'));
-    expect(screen.getByRole('button', { name: 'Enable sound' })).toBeVisible();
-
+    await enableSound();
     Object.defineProperty(document, 'visibilityState', {
       configurable: true,
       value: 'hidden',
@@ -314,74 +228,103 @@ describe('useDisplayAudio', () => {
     fireEvent(document, new Event('visibilitychange'));
     view.rerender(<Harness room={activeRoom(2, 1)} />);
     expect(audio.playAccepted).not.toHaveBeenCalled();
+    expect(audio.cancelAcceptedTones).toHaveBeenCalledOnce();
 
-    audio.setNextStatus('running');
     Object.defineProperty(document, 'visibilityState', {
       configurable: true,
       value: 'visible',
     });
     fireEvent(document, new Event('visibilitychange'));
-    await flushAudio();
-    expect(screen.queryByRole('button', { name: 'Enable sound' })).toBeNull();
-    expect(audio.playAccepted).not.toHaveBeenCalled();
+    view.rerender(<Harness room={activeRoom(3, 1)} />);
+    expect(audio.playAccepted).toHaveBeenCalledWith(0, 0);
+    expect(audio.playAccepted).toHaveBeenCalledTimes(1);
   });
 
-  it('plays one positive live winner tune, including ties, but never delayed or zero tunes', async () => {
-    const view = render(<Harness room={activeRoom(1, 1)} />);
-    await flushAudio();
-    const tied = endedRoom();
-    if (!tied.round?.results) throw new Error('Expected results.');
+  it('plays one winner tune only for a live positive active-to-ended transition', async () => {
+    const view = render(<Harness room={activeRoom(1, 0)} />);
+    await enableSound();
+    view.rerender(<Harness room={endedRoom()} />);
+    expect(audio.cancelAcceptedTones).toHaveBeenCalledOnce();
+    expect(audio.playWinnerTune).toHaveBeenCalledOnce();
+
+    view.rerender(<Harness room={{ ...endedRoom(), stateVersion: 99 }} />);
+    expect(audio.playWinnerTune).toHaveBeenCalledOnce();
+  });
+
+  it('plays one tune for tied winners and cancels stale tones when a round changes', async () => {
+    const firstRound = activeRoom(1, 1);
+    const view = render(<Harness room={firstRound} />);
+    await enableSound();
+    const tiedEnded = endedRoom();
+    if (!tiedEnded.round?.results) throw new Error('Expected ended results.');
+    const tied: RoomState = {
+      ...tiedEnded,
+      round: {
+        ...tiedEnded.round,
+        results: {
+          ...tiedEnded.round.results,
+          players: tiedEnded.round.results.players.map((player) => ({
+            ...player,
+            rank: 1,
+            baseScore: 3,
+            uniqueBonusScore: 1,
+            finalScore: 4,
+            words: [
+              {
+                word: 'CAT',
+                basePoints: 3,
+                shared: false,
+                uniqueBonusPoints: 1,
+                finalPoints: 4,
+              },
+            ],
+          })),
+          winnerPlayerIds: [firstId, secondId],
+        },
+      },
+    };
+    view.rerender(<Harness room={tied} />);
+    expect(audio.playWinnerTune).toHaveBeenCalledOnce();
+
+    const nextRound = activeRoom();
     view.rerender(
       <Harness
         room={{
-          ...tied,
-          round: {
-            ...tied.round,
-            results: {
-              ...tied.round.results,
-              winnerPlayerIds: [firstId, secondId],
-            },
-          },
+          ...nextRound,
+          round: nextRound.round
+            ? {
+                ...nextRound.round,
+                id: '00000000-0000-4000-8000-000000000011',
+                number: 2,
+              }
+            : null,
         }}
       />,
     );
-    expect(audio.playWinnerTune).toHaveBeenCalledOnce();
-    view.rerender(<Harness room={{ ...tied, stateVersion: 99 }} />);
-    expect(audio.playWinnerTune).toHaveBeenCalledOnce();
-
-    view.unmount();
-    vi.clearAllMocks();
-    audio.reset();
-    const zero = render(<Harness room={activeRoom()} />);
-    await flushAudio();
-    zero.rerender(<Harness room={endedRoom({ winner: false })} />);
-    expect(audio.playWinnerTune).not.toHaveBeenCalled();
-  });
-
-  it('keeps direct active/ended hydration and enablement silent', async () => {
-    audio.setNextStatus('blocked');
-    const active = render(<Harness room={activeRoom(4, 2)} />);
-    await flushAudio();
-    audio.setNextStatus('running');
-    fireEvent.click(screen.getByRole('button', { name: 'Enable sound' }));
-    await flushAudio();
+    expect(audio.cancelAcceptedTones).toHaveBeenCalledTimes(2);
     expect(audio.playAccepted).not.toHaveBeenCalled();
-    active.unmount();
-
-    vi.clearAllMocks();
-    audio.reset();
-    render(<Harness room={endedRoom()} />);
-    await flushAudio();
-    expect(audio.playWinnerTune).not.toHaveBeenCalled();
   });
 
-  it('disposes once only when the display session ends and removes subscriptions', async () => {
+  it('does not celebrate zero results or direct hydration into an ended round', async () => {
+    const direct = render(<Harness room={endedRoom()} />);
+    await enableSound();
+    expect(audio.playWinnerTune).not.toHaveBeenCalled();
+    direct.unmount();
+    vi.clearAllMocks();
+
+    const transition = render(<Harness room={activeRoom()} />);
+    await enableSound();
+    transition.rerender(<Harness room={endedRoom({ winner: false })} />);
+    expect(audio.playWinnerTune).not.toHaveBeenCalled();
+    expect(audio.cancelAcceptedTones).toHaveBeenCalledOnce();
+  });
+
+  it('enables from the first display interaction and disposes safely', async () => {
     const view = render(<Harness room={activeRoom()} />);
-    await flushAudio();
-    view.rerender(<Harness room={null} isDisplay={false} />);
-    await flushAudio();
-    expect(audio.dispose).toHaveBeenCalledOnce();
-    expect(audio.subscribe.mock.results[0]?.value).toBeTypeOf('function');
+    fireEvent.pointerDown(window);
+    await act(async () => Promise.resolve());
+    expect(audio.enable).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Sound enabled' })).toBeVisible();
     view.unmount();
     expect(audio.dispose).toHaveBeenCalledOnce();
   });

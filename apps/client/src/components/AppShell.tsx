@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 
 import { ProductTitle } from './ProductTitle';
 import type { ConnectionStatus, RoomState } from '@words/shared';
-import type { DisplayAudioController } from '../hooks/useDisplayAudio';
 import { formatDisplaySettings } from './display-format';
 
 type AppShellProps = {
@@ -11,7 +10,6 @@ type AppShellProps = {
   phoneConnectionStatus?: 'connected' | 'connecting' | 'disconnected' | null;
   displayRoom?: RoomState | null;
   displayConnectionStatus?: ConnectionStatus | null;
-  displayAudio?: DisplayAudioController | null;
 };
 
 export function AppShell({
@@ -20,7 +18,6 @@ export function AppShell({
   phoneConnectionStatus = null,
   displayRoom = null,
   displayConnectionStatus = null,
-  displayAudio = null,
 }: AppShellProps) {
   const displayController = displayRoom?.players.find(
     (player) => player.id === displayRoom.controllerPlayerId,
@@ -111,35 +108,6 @@ export function AppShell({
           </>
         )}
       </header>
-      {displayRoom && (
-        <div
-          className="display-audio-control-layer"
-          data-display-audio-position="below-header-upper-right"
-        >
-          {displayAudio?.showControl && (
-            <button
-              className="display-audio-key"
-              type="button"
-              aria-label="Enable sound"
-              title="Enable sound"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.stopPropagation();
-                void displayAudio.enable();
-              }}
-            >
-              <svg
-                className="display-audio-key__speaker"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path d="M4 9v6h4l5 4V5L8 9H4Zm12.5 3a4.5 4.5 0 0 0-2-3.74v7.48A4.5 4.5 0 0 0 16.5 12Z" />
-              </svg>
-              <span aria-hidden="true">+</span>
-            </button>
-          )}
-        </div>
-      )}
       <main id="main-content">{children}</main>
     </div>
   );
