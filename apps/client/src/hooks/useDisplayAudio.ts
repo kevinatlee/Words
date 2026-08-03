@@ -99,7 +99,13 @@ export function useDisplayAudio(
       previous.roundId === current.roundId &&
       (room.round?.results?.winnerPlayerIds.length ?? 0) > 0
     ) {
-      engineRef.current?.playWinnerTune();
+      const winnerId = room.round?.results?.winnerPlayerIds[0];
+      const winnerIndex = room.round?.participants.findIndex(
+        (participant) => participant.playerId === winnerId,
+      );
+      if (winnerIndex !== undefined && winnerIndex >= 0) {
+        engineRef.current?.playWinnerTune(winnerIndex);
+      }
     }
   }, [enabled, isDisplay, room]);
 
