@@ -8,7 +8,6 @@ import {
   DEFAULT_BOARD_QUALITY_PROFILES,
   DEFAULT_TILE_DISTRIBUTION,
   generateDefaultBoard,
-  measureBoardSpatialQuality,
 } from '../src/index.ts';
 import { createAuditRandom } from './lib/distribution-model.mjs';
 
@@ -28,11 +27,6 @@ function createMetrics(size) {
     tiles: 0,
     vowelCounts: Array(size * size + 1).fill(0),
     maximumRepeatCounts: Array(size * size + 1).fill(0),
-    largestIdenticalComponentCounts: Array(size * size + 1).fill(0),
-    identicalStraightRunCounts: Array(size * size + 1).fill(0),
-    maximumVowelsInTwoByTwoCounts: Array(5).fill(0),
-    maximumVowelsInThreeByThreeCounts: Array(10).fill(0),
-    spatialViolations: 0,
     tokenCounts: Object.fromEntries(
       DEFAULT_TILE_DISTRIBUTION.map(({ token }) => [token, 0]),
     ),
@@ -55,29 +49,10 @@ function recordBoard(metrics, board) {
     }
   }
   const maximumRepeat = Math.max(...Object.values(counts));
-  const spatial = measureBoardSpatialQuality(board);
-  const profile = DEFAULT_BOARD_QUALITY_PROFILES[board.size];
   metrics.boards += 1;
   metrics.tiles += board.tiles.length;
   metrics.vowelCounts[vowels] += 1;
   metrics.maximumRepeatCounts[maximumRepeat] += 1;
-  metrics.largestIdenticalComponentCounts[
-    spatial.largestIdenticalConnectedComponent
-  ] += 1;
-  metrics.identicalStraightRunCounts[spatial.identicalStraightRuns] += 1;
-  metrics.maximumVowelsInTwoByTwoCounts[spatial.maximumVowelsInTwoByTwo] += 1;
-  metrics.maximumVowelsInThreeByThreeCounts[
-    spatial.maximumVowelsInThreeByThree
-  ] += 1;
-  if (
-    spatial.largestIdenticalConnectedComponent >
-      profile.maximumIdenticalConnectedComponent ||
-    spatial.longestIdenticalStraightRun > profile.maximumIdenticalStraightRun ||
-    spatial.maximumVowelsInTwoByTwo > profile.maximumVowelsInTwoByTwo ||
-    spatial.maximumVowelsInThreeByThree > profile.maximumVowelsInThreeByThree
-  ) {
-    metrics.spatialViolations += 1;
-  }
   if (hasQu) {
     metrics.boardsWithQu += 1;
   }
@@ -104,16 +79,6 @@ function finishMetrics(metrics) {
       (total, count, value) => total + count * value,
       0,
     ) / metrics.boards;
-  const meanIdenticalStraightRuns =
-    metrics.identicalStraightRunCounts.reduce(
-      (total, count, value) => total + count * value,
-      0,
-    ) / metrics.boards;
-  const maximumObserved = (histogram) =>
-    histogram.reduce(
-      (maximum, count, value) => (count > 0 ? value : maximum),
-      0,
-    );
 
   return {
     boards: metrics.boards,
@@ -121,29 +86,6 @@ function finishMetrics(metrics) {
     vowelCountDistribution: compactHistogram(metrics.vowelCounts),
     meanMaximumRepeatedToken: round(meanMaximumRepeat),
     maximumRepeatDistribution: compactHistogram(metrics.maximumRepeatCounts),
-    largestIdenticalConnectedComponentObserved: maximumObserved(
-      metrics.largestIdenticalComponentCounts,
-    ),
-    largestIdenticalConnectedComponentDistribution: compactHistogram(
-      metrics.largestIdenticalComponentCounts,
-    ),
-    meanIdenticalStraightRuns: round(meanIdenticalStraightRuns),
-    identicalStraightRunDistribution: compactHistogram(
-      metrics.identicalStraightRunCounts,
-    ),
-    maximumVowelsInAnyTwoByTwoObserved: maximumObserved(
-      metrics.maximumVowelsInTwoByTwoCounts,
-    ),
-    maximumVowelsInTwoByTwoDistribution: compactHistogram(
-      metrics.maximumVowelsInTwoByTwoCounts,
-    ),
-    maximumVowelsInAnyThreeByThreeObserved: maximumObserved(
-      metrics.maximumVowelsInThreeByThreeCounts,
-    ),
-    maximumVowelsInThreeByThreeDistribution: compactHistogram(
-      metrics.maximumVowelsInThreeByThreeCounts,
-    ),
-    spatialViolations: metrics.spatialViolations,
     boardsWithQuPercent: round((metrics.boardsWithQu / metrics.boards) * 100),
     tokenRates: DEFAULT_TILE_DISTRIBUTION.map(({ token, weight }) => {
       const expectedPercent = (weight / totalWeight) * 100;
@@ -202,11 +144,6 @@ function auditSize(size, seed) {
       `Accepted size-${size} audit did not reach ${BOARD_SAMPLE_SIZE} boards within its bound.`,
     );
   }
-  if (acceptedMetrics.spatialViolations !== 0) {
-    throw new Error(
-      `Accepted size-${size} audit found ${acceptedMetrics.spatialViolations} spatial violations.`,
-    );
-  }
 
   const successfulInvocations = invocations - failures;
   const rejectedCandidates = candidateAttempts - successfulInvocations;
@@ -231,7 +168,7 @@ function auditSize(size, seed) {
 
 function createReport() {
   return {
-    schemaVersion: 2,
+    schemaVersion: 1,
     sampleBoardsPerSize: BOARD_SAMPLE_SIZE,
     randomSource:
       'Seeded xorshift32 for deterministic audit/test evaluation only; not suitable for production board generation.',

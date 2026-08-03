@@ -12,7 +12,6 @@ import {
   DEFAULT_TILE_DISTRIBUTION,
   generateDefaultBoard,
   isDefaultBoardAcceptable,
-  measureBoardSpatialQuality,
 } from '../src/index.js';
 
 const VOWELS = ['A', 'E', 'I', 'O', 'U'] as const;
@@ -48,69 +47,12 @@ function makeBoard(size: BoardSize, tiles: readonly string[]): Board {
 }
 
 function boardWithVowels(size: BoardSize, vowelCount: number): Board {
-  const preferredVowelIndices = Array.from(
-    { length: size * size },
-    (_, index) => index,
-  ).filter((index) => {
-    const row = Math.floor(index / size);
-    const column = index % size;
-    return (row + column) % 2 === 0;
-  });
-  const extraVowels = [1, size * size - 2].filter(
-    (index) => !preferredVowelIndices.includes(index),
+  const tiles = Array.from({ length: size * size }, (_, index) =>
+    index < vowelCount
+      ? VOWELS[index % VOWELS.length]!
+      : CONSONANTS[(index - vowelCount) % CONSONANTS.length]!,
   );
-  const remainingIndices = Array.from(
-    { length: size * size },
-    (_, index) => index,
-  ).filter(
-    (index) =>
-      !preferredVowelIndices.includes(index) && !extraVowels.includes(index),
-  );
-  const vowelIndices = new Set(
-    [...preferredVowelIndices, ...extraVowels, ...remainingIndices].slice(
-      0,
-      vowelCount,
-    ),
-  );
-  const tiles = Array.from({ length: size * size }, (_, index) => {
-    const row = Math.floor(index / size);
-    const column = index % size;
-    return vowelIndices.has(index)
-      ? VOWELS[(row * 2 + column) % VOWELS.length]!
-      : CONSONANTS[(row * 3 + column) % CONSONANTS.length]!;
-  });
   return makeBoard(size, tiles);
-}
-
-function acceptableFourByFour(): Board {
-  return makeBoard(4, [
-    'B',
-    'C',
-    'D',
-    'A',
-    'F',
-    'G',
-    'E',
-    'H',
-    'J',
-    'I',
-    'K',
-    'L',
-    'O',
-    'M',
-    'N',
-    'U',
-  ]);
-}
-
-function replaceTiles(
-  board: Board,
-  replacements: Readonly<Record<number, string>>,
-): Board {
-  return makeBoard(
-    board.size,
-    board.tiles.map((token, index) => replacements[index] ?? token),
-  );
 }
 
 function boardWithRepeatedToken(size: BoardSize): Board {
@@ -328,90 +270,5 @@ describe('default board generation', () => {
     } finally {
       fallback.mockRestore();
     }
-  });
-});
-
-describe('default spatial board quality', () => {
-  it('rejects connected groups of four and five identical exact tokens', () => {
-    const base = acceptableFourByFour();
-    for (const indices of [
-      [0, 1, 4, 5],
-      [0, 1, 2, 4, 5],
-    ]) {
-      const board = replaceTiles(
-        base,
-        Object.fromEntries(indices.map((index) => [index, 'B'])),
-      );
-      expect(
-        measureBoardSpatialQuality(board).largestIdenticalConnectedComponent,
-      ).toBe(indices.length);
-      expect(isDefaultBoardAcceptable(board)).toBe(false);
-    }
-  });
-
-  it.each([
-    ['horizontal', [0, 1, 2]],
-    ['vertical', [0, 4, 8]],
-    ['diagonal', [0, 5, 10]],
-  ] as const)('rejects an identical %s straight run', (_label, indices) => {
-    const board = replaceTiles(
-      acceptableFourByFour(),
-      Object.fromEntries(indices.map((index) => [index, 'B'])),
-    );
-    const spatial = measureBoardSpatialQuality(board);
-
-    expect(spatial.longestIdenticalStraightRun).toBe(3);
-    expect(spatial.identicalStraightRuns).toBeGreaterThan(0);
-    expect(isDefaultBoardAcceptable(board)).toBe(false);
-  });
-
-  it('rejects an all-vowel 2 by 2 window without treating QU as a vowel', () => {
-    const board = replaceTiles(acceptableFourByFour(), {
-      0: 'A',
-      1: 'E',
-      4: 'I',
-      5: 'O',
-      15: 'QU',
-    });
-    expect(measureBoardSpatialQuality(board).maximumVowelsInTwoByTwo).toBe(4);
-    expect(isDefaultBoardAcceptable(board)).toBe(false);
-  });
-
-  it('rejects a 3 by 3 window with seven vowels', () => {
-    const base = replaceTiles(acceptableFourByFour(), {
-      3: 'B',
-      6: 'C',
-      9: 'D',
-      12: 'O',
-    });
-    const board = replaceTiles(base, {
-      0: 'A',
-      1: 'E',
-      2: 'I',
-      4: 'O',
-      5: 'U',
-      6: 'A',
-      8: 'E',
-    });
-    expect(measureBoardSpatialQuality(board).maximumVowelsInThreeByThree).toBe(
-      7,
-    );
-    expect(isDefaultBoardAcceptable(board)).toBe(false);
-  });
-
-  it('accepts separated repeated letters and a distributed vowel pattern', () => {
-    const board = replaceTiles(acceptableFourByFour(), {
-      0: 'B',
-      2: 'B',
-      8: 'B',
-    });
-    expect(measureBoardSpatialQuality(board)).toEqual({
-      largestIdenticalConnectedComponent: 1,
-      identicalStraightRuns: 0,
-      longestIdenticalStraightRun: 1,
-      maximumVowelsInTwoByTwo: 2,
-      maximumVowelsInThreeByThree: 3,
-    });
-    expect(isDefaultBoardAcceptable(board)).toBe(true);
   });
 });

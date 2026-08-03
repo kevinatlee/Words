@@ -217,38 +217,36 @@ point; later play testing may justify a reviewed and versioned replacement.
 
 ## Board-quality profiles and audit
 
-The policy retains total vowel-token and repeated-token bounds, then rejects
-local clumps without solving the board or rearranging a sampled candidate. It
-uses exact tile-token identity and the engine's eight-direction row-major
-adjacency. `QU` participates in identical-token checks but is not a vowel.
+The policy checks only vowel-token bounds and the maximum occurrence of one
+token. It performs no dictionary solve, recursion, filesystem access, or
+network request.
 
-|  Size | Vowels | Max one token | Max connected identical | Max straight identical | Max vowels 2 × 2 / 3 × 3 | Max attempts |
-| ----: | -----: | ------------: | ----------------------: | ---------------------: | -----------------------: | -----------: |
-| 4 × 4 |    4–9 |             4 |                       2 |                      2 |                    3 / 6 |           16 |
-| 5 × 5 |   6–14 |             5 |                       2 |                      2 |                    3 / 6 |           32 |
-| 6 × 6 |   9–20 |             6 |                       2 |                      2 |                    3 / 6 |           64 |
+|  Size | Vowels | Maximum one token | Maximum attempts |
+| ----: | -----: | ----------------: | ---------------: |
+| 4 × 4 |    4–9 |                 4 |                8 |
+| 5 × 5 |   6–14 |                 5 |                8 |
+| 6 × 6 |   9–20 |                 6 |                8 |
 
-The deterministic audit generates 10,000 raw and 10,000 accepted boards for
-every size and reproduces the report byte-for-byte:
+The deterministic board audit generated at least 10,000 raw and 10,000
+accepted boards for every size and reproduced its report byte-for-byte:
 
-|  Size | Accepted calls | Candidate attempts | Rejected candidates | Mean attempts | Highest successful attempt | Failures | Spatial violations |
-| ----: | -------------: | -----------------: | ------------------: | ------------: | -------------------------: | -------: | -----------------: |
-| 4 × 4 |         10,000 |             19,804 |             49.505% |        1.9804 |                         14 |        0 |                  0 |
-| 5 × 5 |         10,000 |             30,809 |             67.542% |        3.0809 |                         20 |        0 |                  0 |
-| 6 × 6 |         10,000 |             57,968 |             82.749% |        5.7968 |                         47 |        0 |                  0 |
+|  Size | Raw / accepted mean vowels | Raw / accepted mean max repeat | Rejected candidates | Mean attempts | Failures |
+| ----: | -------------------------: | -----------------------------: | ------------------: | ------------: | -------: |
+| 4 × 4 |              5.858 / 6.060 |                  3.185 / 3.029 |             19.231% |        1.2381 |        0 |
+| 5 × 5 |              9.204 / 9.224 |                  4.346 / 4.061 |             17.648% |        1.2143 |        0 |
+| 6 × 6 |            13.260 / 13.183 |                  5.676 / 5.181 |             25.278% |        1.3383 |        0 |
 
-Across all 30,000 accepted boards, the largest connected identical component
-was two, identical straight runs were zero, the maximum vowel count was three
-in every 2 × 2 window and six in every 3 × 3 window, and no generation call
-failed. The deterministic report SHA-256 is
-`e466c4fc76ee4dbd786a5f92aaea133dcf846dd2437c39b72c0bef02758cc6ae`.
+Raw boards with at least one `QU` were 2.84%, 4.55%, and 6.02% by size;
+accepted boards were 2.80%, 4.66%, and 6.55%. Observed raw per-token rates
+remain close to generated expectations. Across 30,000 accepted calls, none
+exhausted the eight-attempt bound.
 
-The former eight-attempt ceiling produced deterministic sample failures after
-the spatial checks were added, especially for 6 × 6 boards. The size-specific
-16/32/64 ceilings are the smallest reviewed powers-of-two bounds above the
-highest successful attempts observed in this audit. Failure remains structured
-and hard-bounded; there is no unbounded retry, post-generation rearrangement,
-filesystem access, or network request.
+Treating measured candidate rejection as independent between attempts gives
+approximate eight-attempt exhaustion probabilities of 0.000187% for 4 × 4
+(about 1 in 534,528), 0.0000941% for 5 × 5 (about 1 in 1,062,749), and
+0.001667% for 6 × 6 (about 1 in 59,981). Stage 4B must handle the structured
+failure and should revisit the bound with production telemetry rather than
+adding an unbounded retry.
 
 ## Server-only APIs
 
