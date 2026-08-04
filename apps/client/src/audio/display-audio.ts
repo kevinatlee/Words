@@ -5,14 +5,14 @@ export const participantToneFrequencies = [
 export const acceptedChimeInterval = 1.5;
 export const acceptedChimeNoteDelaySeconds = 0.055;
 export const acceptedChimeNoteDurationSeconds = 0.16;
-export const acceptedChimeGain = 0.07;
+export const acceptedChimeGain = 0.14;
 export const winnerPhraseIntervals = [1, 1.25, 1.5, 2] as const;
 export const winnerPhraseNoteSpacingSeconds = 0.18;
 export const winnerPhraseNoteDurationSeconds = 0.18;
-export const winnerPhraseGain = 0.075;
+export const winnerPhraseGain = 0.15;
 export const winnerChordDelaySeconds = 0.72;
 export const winnerChordDurationSeconds = 0.24;
-export const winnerChordGain = 0.08;
+export const winnerChordGain = 0.16;
 
 type AudioWindow = Window &
   typeof globalThis & {

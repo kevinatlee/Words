@@ -41,6 +41,12 @@ type AppProps = {
   sessionStore?: LobbySessionStore;
 };
 
+type PlayerRecovery = {
+  roomCode: string | null;
+  displayName: string;
+  kind: 'rejoin' | 'find-room';
+};
+
 function roomCodeFromPath(path: string): string | null {
   const match = /^\/room\/([^/]+)$/.exec(path);
   return match?.[1] ? normalizeRoomCode(match[1]) : null;
@@ -60,6 +66,7 @@ const replaceableDisplayCredentialErrors = new Set<RoomErrorCode>([
   'ROOM_EXPIRED',
   'ROOM_NOT_FOUND',
 ]);
+const displayRoomRecoveryDelayMilliseconds = 3_000;
 
 function isSameSession(
   left: StoredLobbySession | null,
@@ -291,6 +298,9 @@ export function App({
     useState<PlayerRoundSubmissionState | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
   const [displayStarting, setDisplayStarting] = useState(false);
+  const [playerRecovery, setPlayerRecovery] = useState<PlayerRecovery | null>(
+    null,
+  );
   useDisplayAudio(room, currentPath === '/' && session?.role === 'display');
   const sessionRef = useRef<StoredLobbySession | null>(null);
   const roomRef = useRef<RoomState | null>(null);
@@ -298,7 +308,15 @@ export function App({
   const reconnectingRef = useRef(false);
   const pendingReconnectRef = useRef<StoredLobbySession | null>(null);
   const displayStartupStartedRef = useRef(false);
+  const displayRecoveryTimerRef = useRef<number | null>(null);
   const attemptedRoomCodeRef = useRef<string | null>(null);
+
+  const cancelDisplayRecovery = useCallback(() => {
+    if (displayRecoveryTimerRef.current !== null) {
+      window.clearTimeout(displayRecoveryTimerRef.current);
+      displayRecoveryTimerRef.current = null;
+    }
+  }, []);
 
   const acceptRoomSnapshot = useCallback(
     (nextRoom: RoomState, expectedSession?: StoredLobbySession) => {
@@ -379,6 +397,7 @@ export function App({
 
   const rememberSession = useCallback(
     (nextRoom: RoomState, nextSession: StoredLobbySession) => {
+      cancelDisplayRecovery();
       sessionStore.save(nextSession);
       sessionRef.current = nextSession;
       setSession(nextSession);
@@ -410,7 +429,7 @@ export function App({
         navigate('/');
       }
     },
-    [currentPath, navigate, sessionStore],
+    [cancelDisplayRecovery, currentPath, navigate, sessionStore],
   );
 
   const acceptSubmissionState = useCallback(
@@ -499,12 +518,38 @@ export function App({
           }
 
           if (!response.ok) {
+            const shouldClearPlayerSession =
+              requestedSession.role === 'player' &&
+              (response.error.code === 'RECONNECT_FAILED' ||
+                response.error.code === 'ROOM_NOT_FOUND' ||
+                response.error.code === 'ROOM_EXPIRED');
+            if (
+              requestedSession.role === 'player' &&
+              !shouldClearPlayerSession
+            ) {
+              setRoomError(response.error);
+              return;
+            }
+
             sessionStore.clear(requestedSession);
             sessionRef.current = null;
             setSession(null);
             roomRef.current = null;
             setRoom(null);
             setSubmissionState(null);
+            if (requestedSession.role === 'player') {
+              setPlayerRecovery({
+                roomCode:
+                  response.error.code === 'RECONNECT_FAILED'
+                    ? requestedSession.roomCode
+                    : null,
+                displayName: requestedSession.displayName,
+                kind:
+                  response.error.code === 'RECONNECT_FAILED'
+                    ? 'rejoin'
+                    : 'find-room',
+              });
+            }
             setRoomError(response.error);
             return;
           }
@@ -620,15 +665,71 @@ export function App({
       }
     });
     const stopRoomError = client.onRoomError((error) => {
-      setRoomError(error);
+      const activeSession = sessionRef.current;
+      const shouldRecoverMissingDisplayRoom =
+        currentPath === '/' &&
+        activeSession?.role === 'display' &&
+        error.code === 'ROOM_NOT_FOUND';
 
-      if (error.code === 'ROOM_EXPIRED' || error.code === 'RECONNECT_FAILED') {
-        sessionStore.clear(sessionRef.current);
+      if (shouldRecoverMissingDisplayRoom) {
+        sessionStore.clear(activeSession);
         sessionRef.current = null;
         setSession(null);
         roomRef.current = null;
         setRoom(null);
         setSubmissionState(null);
+        setRoomError(null);
+        setDisplayStarting(true);
+        displayStartupStartedRef.current = true;
+        reconnectNeededRef.current = false;
+        pendingReconnectRef.current = null;
+
+        cancelDisplayRecovery();
+        displayRecoveryTimerRef.current = window.setTimeout(() => {
+          displayRecoveryTimerRef.current = null;
+          void startDisplay();
+        }, displayRoomRecoveryDelayMilliseconds);
+        return;
+      }
+
+      if (
+        currentPath === '/' &&
+        error.code === 'ROOM_NOT_FOUND' &&
+        displayRecoveryTimerRef.current !== null
+      ) {
+        return;
+      }
+
+      setRoomError(error);
+
+      const sessionWithError = sessionRef.current;
+      const shouldClearPlayerSession =
+        sessionWithError?.role === 'player' &&
+        (error.code === 'RECONNECT_FAILED' ||
+          error.code === 'ROOM_NOT_FOUND' ||
+          error.code === 'ROOM_EXPIRED');
+
+      if (
+        error.code === 'ROOM_EXPIRED' ||
+        error.code === 'RECONNECT_FAILED' ||
+        shouldClearPlayerSession
+      ) {
+        sessionStore.clear(sessionWithError);
+        sessionRef.current = null;
+        setSession(null);
+        roomRef.current = null;
+        setRoom(null);
+        setSubmissionState(null);
+        if (sessionWithError?.role === 'player') {
+          setPlayerRecovery({
+            roomCode:
+              error.code === 'RECONNECT_FAILED'
+                ? sessionWithError.roomCode
+                : null,
+            displayName: sessionWithError.displayName,
+            kind: error.code === 'RECONNECT_FAILED' ? 'rejoin' : 'find-room',
+          });
+        }
       }
     });
     const stopConnectionStatus = client.onConnectionStatus((status) => {
@@ -663,7 +764,15 @@ export function App({
       stopConnectionStatus();
       window.removeEventListener('popstate', onPopState);
     };
-  }, [acceptRoomSnapshot, client, reconnectSession, sessionStore]);
+  }, [
+    acceptRoomSnapshot,
+    cancelDisplayRecovery,
+    client,
+    currentPath,
+    reconnectSession,
+    sessionStore,
+    startDisplay,
+  ]);
 
   useEffect(() => {
     if (
@@ -677,6 +786,7 @@ export function App({
 
   useEffect(() => {
     if (currentPath !== '/') {
+      cancelDisplayRecovery();
       displayStartupStartedRef.current = false;
       return;
     }
@@ -690,7 +800,9 @@ export function App({
 
     displayStartupStartedRef.current = true;
     void startDisplay();
-  }, [currentPath, startDisplay]);
+  }, [cancelDisplayRecovery, currentPath, startDisplay]);
+
+  useEffect(() => cancelDisplayRecovery, [cancelDisplayRecovery]);
 
   useEffect(() => {
     const roomCode = roomCodeFromPath(currentPath);
@@ -743,6 +855,7 @@ export function App({
       ...response.session,
       displayName: playerName,
     });
+    setPlayerRecovery(null);
     setSubmissionState(response.submissionState);
     return null;
   };
@@ -937,10 +1050,35 @@ export function App({
         </section>
       );
     } else {
+      const shouldOfferRejoin =
+        playerRecovery?.kind === 'rejoin' &&
+        playerRecovery.roomCode === routeRoomCode;
+      const shouldFindCurrentRoom =
+        playerRecovery?.kind === 'find-room' &&
+        playerRecovery.displayName.length > 0;
       page = (
         <>
-          <LobbyError error={roomError} />
-          <JoinRoomForm initialRoomCode={routeRoomCode} onJoin={joinPlayer} />
+          {shouldOfferRejoin ? null : <LobbyError error={roomError} />}
+          <JoinRoomForm
+            key={
+              shouldOfferRejoin
+                ? `rejoin:${routeRoomCode}`
+                : shouldFindCurrentRoom
+                  ? 'find-current-room'
+                  : `join:${routeRoomCode}`
+            }
+            initialRoomCode={shouldFindCurrentRoom ? undefined : routeRoomCode}
+            initialDisplayName={playerRecovery?.displayName}
+            recoveryMessage={
+              shouldOfferRejoin
+                ? 'Your previous connection expired. Rejoin this room when you are ready.'
+                : shouldFindCurrentRoom
+                  ? 'That room is no longer available. Scan the current TV QR code or enter its current room code.'
+                  : undefined
+            }
+            submitLabel={shouldOfferRejoin ? 'Rejoin' : undefined}
+            onJoin={joinPlayer}
+          />
         </>
       );
     }

@@ -80,7 +80,7 @@ whether a validated action is allowed for the socket and current role.
   socket.
 - Socket.IO payloads are capped at 16 KiB.
 - Room lifetime defaults to a sliding two hours.
-- Disconnect grace defaults to 60 seconds.
+- Disconnect grace defaults to five minutes.
 - Cleanup runs every 30 seconds by default and removes expired rooms, ordinary
   players, token mappings, socket references, and expired-code tombstones.
 - A room with no connected controller candidate is still bounded by the

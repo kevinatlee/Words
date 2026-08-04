@@ -13,7 +13,7 @@ describe('product configuration', () => {
       defaultRoundDurationSeconds: 120,
       defaultScoringMode: 'length-plus-unique',
       maxPlayers: 8,
-      reconnectGraceSeconds: 60,
+      reconnectGraceSeconds: 300,
       roomTtlMinutes: 120,
     });
   });

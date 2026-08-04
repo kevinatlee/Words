@@ -1104,6 +1104,91 @@ describe('Stage 4B display and player room routes', () => {
     expect(client.reconnectDisplay).not.toHaveBeenCalled();
   });
 
+  it('offers one explicit same-name rejoin after a player reconnect expires', async () => {
+    const user = userEvent.setup();
+    const stored: StoredLobbySession = {
+      role: 'player',
+      roomCode: 'ABC234',
+      playerId: ordinaryPlayer.id,
+      playerReconnectToken: 'r'.repeat(43),
+      displayName: ordinaryPlayer.displayName,
+    };
+    const reconnectPlayer = vi.fn(async (): Promise<PlayerActionResponse> => ({
+      ok: false,
+      error: {
+        code: 'RECONNECT_FAILED',
+        message: 'That player reconnect credential has expired.',
+      },
+    }));
+    const client = createFakeClient({ reconnectPlayer });
+    const store = createFakeSessionStore(stored);
+
+    render(
+      <App routePath="/room/ABC234" client={client} sessionStore={store} />,
+    );
+
+    expect(
+      await screen.findByText(
+        'Your previous connection expired. Rejoin this room when you are ready.',
+      ),
+    ).toBeInTheDocument();
+    expect(store.clear).toHaveBeenCalledWith(stored);
+    expect(client.joinPlayer).not.toHaveBeenCalled();
+    expect(client.createDisplay).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox', { name: 'Room code' })).toHaveValue(
+      'ABC234',
+    );
+    expect(screen.getByRole('textbox', { name: 'Display name' })).toHaveValue(
+      ordinaryPlayer.displayName,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Rejoin' }));
+    expect(client.joinPlayer).toHaveBeenCalledTimes(1);
+    expect(client.joinPlayer).toHaveBeenCalledWith({
+      roomCode: 'ABC234',
+      displayName: ordinaryPlayer.displayName,
+    });
+  });
+
+  it('does not reuse an obsolete room code after player room expiry', async () => {
+    const stored: StoredLobbySession = {
+      role: 'player',
+      roomCode: 'ABC234',
+      playerId: ordinaryPlayer.id,
+      playerReconnectToken: 's'.repeat(43),
+      displayName: ordinaryPlayer.displayName,
+    };
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+        ok: false,
+        error: {
+          code: 'ROOM_EXPIRED',
+          message: 'That temporary room has expired.',
+        },
+      })),
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore(stored)}
+      />,
+    );
+
+    expect(
+      await screen.findByText(
+        'That room is no longer available. Scan the current TV QR code or enter its current room code.',
+      ),
+    ).toBeInTheDocument();
+    expect(client.joinPlayer).not.toHaveBeenCalled();
+    expect(client.createDisplay).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox', { name: 'Room code' })).toHaveValue('');
+    expect(screen.getByRole('textbox', { name: 'Display name' })).toHaveValue(
+      ordinaryPlayer.displayName,
+    );
+  });
+
   it('releases a stale reconnect before restoring the newer route session', async () => {
     const firstReconnect = deferred<PlayerActionResponse>();
     const firstStored: StoredLobbySession = {
@@ -1264,6 +1349,296 @@ describe('Stage 4B display and player room routes', () => {
       expect.objectContaining({ role: 'display' }),
     );
     expect(client.createDisplay).not.toHaveBeenCalled();
+  });
+
+  it('replaces a missing root display room once after a short delay', async () => {
+    const stored: StoredLobbySession = {
+      role: 'display',
+      roomCode: 'ABC234',
+      displaySessionId: displaySuccess.session.displaySessionId,
+      displayReconnectToken: 'i'.repeat(43),
+    };
+    const store = createStatefulSessionStore(stored);
+    const clear = vi.spyOn(store, 'clear');
+    const replacement: DisplayActionResponse = {
+      ok: true,
+      room: { ...createRoom(), code: 'NEW567' },
+      session: {
+        displaySessionId: '00000000-0000-4000-8000-000000000300',
+        displayReconnectToken: 'j'.repeat(43),
+      },
+    };
+    let reportRoomError: ((error: RoomError) => void) | undefined;
+    const client = createFakeClient({
+      createDisplay: vi.fn(async () => replacement),
+      onRoomError: (listener) => {
+        reportRoomError = listener;
+        return () => undefined;
+      },
+    });
+    render(<App routePath="/" client={client} sessionStore={store} />);
+    expect(await screen.findByLabelText('Puzzle')).toBeInTheDocument();
+
+    vi.useFakeTimers();
+    try {
+      act(() => {
+        reportRoomError?.({
+          code: 'ROOM_NOT_FOUND',
+          message: 'The display room has expired.',
+        });
+        reportRoomError?.({
+          code: 'ROOM_NOT_FOUND',
+          message: 'The display room has expired.',
+        });
+      });
+
+      expect(clear).toHaveBeenCalledTimes(1);
+      expect(clear).toHaveBeenCalledWith(
+        expect.objectContaining({
+          role: 'display',
+          roomCode: 'ABC234',
+          displaySessionId: displaySuccess.session.displaySessionId,
+        }),
+      );
+      expect(
+        screen.getByRole('heading', { name: 'Preparing your room…' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText('http://localhost:3000/join/ABC234'),
+      ).toBeNull();
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(client.createDisplay).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_999);
+      });
+      expect(client.createDisplay).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(client.createDisplay).toHaveBeenCalledTimes(1);
+      expect(
+        screen.getByText('http://localhost:3000/join/NEW567'),
+      ).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3_000);
+      });
+      expect(client.createDisplay).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows a normal retry after a missing-room replacement creation fails', async () => {
+    const stored: StoredLobbySession = {
+      role: 'display',
+      roomCode: 'ABC234',
+      displaySessionId: displaySuccess.session.displaySessionId,
+      displayReconnectToken: 'k'.repeat(43),
+    };
+    const failure: DisplayActionResponse = {
+      ok: false,
+      error: {
+        code: 'SERVER_BUSY',
+        message: 'The replacement display cannot start yet.',
+      },
+    };
+    let reportRoomError: ((error: RoomError) => void) | undefined;
+    const createDisplay = vi.fn(async () => failure);
+    const client = createFakeClient({
+      createDisplay,
+      onRoomError: (listener) => {
+        reportRoomError = listener;
+        return () => undefined;
+      },
+    });
+
+    render(
+      <App
+        routePath="/"
+        client={client}
+        sessionStore={createStatefulSessionStore(stored)}
+      />,
+    );
+    expect(await screen.findByLabelText('Puzzle')).toBeInTheDocument();
+
+    vi.useFakeTimers();
+    try {
+      act(() => {
+        reportRoomError?.({
+          code: 'ROOM_NOT_FOUND',
+          message: 'The display room has expired.',
+        });
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3_000);
+      });
+
+      expect(
+        screen.getByRole('heading', {
+          name: 'We couldn’t prepare the room.',
+        }),
+      ).toBeInTheDocument();
+      expect(createDisplay).toHaveBeenCalledOnce();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      expect(createDisplay).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not recover missing rooms for player routes', async () => {
+    const stored: StoredLobbySession = {
+      role: 'player',
+      roomCode: 'ABC234',
+      playerId: ordinaryPlayer.id,
+      playerReconnectToken: 'l'.repeat(43),
+      displayName: ordinaryPlayer.displayName,
+    };
+    let reportRoomError: ((error: RoomError) => void) | undefined;
+    const client = createFakeClient({
+      onRoomError: (listener) => {
+        reportRoomError = listener;
+        return () => undefined;
+      },
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore(stored)}
+      />,
+    );
+    expect(
+      await screen.findByRole('region', { name: 'Puzzle' }),
+    ).toBeInTheDocument();
+
+    act(() => {
+      reportRoomError?.({
+        code: 'ROOM_NOT_FOUND',
+        message: 'No active room uses that code.',
+      });
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'ROOM_NOT_FOUND',
+    );
+    expect(client.createDisplay).not.toHaveBeenCalled();
+  });
+
+  it('does not recover missing rooms on the join route', () => {
+    let reportRoomError: ((error: RoomError) => void) | undefined;
+    const client = createFakeClient({
+      onRoomError: (listener) => {
+        reportRoomError = listener;
+        return () => undefined;
+      },
+    });
+
+    render(
+      <App
+        routePath="/join/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore()}
+      />,
+    );
+
+    act(() => {
+      reportRoomError?.({
+        code: 'ROOM_NOT_FOUND',
+        message: 'No active room uses that code.',
+      });
+    });
+
+    expect(client.createDisplay).not.toHaveBeenCalled();
+  });
+
+  it('cancels a pending missing-room recovery when the display leaves root or unmounts', async () => {
+    const stored: StoredLobbySession = {
+      role: 'display',
+      roomCode: 'ABC234',
+      displaySessionId: displaySuccess.session.displaySessionId,
+      displayReconnectToken: 'm'.repeat(43),
+    };
+    let reportRoomError: ((error: RoomError) => void) | undefined;
+    const client = createFakeClient({
+      onRoomError: (listener) => {
+        reportRoomError = listener;
+        return () => undefined;
+      },
+    });
+    const view = render(
+      <App client={client} sessionStore={createStatefulSessionStore(stored)} />,
+    );
+    expect(await screen.findByLabelText('Puzzle')).toBeInTheDocument();
+
+    vi.useFakeTimers();
+    try {
+      act(() => {
+        reportRoomError?.({
+          code: 'ROOM_NOT_FOUND',
+          message: 'The display room has expired.',
+        });
+        window.history.pushState({}, '', '/join');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3_000);
+      });
+      expect(client.createDisplay).not.toHaveBeenCalled();
+
+      window.history.replaceState({}, '', '/');
+      view.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('clears a pending missing-room recovery when the display unmounts', async () => {
+    const stored: StoredLobbySession = {
+      role: 'display',
+      roomCode: 'ABC234',
+      displaySessionId: displaySuccess.session.displaySessionId,
+      displayReconnectToken: 'n'.repeat(43),
+    };
+    let reportRoomError: ((error: RoomError) => void) | undefined;
+    const client = createFakeClient({
+      onRoomError: (listener) => {
+        reportRoomError = listener;
+        return () => undefined;
+      },
+    });
+    const view = render(
+      <App
+        routePath="/"
+        client={client}
+        sessionStore={createStatefulSessionStore(stored)}
+      />,
+    );
+    expect(await screen.findByLabelText('Puzzle')).toBeInTheDocument();
+
+    vi.useFakeTimers();
+    try {
+      act(() => {
+        reportRoomError?.({
+          code: 'ROOM_NOT_FOUND',
+          message: 'The display room has expired.',
+        });
+      });
+      view.unmount();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3_000);
+      });
+      expect(client.createDisplay).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('lets the connected controller save a complete authoritative settings object', async () => {

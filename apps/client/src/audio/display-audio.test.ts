@@ -8,6 +8,7 @@ import {
   participantToneFrequencies,
   winnerChordDelaySeconds,
   winnerChordDurationSeconds,
+  winnerChordGain,
   winnerPhraseGain,
   winnerPhraseIntervals,
   winnerPhraseNoteDurationSeconds,
@@ -149,6 +150,8 @@ describe('DisplayAudioEngine', () => {
     const gain = context.gains[0]!;
     const fifthGain = context.gains[1]!;
 
+    expect(acceptedChimeGain).toBe(0.14);
+
     expect(oscillator.type).toBe('triangle');
     expect(fifthOscillator?.type).toBe('triangle');
     expect(oscillator.frequency.setValueAtTime).toHaveBeenCalledWith(
@@ -207,19 +210,28 @@ describe('DisplayAudioEngine', () => {
       [490, 10 + winnerChordDelaySeconds],
       [588, 10 + winnerChordDelaySeconds],
     ]);
+    expect(winnerPhraseGain).toBe(0.15);
+    expect(winnerChordGain).toBe(0.16);
     expect(
-      context.oscillators
-        .slice(2)
-        .every((oscillator) =>
-          context.gains[
-            context.oscillators.indexOf(oscillator)
-          ]?.gain.exponentialRampToValueAtTime.mock.calls.every(
-            ([gain]) => gain <= 0.08,
-          ),
+      context.gains
+        .slice(2, 6)
+        .map(
+          (gain) => gain.gain.exponentialRampToValueAtTime.mock.calls[0]?.[0],
         ),
-    ).toBe(true);
+    ).toEqual([
+      winnerPhraseGain,
+      winnerPhraseGain,
+      winnerPhraseGain,
+      winnerPhraseGain,
+    ]);
+    expect(
+      context.gains
+        .slice(6)
+        .map(
+          (gain) => gain.gain.exponentialRampToValueAtTime.mock.calls[0]?.[0],
+        ),
+    ).toEqual([winnerChordGain, winnerChordGain, winnerChordGain]);
     expect(winnerPhraseIntervals).toEqual([1, 1.25, 1.5, 2]);
-    expect(winnerPhraseGain).toBeGreaterThan(acceptedChimeGain);
     expect(winnerPhraseNoteDurationSeconds).toBe(0.18);
     expect(winnerPhraseNoteSpacingSeconds).toBe(0.18);
     expect(winnerChordDurationSeconds).toBe(0.24);
