@@ -108,6 +108,7 @@ export type ProductionDictionaryLoadResult =
   | {
       readonly success: true;
       readonly dictionary: WordDictionary;
+      readonly words: readonly string[];
       readonly wordCount: number;
       readonly manifest: ProductionDictionaryManifest;
     }
@@ -427,6 +428,7 @@ export async function loadDictionaryBundle(
   return Object.freeze({
     success: true,
     dictionary: built.dictionary,
+    words: Object.freeze([...inspected.words]),
     wordCount: built.wordCount,
     manifest,
   });

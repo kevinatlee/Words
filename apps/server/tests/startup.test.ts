@@ -29,6 +29,7 @@ function successfulDictionaryLoad(
   return {
     success: true,
     dictionary: {} as never,
+    words: Object.freeze([]),
     wordCount: 79_370,
     manifest: manifest as never,
   };
@@ -151,6 +152,7 @@ describe('Words server production-data startup', () => {
         dictionaryLoader: async () => ({
           success: true,
           dictionary: {} as never,
+          words: Object.freeze([]),
           wordCount: 79_369,
           manifest: productionManifestIdentity as never,
         }),

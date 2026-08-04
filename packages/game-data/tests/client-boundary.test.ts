@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -57,6 +58,16 @@ async function createRepository() {
 }
 
 describe('browser game-data boundary', () => {
+  it('keeps the median selector and production dictionary outside client source', async () => {
+    const repositoryRoot = fileURLToPath(new URL('../../..', import.meta.url));
+    await expect(
+      verifyClientSourceExclusion({
+        repositoryRoot,
+        dictionarySha256: DICTIONARY_SHA256,
+      }),
+    ).resolves.toBeUndefined();
+  });
+
   it('rejects a game-data re-export from a browser-reachable workspace', async () => {
     const repositoryRoot = await createRepository();
     await writeFile(

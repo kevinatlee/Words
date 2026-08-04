@@ -85,6 +85,8 @@ describe('production dictionary loader', () => {
       expect(result.dictionary.has('COLOR')).toBe(true);
       expect(result.dictionary.has('AT')).toBe(false);
       expect(result.dictionary.has('NASA')).toBe(false);
+      expect(result.words).toHaveLength(79_370);
+      expect(result.words).toContain('COLOUR');
     }
   });
 
@@ -205,9 +207,11 @@ describe('production dictionary loader', () => {
     expect(second.success).toBe(true);
     if (first.success && second.success) {
       expect(first.dictionary).not.toBe(second.dictionary);
+      expect(first.words).not.toBe(second.words);
       expect(first.manifest).not.toBe(second.manifest);
       expect(Object.keys(first.dictionary)).toEqual(['has']);
       expect(Object.isFrozen(first.dictionary)).toBe(true);
+      expect(Object.isFrozen(first.words)).toBe(true);
       expect(Object.isFrozen(first.manifest)).toBe(true);
       expect(Object.isFrozen(first.manifest.dialects)).toBe(true);
     }

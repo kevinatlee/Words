@@ -1,0 +1,296 @@
+{
+  "schemaVersion": 1,
+  "seed": "median-board-selection-v1",
+  "selectionsPerSize": 5000,
+  "candidatePoolSize": 8,
+  "targets": {
+    "4": { "playableWordCount": 72, "longPlayableWordCount": 18 },
+    "5": { "playableWordCount": 153, "longPlayableWordCount": 51 },
+    "6": { "playableWordCount": 262, "longPlayableWordCount": 101 }
+  },
+  "ranking": [
+    "smallest absolute normalized total-word deviation",
+    "smallest absolute normalized length-5+-word deviation",
+    "highest cell coverage",
+    "smallest largest repeated-token component",
+    "earliest candidate generation index"
+  ],
+  "sizes": {
+    "4": {
+      "baseline": {
+        "playableWordCount": {
+          "min": 6,
+          "max": 276,
+          "mean": 77.6166,
+          "standardDeviation": 34.895919595849634,
+          "p1": 20,
+          "p5": 31,
+          "p10": 38,
+          "p25": 52,
+          "p50": 72,
+          "p75": 98,
+          "p90": 124,
+          "p95": 144,
+          "p99": 180
+        },
+        "longPlayableWordCount": {
+          "min": 0,
+          "max": 155,
+          "mean": 22.7014,
+          "standardDeviation": 17.3945117218047,
+          "p1": 1,
+          "p5": 3,
+          "p10": 5,
+          "p25": 10,
+          "p50": 18,
+          "p75": 30,
+          "p90": 46,
+          "p95": 58,
+          "p99": 81.01000000000022
+        }
+      },
+      "selected": {
+        "playableWordCount": {
+          "p5": 61,
+          "p10": 64,
+          "p25": 68,
+          "p50": 72,
+          "p75": 75,
+          "p90": 79,
+          "p95": 82
+        },
+        "longPlayableWordCount": {
+          "p5": 8,
+          "p10": 10,
+          "p25": 14,
+          "p50": 18,
+          "p75": 22,
+          "p90": 27,
+          "p95": 30
+        },
+        "cellCoverage": {
+          "p5": 0.875,
+          "p10": 0.9375,
+          "p25": 0.9375,
+          "p50": 1,
+          "p75": 1,
+          "p90": 1,
+          "p95": 1
+        },
+        "largestRepeatedTokenComponent": {
+          "p5": 1,
+          "p10": 2,
+          "p25": 2,
+          "p50": 2,
+          "p75": 3,
+          "p90": 3,
+          "p95": 3
+        },
+        "winnerPosition": {
+          "p5": 1,
+          "p10": 1,
+          "p25": 2.75,
+          "p50": 5,
+          "p75": 7,
+          "p90": 8,
+          "p95": 8
+        }
+      },
+      "insideOriginalInterquartileRangePercentage": 99.56,
+      "outsideOriginalInterquartileRangePercentage": 0.4399999999999977,
+      "meanSuccessfulCandidates": 8,
+      "meanUnderlyingGenerationAttempts": 9.803,
+      "distributionGoals": {
+        "medianWithinFivePercent": true,
+        "p5AtLeastOriginalP25": true,
+        "p95AtMostOriginalP75": true,
+        "medianLongWordsInsideOriginalInterquartileRange": true,
+        "atLeastNinetyPercentInsideOriginalInterquartileRange": true
+      }
+    },
+    "5": {
+      "baseline": {
+        "playableWordCount": {
+          "min": 23,
+          "max": 436,
+          "mean": 160.0232,
+          "standardDeviation": 58.9945816305192,
+          "p1": 55,
+          "p5": 77,
+          "p10": 91,
+          "p25": 118,
+          "p50": 153,
+          "p75": 194,
+          "p90": 239,
+          "p95": 267,
+          "p99": 330.0100000000002
+        },
+        "longPlayableWordCount": {
+          "min": 2,
+          "max": 256,
+          "mean": 58.3072,
+          "standardDeviation": 35.31055972595198,
+          "p1": 8,
+          "p5": 15,
+          "p10": 20,
+          "p25": 33,
+          "p50": 51,
+          "p75": 77,
+          "p90": 106.10000000000036,
+          "p95": 126,
+          "p99": 172
+        }
+      },
+      "selected": {
+        "playableWordCount": {
+          "p5": 133,
+          "p10": 139,
+          "p25": 147,
+          "p50": 153,
+          "p75": 159,
+          "p90": 166,
+          "p95": 171
+        },
+        "longPlayableWordCount": {
+          "p5": 32,
+          "p10": 36,
+          "p25": 43,
+          "p50": 51,
+          "p75": 59,
+          "p90": 68,
+          "p95": 73
+        },
+        "cellCoverage": {
+          "p5": 0.92,
+          "p10": 0.92,
+          "p25": 0.96,
+          "p50": 1,
+          "p75": 1,
+          "p90": 1,
+          "p95": 1
+        },
+        "largestRepeatedTokenComponent": {
+          "p5": 2,
+          "p10": 2,
+          "p25": 2,
+          "p50": 3,
+          "p75": 3,
+          "p90": 4,
+          "p95": 4
+        },
+        "winnerPosition": {
+          "p5": 1,
+          "p10": 1,
+          "p25": 2,
+          "p50": 4,
+          "p75": 6,
+          "p90": 8,
+          "p95": 8
+        }
+      },
+      "insideOriginalInterquartileRangePercentage": 99.48,
+      "outsideOriginalInterquartileRangePercentage": 0.519999999999996,
+      "meanSuccessfulCandidates": 8,
+      "meanUnderlyingGenerationAttempts": 9.7278,
+      "distributionGoals": {
+        "medianWithinFivePercent": true,
+        "p5AtLeastOriginalP25": true,
+        "p95AtMostOriginalP75": true,
+        "medianLongWordsInsideOriginalInterquartileRange": true,
+        "atLeastNinetyPercentInsideOriginalInterquartileRange": true
+      }
+    },
+    "6": {
+      "baseline": {
+        "playableWordCount": {
+          "min": 51,
+          "max": 672,
+          "mean": 272.3768,
+          "standardDeviation": 87.06702258467313,
+          "p1": 111.99000000000001,
+          "p5": 148,
+          "p10": 170,
+          "p25": 210,
+          "p50": 262,
+          "p75": 326,
+          "p90": 387.10000000000036,
+          "p95": 428.0500000000002,
+          "p99": 514.0100000000002
+        },
+        "longPlayableWordCount": {
+          "min": 2,
+          "max": 423,
+          "mean": 110.8202,
+          "standardDeviation": 56.42985975492049,
+          "p1": 23,
+          "p5": 38,
+          "p10": 48,
+          "p25": 70,
+          "p50": 101,
+          "p75": 142,
+          "p90": 186.10000000000036,
+          "p95": 215,
+          "p99": 282
+        }
+      },
+      "selected": {
+        "playableWordCount": {
+          "p5": 234,
+          "p10": 242,
+          "p25": 253,
+          "p50": 262,
+          "p75": 270,
+          "p90": 281,
+          "p95": 288
+        },
+        "longPlayableWordCount": {
+          "p5": 71,
+          "p10": 77,
+          "p25": 88,
+          "p50": 100,
+          "p75": 113,
+          "p90": 125,
+          "p95": 132.05000000000018
+        },
+        "cellCoverage": {
+          "p5": 0.9166666666666666,
+          "p10": 0.9444444444444444,
+          "p25": 0.9722222222222222,
+          "p50": 1,
+          "p75": 1,
+          "p90": 1,
+          "p95": 1
+        },
+        "largestRepeatedTokenComponent": {
+          "p5": 2,
+          "p10": 2,
+          "p25": 2,
+          "p50": 3,
+          "p75": 3,
+          "p90": 4,
+          "p95": 4
+        },
+        "winnerPosition": {
+          "p5": 1,
+          "p10": 1,
+          "p25": 3,
+          "p50": 5,
+          "p75": 7,
+          "p90": 8,
+          "p95": 8
+        }
+      },
+      "insideOriginalInterquartileRangePercentage": 99.5,
+      "outsideOriginalInterquartileRangePercentage": 0.5,
+      "meanSuccessfulCandidates": 8,
+      "meanUnderlyingGenerationAttempts": 10.7548,
+      "distributionGoals": {
+        "medianWithinFivePercent": true,
+        "p5AtLeastOriginalP25": true,
+        "p95AtMostOriginalP75": true,
+        "medianLongWordsInsideOriginalInterquartileRange": true,
+        "atLeastNinetyPercentInsideOriginalInterquartileRange": true
+      }
+    }
+  }
+}

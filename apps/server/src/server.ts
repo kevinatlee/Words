@@ -5,6 +5,7 @@ import {
   generateDefaultBoard,
   loadProductionDictionary,
   PRODUCTION_DICTIONARY_IDENTITY,
+  selectMedianBoard,
   type ProductionDictionaryLoadResult,
 } from '@words/game-data';
 import {
@@ -204,6 +205,10 @@ export function createWordsServer(
   const scheduleInterval = dependencies.setInterval ?? setInterval;
   const cancelInterval = dependencies.clearInterval ?? clearInterval;
   let acceptingRooms = false;
+  let gameDataRuntime: Extract<
+    ProductionDictionaryLoadResult,
+    { success: true }
+  > | null = null;
   const app = express();
   const httpServer = createHttpServer(app);
   const io = new SocketServer<
@@ -228,11 +233,22 @@ export function createWordsServer(
     reconnectGraceMs: config.reconnectGraceMs,
     now,
     roundIdGenerator: dependencies.roundIdGenerator ?? randomUUID,
-    roundBoardGenerator: (size) =>
-      boardGenerator({
+    roundBoardGenerator: (size) => {
+      if (gameDataRuntime === null) {
+        return {
+          success: false,
+          code: 'NO_ACCEPTABLE_BOARD',
+          attempts: 0,
+        };
+      }
+      return selectMedianBoard({
         size,
         random: randomSource,
-      }),
+        dictionary: gameDataRuntime.dictionary,
+        dictionaryWords: gameDataRuntime.words,
+        generateCandidate: boardGenerator,
+      });
+    },
     canCreateRooms: () => acceptingRooms,
   });
   const rateLimiter = new SocketRateLimiter(
@@ -246,10 +262,6 @@ export function createWordsServer(
     now,
   );
   const submissionSocketRateLimiter = new SocketRateLimiter(1_000, 20, now);
-  let gameDataRuntime: Extract<
-    ProductionDictionaryLoadResult,
-    { success: true }
-  > | null = null;
   let lifecycleTimer: LifecycleTimer | null = null;
   let startupPromise: Promise<number> | null = null;
   let stopPromise: Promise<void> | null = null;
@@ -1034,7 +1046,11 @@ export function createWordsServer(
     }
 
     const result = loaded as Record<string, unknown>;
-    if (result.success !== true || result.wordCount !== 79_370) {
+    if (
+      result.success !== true ||
+      result.wordCount !== 79_370 ||
+      !Array.isArray(result.words)
+    ) {
       return false;
     }
 

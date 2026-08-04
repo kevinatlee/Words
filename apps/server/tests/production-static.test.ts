@@ -18,6 +18,7 @@ const successfulDictionaryLoad: Extract<
 > = {
   success: true,
   dictionary: { has: () => false },
+  words: Object.freeze([]),
   wordCount: 79_370,
   manifest: PRODUCTION_DICTIONARY_IDENTITY as never,
 };

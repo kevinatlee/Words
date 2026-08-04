@@ -46,6 +46,7 @@ const successfulDictionaryLoad: Extract<
   dictionary: {
     has: (word: string) => ['ABC', 'CAT', 'DOG', 'QUIZ'].includes(word),
   },
+  words: Object.freeze(['ABC', 'CAT', 'DOG', 'QUIZ']),
   wordCount: 79_370,
   manifest: PRODUCTION_DICTIONARY_IDENTITY as never,
 };
@@ -1969,6 +1970,44 @@ describe('Words Stage 4B server', () => {
     });
   });
 
+  it('uses the median selector with eight production-valid candidates', async () => {
+    await server.stop();
+    const randomSource = { next: vi.fn(() => 0.5) };
+    const boardGenerator = vi.fn(({ size, random }) => {
+      expect(random).toBe(randomSource);
+      return {
+        success: true as const,
+        board: {
+          size,
+          tiles: Array.from({ length: size * size }, (_, index) =>
+            String.fromCharCode(65 + (index % 26)),
+          ),
+        },
+        attempts: 1,
+      };
+    });
+    server = createWordsServer(
+      { port: 0, cleanupIntervalMs: 60_000 },
+      { ...testDependencies, boardGenerator, randomSource },
+    );
+    port = await server.start(0);
+    const display = await connectClient();
+    const created = await emitCreateDisplay(display);
+    if (!created.ok) throw new Error('Display creation failed.');
+    const controller = await connectClient();
+    await emitJoinPlayer(controller, {
+      roomCode: created.room.code,
+      displayName: 'Silver Owl',
+    });
+
+    const started = await emitStartRound(controller);
+    expect(started).toMatchObject({
+      ok: true,
+      room: { round: { generationAttempts: 1 } },
+    });
+    expect(boardGenerator).toHaveBeenCalledTimes(8);
+  });
+
   it('broadcasts one count-only progress snapshot while keeping accepted words private', async () => {
     const display = await connectClient();
     const created = await emitCreateDisplay(display);
@@ -2240,6 +2279,7 @@ describe('Words Stage 4B server', () => {
         dictionaryLoader: async () => ({
           ...successfulDictionaryLoad,
           dictionary: { has: dictionaryHas },
+          words: Object.freeze([]),
         }),
       },
     );
