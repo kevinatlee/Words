@@ -1522,3 +1522,14 @@ player are separate roles, and neither socket alone owns room lifetime.
 - Kept tile distribution, existing board acceptance profiles, dictionary,
   scoring, network schemas, client behavior, and deployment workflows
   unchanged. This branch is for physical testing before any production choice.
+
+## 2026-08-03 — TV audio and root display recovery (draft)
+
+- Doubled the synthesized accepted-word chime, winner phrase, and winner chord
+  gains without changing pitches, envelopes, note lengths, or scheduling.
+- Added a single guarded three-second recovery for a root display whose live
+  room reports `ROOM_NOT_FOUND`: stale display credentials and UI state clear,
+  then one replacement display room is created without reloading the page.
+- Kept recovery out of all player and non-root routes, retained ordinary error
+  and retry handling for replacement failures, and cancel pending recovery on
+  route exit, successful display restoration, or unmount.

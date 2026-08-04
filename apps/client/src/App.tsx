@@ -60,6 +60,7 @@ const replaceableDisplayCredentialErrors = new Set<RoomErrorCode>([
   'ROOM_EXPIRED',
   'ROOM_NOT_FOUND',
 ]);
+const displayRoomRecoveryDelayMilliseconds = 3_000;
 
 function isSameSession(
   left: StoredLobbySession | null,
@@ -298,7 +299,15 @@ export function App({
   const reconnectingRef = useRef(false);
   const pendingReconnectRef = useRef<StoredLobbySession | null>(null);
   const displayStartupStartedRef = useRef(false);
+  const displayRecoveryTimerRef = useRef<number | null>(null);
   const attemptedRoomCodeRef = useRef<string | null>(null);
+
+  const cancelDisplayRecovery = useCallback(() => {
+    if (displayRecoveryTimerRef.current !== null) {
+      window.clearTimeout(displayRecoveryTimerRef.current);
+      displayRecoveryTimerRef.current = null;
+    }
+  }, []);
 
   const acceptRoomSnapshot = useCallback(
     (nextRoom: RoomState, expectedSession?: StoredLobbySession) => {
@@ -379,6 +388,7 @@ export function App({
 
   const rememberSession = useCallback(
     (nextRoom: RoomState, nextSession: StoredLobbySession) => {
+      cancelDisplayRecovery();
       sessionStore.save(nextSession);
       sessionRef.current = nextSession;
       setSession(nextSession);
@@ -410,7 +420,7 @@ export function App({
         navigate('/');
       }
     },
-    [currentPath, navigate, sessionStore],
+    [cancelDisplayRecovery, currentPath, navigate, sessionStore],
   );
 
   const acceptSubmissionState = useCallback(
@@ -620,6 +630,41 @@ export function App({
       }
     });
     const stopRoomError = client.onRoomError((error) => {
+      const activeSession = sessionRef.current;
+      const shouldRecoverMissingDisplayRoom =
+        currentPath === '/' &&
+        activeSession?.role === 'display' &&
+        error.code === 'ROOM_NOT_FOUND';
+
+      if (shouldRecoverMissingDisplayRoom) {
+        sessionStore.clear(activeSession);
+        sessionRef.current = null;
+        setSession(null);
+        roomRef.current = null;
+        setRoom(null);
+        setSubmissionState(null);
+        setRoomError(null);
+        setDisplayStarting(true);
+        displayStartupStartedRef.current = true;
+        reconnectNeededRef.current = false;
+        pendingReconnectRef.current = null;
+
+        cancelDisplayRecovery();
+        displayRecoveryTimerRef.current = window.setTimeout(() => {
+          displayRecoveryTimerRef.current = null;
+          void startDisplay();
+        }, displayRoomRecoveryDelayMilliseconds);
+        return;
+      }
+
+      if (
+        currentPath === '/' &&
+        error.code === 'ROOM_NOT_FOUND' &&
+        displayRecoveryTimerRef.current !== null
+      ) {
+        return;
+      }
+
       setRoomError(error);
 
       if (error.code === 'ROOM_EXPIRED' || error.code === 'RECONNECT_FAILED') {
@@ -663,7 +708,15 @@ export function App({
       stopConnectionStatus();
       window.removeEventListener('popstate', onPopState);
     };
-  }, [acceptRoomSnapshot, client, reconnectSession, sessionStore]);
+  }, [
+    acceptRoomSnapshot,
+    cancelDisplayRecovery,
+    client,
+    currentPath,
+    reconnectSession,
+    sessionStore,
+    startDisplay,
+  ]);
 
   useEffect(() => {
     if (
@@ -677,6 +730,7 @@ export function App({
 
   useEffect(() => {
     if (currentPath !== '/') {
+      cancelDisplayRecovery();
       displayStartupStartedRef.current = false;
       return;
     }
@@ -690,7 +744,9 @@ export function App({
 
     displayStartupStartedRef.current = true;
     void startDisplay();
-  }, [currentPath, startDisplay]);
+  }, [cancelDisplayRecovery, currentPath, startDisplay]);
+
+  useEffect(() => cancelDisplayRecovery, [cancelDisplayRecovery]);
 
   useEffect(() => {
     const roomCode = roomCodeFromPath(currentPath);
