@@ -51,6 +51,13 @@ This is a deterministic, developer-only analysis of boards accepted by the curre
 - The exploratory hybrid policy rejected 16.640%, 21.000%, and 12.720% while raising P5 playable-word counts by 13, 25, and 39. Its estimated generation-cost multipliers were 1.200×, 1.266×, and 1.146× before solver cost.
 - These are associations within generated boards, not evidence that any metric causes players to perceive a board as fair or fun.
 
+## Human review decision
+
+- Both the median and strong sample boards were judged excellent.
+- Median boards are preferred for normal gameplay because they preserve meaningful searching.
+- Strong boards may contain enough playable words to shift play toward bulk-entry speed competition.
+- The strong-board research remains available for a possible future fast, high-density, or alternate game mode.
+
 ## 4 × 4
 
 | Metric                    |    Mean |    P5 | P50 | P95 |
