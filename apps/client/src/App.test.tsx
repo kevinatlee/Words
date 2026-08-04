@@ -1104,6 +1104,91 @@ describe('Stage 4B display and player room routes', () => {
     expect(client.reconnectDisplay).not.toHaveBeenCalled();
   });
 
+  it('offers one explicit same-name rejoin after a player reconnect expires', async () => {
+    const user = userEvent.setup();
+    const stored: StoredLobbySession = {
+      role: 'player',
+      roomCode: 'ABC234',
+      playerId: ordinaryPlayer.id,
+      playerReconnectToken: 'r'.repeat(43),
+      displayName: ordinaryPlayer.displayName,
+    };
+    const reconnectPlayer = vi.fn(async (): Promise<PlayerActionResponse> => ({
+      ok: false,
+      error: {
+        code: 'RECONNECT_FAILED',
+        message: 'That player reconnect credential has expired.',
+      },
+    }));
+    const client = createFakeClient({ reconnectPlayer });
+    const store = createFakeSessionStore(stored);
+
+    render(
+      <App routePath="/room/ABC234" client={client} sessionStore={store} />,
+    );
+
+    expect(
+      await screen.findByText(
+        'Your previous connection expired. Rejoin this room when you are ready.',
+      ),
+    ).toBeInTheDocument();
+    expect(store.clear).toHaveBeenCalledWith(stored);
+    expect(client.joinPlayer).not.toHaveBeenCalled();
+    expect(client.createDisplay).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox', { name: 'Room code' })).toHaveValue(
+      'ABC234',
+    );
+    expect(screen.getByRole('textbox', { name: 'Display name' })).toHaveValue(
+      ordinaryPlayer.displayName,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Rejoin' }));
+    expect(client.joinPlayer).toHaveBeenCalledTimes(1);
+    expect(client.joinPlayer).toHaveBeenCalledWith({
+      roomCode: 'ABC234',
+      displayName: ordinaryPlayer.displayName,
+    });
+  });
+
+  it('does not reuse an obsolete room code after player room expiry', async () => {
+    const stored: StoredLobbySession = {
+      role: 'player',
+      roomCode: 'ABC234',
+      playerId: ordinaryPlayer.id,
+      playerReconnectToken: 's'.repeat(43),
+      displayName: ordinaryPlayer.displayName,
+    };
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+        ok: false,
+        error: {
+          code: 'ROOM_EXPIRED',
+          message: 'That temporary room has expired.',
+        },
+      })),
+    });
+
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore(stored)}
+      />,
+    );
+
+    expect(
+      await screen.findByText(
+        'That room is no longer available. Scan the current TV QR code or enter its current room code.',
+      ),
+    ).toBeInTheDocument();
+    expect(client.joinPlayer).not.toHaveBeenCalled();
+    expect(client.createDisplay).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox', { name: 'Room code' })).toHaveValue('');
+    expect(screen.getByRole('textbox', { name: 'Display name' })).toHaveValue(
+      ordinaryPlayer.displayName,
+    );
+  });
+
   it('releases a stale reconnect before restoring the newer route session', async () => {
     const firstReconnect = deferred<PlayerActionResponse>();
     const firstStored: StoredLobbySession = {

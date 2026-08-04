@@ -18,4 +18,11 @@ describe('server configuration', () => {
       }).publicBaseUrl,
     ).toBe('https://deployment.example.invalid');
   });
+
+  it('defaults reconnect grace to five minutes while accepting the bounded override', () => {
+    expect(createServerConfig({}).reconnectGraceMs).toBe(300_000);
+    expect(
+      createServerConfig({ RECONNECT_GRACE_SECONDS: '90' }).reconnectGraceMs,
+    ).toBe(90_000);
+  });
 });

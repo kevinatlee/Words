@@ -388,6 +388,8 @@ export class RoomStore {
     socketId: string,
   ): PlayerSessionResult {
     const room = this.requireActiveRoom(roomCode);
+    const now = this.now();
+    this.pruneExpiredPlayers(room, now);
 
     if (room.players.size >= this.options.maxPlayers) {
       throw new RoomOperationError(
@@ -410,7 +412,6 @@ export class RoomStore {
       );
     }
 
-    const now = this.now();
     const player = this.createPlayer(displayName, socketId, now);
     room.players.set(player.id, player);
     const playerReconnectToken = player.reconnectToken;
@@ -686,6 +687,7 @@ export class RoomStore {
       player.reconnectToken !== playerReconnectToken ||
       (player.disconnectExpiresAt !== null && player.disconnectExpiresAt < now)
     ) {
+      this.pruneExpiredPlayers(room, now);
       this.playerSessions.delete(playerReconnectToken);
       throw new RoomOperationError(
         'RECONNECT_FAILED',
@@ -1042,30 +1044,8 @@ export class RoomStore {
         display.disconnectExpiresAt = null;
       }
 
-      const expiredPlayers = [...room.players.values()].filter(
-        (player) =>
-          !player.connected &&
-          player.disconnectExpiresAt !== null &&
-          player.disconnectExpiresAt <= now,
-      );
-
-      let removedController = false;
-
-      for (const player of expiredPlayers) {
-        this.invalidatePlayerCredential(player);
-        room.players.delete(player.id);
-
-        if (player.id === room.controllerPlayerId) {
-          removedController = true;
-        }
+      if (this.pruneExpiredPlayers(room, now)) {
         updatedRoomCodes.add(room.code);
-      }
-
-      if (removedController) {
-        this.assignEarliestConnectedController(room);
-      }
-      if (expiredPlayers.length > 0) {
-        room.stateVersion += 1;
       }
 
       if (
@@ -1669,6 +1649,32 @@ export class RoomStore {
     player.socketId = null;
     player.reconnectToken = null;
     player.disconnectExpiresAt = null;
+  }
+
+  private pruneExpiredPlayers(room: InternalRoom, now: number): boolean {
+    const expiredPlayers = [...room.players.values()].filter(
+      (player) =>
+        !player.connected &&
+        player.disconnectExpiresAt !== null &&
+        player.disconnectExpiresAt <= now,
+    );
+    let removedController = false;
+
+    for (const player of expiredPlayers) {
+      this.invalidatePlayerCredential(player);
+      room.players.delete(player.id);
+      removedController ||= player.id === room.controllerPlayerId;
+    }
+
+    if (removedController) {
+      this.assignEarliestConnectedController(room);
+    }
+    if (expiredPlayers.length > 0) {
+      room.stateVersion += 1;
+      return true;
+    }
+
+    return false;
   }
 
   private deleteRoom(

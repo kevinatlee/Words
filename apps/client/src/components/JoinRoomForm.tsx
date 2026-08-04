@@ -5,18 +5,24 @@ import type { RoomError } from '@words/shared';
 import { LobbyError } from './LobbyError';
 
 type JoinRoomFormProps = {
-  initialRoomCode?: string;
+  initialRoomCode?: string | undefined;
+  initialDisplayName?: string | undefined;
   roomCodeLocked?: boolean;
+  recoveryMessage?: string | undefined;
+  submitLabel?: string | undefined;
   onJoin: (roomCode: string, displayName: string) => Promise<RoomError | null>;
 };
 
 export function JoinRoomForm({
   initialRoomCode = '',
+  initialDisplayName = '',
   roomCodeLocked = false,
+  recoveryMessage,
+  submitLabel,
   onJoin,
 }: JoinRoomFormProps) {
   const [roomCode, setRoomCode] = useState(initialRoomCode);
-  const [displayName, setDisplayName] = useState('');
+  const [displayName, setDisplayName] = useState(initialDisplayName);
   const [error, setError] = useState<RoomError | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -31,6 +37,7 @@ export function JoinRoomForm({
     <section className="form-page">
       <div className="form-page__intro">
         <h1>Join the Room</h1>
+        {recoveryMessage ? <p>{recoveryMessage}</p> : null}
       </div>
 
       <form
@@ -69,7 +76,7 @@ export function JoinRoomForm({
           type="submit"
           disabled={submitting}
         >
-          {submitting ? 'Joining room…' : 'Join Room'}
+          {submitting ? 'Joining room…' : (submitLabel ?? 'Join Room')}
         </button>
       </form>
     </section>

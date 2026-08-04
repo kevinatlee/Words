@@ -13,7 +13,7 @@ export const productConfig = {
   maximumSubmittedWordLength: 64,
   maximumAcceptedWordsPerPlayerPerRound: 256,
   roomCodeLength: 6,
-  reconnectGraceSeconds: 60,
+  reconnectGraceSeconds: 300,
   roomTtlMinutes: 120,
 } as const;
 

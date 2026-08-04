@@ -750,6 +750,143 @@ describe('RoomStore display and player sessions', () => {
     expect(room?.players[0]?.id).toBe(controller.session.playerId);
   });
 
+  it('prunes an expired disconnected player before capacity and duplicate-name checks', () => {
+    let now = Date.parse('2026-07-27T20:00:00.000Z');
+    const store = createStore({
+      now: () => now,
+      maxPlayers: 1,
+      reconnectGraceMs: 60_000,
+    });
+    const created = store.createDisplay('socket-display');
+    const first = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-first',
+    );
+
+    store.disconnect(
+      {
+        role: 'player',
+        roomCode: created.room.code,
+        playerId: first.session.playerId,
+      },
+      'socket-first',
+    );
+    now += 59_999;
+    expectRoomError(
+      () => store.joinPlayer(created.room.code, 'silver owl', 'socket-early'),
+      'ROOM_FULL',
+    );
+
+    now += 1;
+    const rejoined = store.joinPlayer(
+      created.room.code,
+      'silver owl',
+      'socket-rejoined',
+    );
+    expect(rejoined.session.playerId).not.toBe(first.session.playerId);
+    expect(rejoined.room.players).toHaveLength(1);
+    expect(rejoined.player.displayName).toBe('silver owl');
+  });
+
+  it('keeps a disconnected player within grace reserved by name', () => {
+    let now = Date.parse('2026-07-27T20:00:00.000Z');
+    const store = createStore({ now: () => now, reconnectGraceMs: 60_000 });
+    const created = store.createDisplay('socket-display');
+    const first = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-first',
+    );
+
+    store.disconnect(
+      {
+        role: 'player',
+        roomCode: created.room.code,
+        playerId: first.session.playerId,
+      },
+      'socket-first',
+    );
+    now += 59_999;
+
+    expectRoomError(
+      () => store.joinPlayer(created.room.code, 'silver owl', 'socket-second'),
+      'INVALID_NAME',
+    );
+    expect(store.getRoomState(created.room.code)?.players).toHaveLength(1);
+  });
+
+  it('removes an expired reconnect identity before returning reconnect failure', () => {
+    let now = Date.parse('2026-07-27T20:00:00.000Z');
+    const store = createStore({ now: () => now, reconnectGraceMs: 60_000 });
+    const created = store.createDisplay('socket-display');
+    const first = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-first',
+    );
+
+    store.disconnect(
+      {
+        role: 'player',
+        roomCode: created.room.code,
+        playerId: first.session.playerId,
+      },
+      'socket-first',
+    );
+    now += 60_001;
+    expectRoomError(
+      () =>
+        store.reconnectPlayer(
+          created.room.code,
+          first.session.playerReconnectToken,
+          'socket-late',
+        ),
+      'RECONNECT_FAILED',
+    );
+    expect(store.getRoomState(created.room.code)?.players).toEqual([]);
+    expect(
+      store.joinPlayer(created.room.code, 'Silver Owl', 'socket-rejoined')
+        .session.playerId,
+    ).not.toBe(first.session.playerId);
+  });
+
+  it('uses the same expiry cleanup to promote a controller successor during join', () => {
+    let now = Date.parse('2026-07-27T20:00:00.000Z');
+    const store = createStore({ now: () => now, reconnectGraceMs: 60_000 });
+    const created = store.createDisplay('socket-display');
+    const controller = store.joinPlayer(
+      created.room.code,
+      'Silver Owl',
+      'socket-controller',
+    );
+    now += 1;
+    const successor = store.joinPlayer(
+      created.room.code,
+      'Amber Kite',
+      'socket-successor',
+    );
+
+    store.disconnect(
+      {
+        role: 'player',
+        roomCode: created.room.code,
+        playerId: controller.session.playerId,
+      },
+      'socket-controller',
+    );
+    now += 60_000;
+    const joined = store.joinPlayer(
+      created.room.code,
+      'Copper Lynx',
+      'socket-new',
+    );
+
+    expect(joined.room.controllerPlayerId).toBe(successor.session.playerId);
+    expect(joined.room.players).toHaveLength(2);
+    expect(() => roomStateSchema.parse(joined.room)).not.toThrow();
+  });
+
   it('promotes the earliest-joined connected player after controller grace', () => {
     let now = Date.parse('2026-07-27T20:00:00.000Z');
     const store = createStore({

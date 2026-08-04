@@ -1533,3 +1533,12 @@ player are separate roles, and neither socket alone owns room lifetime.
 - Kept recovery out of all player and non-root routes, retained ordinary error
   and retry handling for replacement failures, and cancel pending recovery on
   route exit, successful display restoration, or unmount.
+
+## 2026-08-03 — Mobile player reconnection (draft)
+
+- Extended reconnect grace to five minutes because mobile browsers may suspend
+  while backgrounded.
+- Prune expired disconnected players before join capacity and duplicate-name
+  checks, so their room slot and name become immediately reusable.
+- A failed player reconnect now offers an explicit same-name Rejoin instead of
+  automatically creating an identity; audio was confirmed correct and unchanged.
