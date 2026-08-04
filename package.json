@@ -19,6 +19,7 @@
     "data:dictionary:audit": "node packages/game-data/scripts/audit-vocabulary.mjs",
     "data:distribution:derive": "node packages/game-data/scripts/derive-distribution.mjs",
     "data:boards:audit": "tsx packages/game-data/scripts/audit-boards.mjs",
+    "research:boards": "tsx scripts/research-board-quality.ts",
     "privacy:check": "node scripts/check-public-privacy.mjs",
     "build:production": "npm run build --workspace @words/client && node scripts/build-production.mjs",
     "start:production": "node dist/production/server/index.mjs",
