@@ -1507,3 +1507,18 @@ player are separate roles, and neither socket alone owns room lifetime.
 - Changed no production board rule, runtime path, networking behavior, or
   deployment channel; the policy thresholds remain research hypotheses for a
   future physical A/B study.
+
+## 2026-08-03 — Median-playability board selection (draft)
+
+- Added an experimental server-only selector that ranks a bounded pool of eight
+  boards from the unchanged production generator against the human-approved
+  median playable-word targets.
+- Extracted a minimal trie-backed playability solver shared with the retained
+  research tooling; the trie is cached per production dictionary object and
+  remains excluded from browser builds.
+- Audited 5,000 selections per size twice with seed
+  `median-board-selection-v1`. Both outputs were byte-identical, all
+  distribution goals passed, and local selector P95 remained below 25 ms.
+- Kept tile distribution, existing board acceptance profiles, dictionary,
+  scoring, network schemas, client behavior, and deployment workflows
+  unchanged. This branch is for physical testing before any production choice.

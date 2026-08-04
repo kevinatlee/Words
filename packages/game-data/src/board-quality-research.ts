@@ -2,7 +2,6 @@ import {
   createWordDictionary,
   generateBoard,
   getAdjacentIndices,
-  scoreWordByLength,
   type Board,
   type BoardSize,
   type RandomSource,
@@ -11,12 +10,12 @@ import {
 } from '@words/game-engine';
 
 import { DEFAULT_TILE_DISTRIBUTION, generateDefaultBoard } from './index.js';
+import { createBoardPlayabilitySolver } from './board-playability.js';
 
 export const RESEARCH_SEED = 'board-quality-v1';
 export const RESEARCH_SIZES = Object.freeze([4, 5, 6] as const);
 export const BOARDS_PER_SIZE = 5_000;
 export const VOWEL_TOKENS = Object.freeze(['A', 'E', 'I', 'O', 'U']);
-export const MINIMUM_WORD_LENGTH = 3;
 
 export type ResearchBoardSize = (typeof RESEARCH_SIZES)[number];
 
@@ -49,13 +48,6 @@ export interface ResearchBoardMetrics {
   readonly startingCellCount: number;
   readonly representativeLongestWords: readonly string[];
 }
-
-interface TrieNode {
-  readonly children: Map<string, TrieNode>;
-  terminal: boolean;
-}
-
-const trieCache = new WeakMap<object, TrieNode>();
 
 export interface SeededRandom extends RandomSource {
   readonly seed: string;
@@ -95,7 +87,10 @@ export function analyzeBoard(
 ): ResearchBoardMetrics {
   const composition = measureComposition(board);
   const repetition = measureRepetition(board);
-  const playability = solveBoard(board, dictionary, dictionaryWords);
+  const playability = createBoardPlayabilitySolver(
+    dictionary,
+    dictionaryWords,
+  ).analyze(board);
   return Object.freeze({
     size: board.size,
     board: Object.freeze([...board.tiles]),
@@ -417,109 +412,6 @@ function maximumDistanceTo(
       );
     }),
   );
-}
-
-function solveBoard(
-  board: Board,
-  dictionary: WordDictionary,
-  dictionaryWords: readonly string[],
-) {
-  const root = getTrie(dictionaryWords);
-  const words = new Set<string>();
-  const usedCells = new Set<number>();
-  const startingCells = new Set<number>();
-  const visit = (
-    index: number,
-    node: TrieNode,
-    mask: bigint,
-    word: string,
-    path: number[],
-  ) => {
-    const token = board.tiles[index]!;
-    const next = node.children.get(token);
-    if (!next) return;
-    const nextWord = word + token;
-    const nextPath = [...path, index];
-    if (
-      next.terminal &&
-      nextWord.length >= MINIMUM_WORD_LENGTH &&
-      dictionary.has(nextWord)
-    ) {
-      words.add(nextWord);
-      nextPath.forEach((cell) => usedCells.add(cell));
-      startingCells.add(nextPath[0]!);
-    }
-    const nextMask = mask | (1n << BigInt(index));
-    getAdjacentIndices(board.size, index).forEach((neighbor) => {
-      if ((nextMask & (1n << BigInt(neighbor))) === 0n)
-        visit(neighbor, next, nextMask, nextWord, nextPath);
-    });
-  };
-  board.tiles.forEach((_, index) => visit(index, root, 0n, '', []));
-  const byLength: Record<string, number> = {};
-  words.forEach((word) => {
-    const bucket = word.length >= 8 ? '8+' : String(word.length);
-    byLength[bucket] = (byLength[bucket] ?? 0) + 1;
-  });
-  const longestWordLength = Math.max(
-    0,
-    ...[...words].map((word) => word.length),
-  );
-  const representativeLongestWords = [...words]
-    .filter((word) => word.length === longestWordLength)
-    .sort()
-    .slice(0, 5);
-  const totalPossibleScore = [...words].reduce((total, word) => {
-    const scored = scoreWordByLength(word);
-    if (!scored.valid) return total;
-    const bonus = word.length === 3 || word.length === 4 ? 1 : 2;
-    return total + scored.points + bonus;
-  }, 0);
-  return {
-    playableWordCount: words.size,
-    longPlayableWordCount: [...words].filter((word) => word.length >= 5).length,
-    wordCountsByLength: Object.freeze(byLength),
-    longestWordLength,
-    totalPossibleScore,
-    cellCoverage: usedCells.size / board.tiles.length,
-    startingCellCount: startingCells.size,
-    representativeLongestWords: Object.freeze(representativeLongestWords),
-  };
-}
-
-function getTrie(words: readonly string[]): TrieNode {
-  const key = words as object;
-  const cached = trieCache.get(key);
-  if (cached) return cached;
-  const trie = createTrie(words);
-  trieCache.set(key, trie);
-  return trie;
-}
-
-function createTrie(words: readonly string[]): TrieNode {
-  const root: TrieNode = { children: new Map(), terminal: false };
-  words.forEach((word) => {
-    let node = root;
-    for (const token of tokenizeWord(word)) {
-      let child = node.children.get(token);
-      if (!child) {
-        child = { children: new Map(), terminal: false };
-        node.children.set(token, child);
-      }
-      node = child;
-    }
-    node.terminal = true;
-  });
-  return root;
-}
-
-function tokenizeWord(word: string): readonly string[] {
-  const tokens: string[] = [];
-  for (let index = 0; index < word.length; index += 1) {
-    tokens.push(word.slice(index, index + 2) === 'QU' ? 'QU' : word[index]!);
-    if (tokens.at(-1) === 'QU') index += 1;
-  }
-  return tokens;
 }
 
 function hashSeed(seed: string): number {
