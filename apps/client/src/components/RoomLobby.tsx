@@ -344,7 +344,10 @@ export function RoomLobby({
     return (
       <div className="room-page display-room-page">
         {roundIsEnded && room.round?.results ? (
-          <RoundResults results={room.round.results} />
+          <RoundResults
+            results={room.round.results}
+            roundNumber={room.round.number}
+          />
         ) : (
           <div className="display-room-layout">
             <aside

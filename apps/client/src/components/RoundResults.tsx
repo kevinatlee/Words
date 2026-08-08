@@ -1,9 +1,11 @@
 import type { RoundResults as RoundResultsState } from '@words/shared';
+import { getResultQuip } from '../utils/result-quip';
 
 type RoundResultsProps = {
   results: RoundResultsState;
   currentPlayerId?: string | null;
   isDisplay?: boolean;
+  roundNumber?: number;
 };
 
 function uniqueLimit(count: number): number {
@@ -13,12 +15,19 @@ function uniqueLimit(count: number): number {
   return 2;
 }
 
-export function RoundResults({ results }: RoundResultsProps) {
+export function RoundResults({ results, roundNumber = 1 }: RoundResultsProps) {
   const limit = uniqueLimit(results.players.length);
   const celebrate = (results.players[0]?.finalScore ?? 0) > 0;
+  const quip = getResultQuip(results, roundNumber);
   return (
     <section className="display-results" aria-labelledby="round-results-title">
       <h1 id="round-results-title">Round Results</h1>
+      <div className="display-results__celebration" aria-hidden="true">
+        {Array.from({ length: 20 }, (_, index) => (
+          <i key={index} />
+        ))}
+      </div>
+      <p className="display-results__quip">{quip.text}</p>
       <ol
         className={`display-results__cards display-results__cards--${results.players.length}`}
         data-result-card-count={results.players.length}

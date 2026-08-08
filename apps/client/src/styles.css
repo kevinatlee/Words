@@ -176,6 +176,7 @@ button:disabled {
   margin: 0;
 }
 .display-results {
+  position: relative;
   min-height: 70vh;
   display: flex;
   flex-direction: column;
@@ -183,6 +184,48 @@ button:disabled {
   justify-content: center;
   gap: 1rem;
   padding-inline: 2vw;
+}
+.display-results__quip {
+  position: relative;
+  z-index: 1;
+  margin: 0 auto 1rem;
+  max-width: 44rem;
+  text-align: center;
+  font-weight: 700;
+  font-size: clamp(1rem, 2vw, 1.4rem);
+}
+.display-results__celebration {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.display-results__celebration i {
+  position: absolute;
+  width: 8px;
+  height: 12px;
+  opacity: 0.45;
+  background: var(--mint);
+  animation: confetti-fall 4s ease-out both;
+  left: calc((var(--i, 1) * 5%));
+}
+.display-results__celebration i:nth-child(3n) {
+  background: var(--coral);
+}
+.display-results__celebration i:nth-child(4n) {
+  background: var(--sun);
+}
+.display-results__celebration i:nth-child(5n) {
+  background: var(--blue);
+}
+@keyframes confetti-fall {
+  from {
+    transform: translateY(-20px) rotate(0);
+  }
+  to {
+    transform: translateY(280px) rotate(360deg);
+    opacity: 0;
+  }
 }
 .display-results__cards {
   display: grid;
@@ -233,7 +276,13 @@ button:disabled {
   margin-top: clamp(1.35rem, 4vh, 2.75rem);
 }
 .result-player-card--celebrate {
-  animation: result-winner-arrival 1.2s ease-out both;
+  animation: result-winner-arrival 1s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .display-results__celebration,
+  .result-player-card--celebrate {
+    animation: none;
+  }
 }
 @keyframes result-winner-arrival {
   0% {
