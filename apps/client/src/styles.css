@@ -204,11 +204,11 @@ button:disabled {
   position: absolute;
   left: var(--firework-x);
   top: var(--firework-y);
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
   opacity: 0;
   animation: firework-pop 1.25s ease-out both;
-  animation-delay: calc(var(--firework, 1) * 0.8s + 0.2s);
+  animation-delay: var(--firework-delay);
 }
 .display-results__firework:nth-child(3n) {
   color: var(--coral);
@@ -221,17 +221,17 @@ button:disabled {
 }
 .display-results__firework b {
   position: absolute;
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: currentColor;
-  transform: rotate(calc(var(--spark, 1) * 45deg)) translateY(-18px);
+  transform: rotate(calc(var(--spark, 1) * 45deg)) translateY(-28px);
 }
 .display-results__firework b:nth-child(2) {
-  transform: rotate(45deg) translateY(-18px);
+  transform: rotate(45deg) translateY(-28px);
 }
 .display-results__firework b:nth-child(3) {
-  transform: rotate(90deg) translateY(-18px);
+  transform: rotate(90deg) translateY(-28px);
 }
 .display-results__firework b:nth-child(4) {
   transform: rotate(135deg) translateY(-18px);
@@ -311,7 +311,7 @@ button:disabled {
   margin-top: clamp(1.35rem, 4vh, 2.75rem);
 }
 .result-player-card--celebrate {
-  animation: result-winner-arrival 2.2s ease-out both;
+  animation: result-winner-arrival 5s ease-out both;
 }
 @media (prefers-reduced-motion: reduce) {
   .result-player-card--celebrate {
@@ -340,6 +340,21 @@ button:disabled {
   }
   77% {
     transform: translateY(1px);
+  }
+  84% {
+    transform: translateY(-1.5px);
+  }
+  89% {
+    transform: translateY(0.75px);
+  }
+  93% {
+    transform: translateY(-0.75px);
+  }
+  96% {
+    transform: translateY(0.4px);
+  }
+  98% {
+    transform: translateY(-0.3px);
   }
 }
 .result-player-card--winner h2 [aria-label='Game Host winner'] {

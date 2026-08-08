@@ -23,16 +23,16 @@ const phrases = {
     '{winner} has secured unanimous first place.',
   ],
   'nail-biter': [
-    '{winner} wins by {margin}. Somebody check the replay.',
-    '{winner} by a whisker. That was close.',
-    "{winner} squeaks it out. That's a photo finish.",
-    '{winner} survives the nail-biter.',
-    '{winner} steals it by {margin}. Absolute robbery.',
+    '{winner} escapes with the win. Barely.',
+    '{winner} survives a round that had no business being that close.',
+    '{winner} takes it. Nobody unclench yet.',
+    '{winner} sneaks across the finish line first.',
+    '{winner} wins. Dramatic for absolutely no reason.',
   ],
   close: [
-    '{winner} edges past the field by {margin}.',
+    '{winner} had the edge when it counted.',
     '{winner} had just enough alphabet left in the tank.',
-    '{winner} wins the argument by {margin} points.',
+    '{winner} made just enough room at the top.',
     '{winner} found one more gear — and a few more words.',
     '{winner} takes it. Competitive nonsense at its finest.',
   ],
@@ -45,7 +45,7 @@ const phrases = {
   ],
   landslide: [
     '{winner} chose violence, alphabetically.',
-    '{winner} wins by {margin}. That escalated quickly.',
+    '{winner} apparently misunderstood the meaning of friendly competition.',
     '{winner} has been asked to leave some points for the rest of us.',
     '{winner} turned the scoreboard into a spelling demonstration.',
     "{winner} didn't just win the round. {winner} claimed it.",
@@ -86,9 +86,6 @@ export function getResultQuip(results: RoundResults, roundNumber: number) {
     '';
   return {
     category,
-    text: phrase
-      .replaceAll('{winner}', winners[0]?.displayName ?? '')
-      .replaceAll('{winners}', formatNames(winners.map((p) => p.displayName)))
-      .replaceAll('{margin}', String(margin)),
+    text: phrase.replaceAll('{winner}', winners[0]?.displayName ?? ''),
   };
 }
