@@ -16,6 +16,7 @@ import {
   reconnectDisplayInputSchema,
   reconnectPlayerInputSchema,
   roomSettingsSchema,
+  returnToLobbyInputSchema,
   startRoundInputSchema,
   submitWordInputSchema,
   transferControllerInputSchema,
@@ -29,6 +30,7 @@ import {
   type PlayerActionAcknowledgement,
   type ReconnectDisplayInput,
   type ReconnectPlayerInput,
+  type ReturnToLobbyInput,
   type RoomActionFailure,
   type RoomError,
   type RoomErrorCode,
@@ -820,6 +822,57 @@ export function createWordsServer(
 
         try {
           const result = roomStore.startRound(session, socket.id);
+          acknowledge({ ok: true, room: result.room });
+          io.to(session.roomCode).emit('room:state', result.room);
+        } catch (error) {
+          acknowledgeFailure(acknowledge, toRoomError(error));
+        }
+      },
+    );
+
+    socket.on(
+      'controller:return-to-lobby',
+      (
+        payload: ReturnToLobbyInput,
+        acknowledge: ControllerActionAcknowledgement,
+      ) => {
+        if (!checkRateLimit(acknowledge)) {
+          return;
+        }
+
+        const parsed = returnToLobbyInputSchema.safeParse(payload);
+        if (!parsed.success) {
+          acknowledgeFailure(acknowledge, {
+            code: 'INVALID_PAYLOAD',
+            message: publicErrorMessages.INVALID_PAYLOAD,
+          });
+          return;
+        }
+
+        const session = socket.data.session;
+        if (!session) {
+          acknowledgeFailure(acknowledge, {
+            code: 'UNAUTHORIZED',
+            message: publicErrorMessages.UNAUTHORIZED,
+          });
+          return;
+        }
+        try {
+          broadcastDueRound(session.roomCode);
+        } catch (error) {
+          acknowledgeFailure(acknowledge, toRoomError(error));
+          return;
+        }
+        if (session.role !== 'player') {
+          acknowledgeFailure(acknowledge, {
+            code: 'NOT_CONTROLLER',
+            message: publicErrorMessages.NOT_CONTROLLER,
+          });
+          return;
+        }
+
+        try {
+          const result = roomStore.returnToLobby(session, socket.id);
           acknowledge({ ok: true, room: result.room });
           io.to(session.roomCode).emit('room:state', result.room);
         } catch (error) {

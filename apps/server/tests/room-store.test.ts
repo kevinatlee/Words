@@ -2404,6 +2404,75 @@ describe('RoomStore authoritative settings and rounds', () => {
     expect(store.advanceDueRounds()).toEqual([]);
   });
 
+  it('lets the connected controller return finalized results to the lobby early', () => {
+    let now = Date.parse('2026-07-29T20:00:00.000Z');
+    const { store, display, controllerSession } = createRoundRoom({
+      now: () => now,
+    });
+    store.updateSettings(
+      controllerSession,
+      {
+        gridSize: 4,
+        roundDurationSeconds: 30,
+        scoringMode: 'length-plus-unique',
+      },
+      'socket-controller',
+    );
+    const started = store.startRound(
+      controllerSession,
+      'socket-controller',
+    ).room;
+    const settings = started.settings;
+    const players = started.players;
+    const controllerPlayerId = started.controllerPlayerId;
+    now += 120_000;
+    expect(store.advanceDueRounds()).toEqual([display.room.code]);
+    const ended = store.getRoomState(display.room.code);
+    const highlights = ended?.highlights;
+
+    const returned = store.returnToLobby(
+      controllerSession,
+      'socket-controller',
+    ).room;
+
+    expect(returned).toMatchObject({
+      phase: 'LOBBY',
+      round: null,
+      settings,
+      players,
+      controllerPlayerId,
+      highlights,
+    });
+    expect(returned.stateVersion).toBe((ended?.stateVersion ?? 0) + 1);
+    expect(
+      store.startRound(controllerSession, 'socket-controller').room.round
+        ?.number,
+    ).toBe(2);
+  });
+
+  it('rejects return-to-lobby calls outside ended results and from stale sessions', () => {
+    let now = Date.parse('2026-07-29T20:00:00.000Z');
+    const { store, display, controllerSession } = createRoundRoom({
+      now: () => now,
+    });
+
+    expectRoomError(
+      () => store.returnToLobby(controllerSession, 'socket-controller'),
+      'ROUND_IN_PROGRESS',
+    );
+    store.startRound(controllerSession, 'socket-controller');
+    expectRoomError(
+      () => store.returnToLobby(controllerSession, 'socket-controller'),
+      'ROUND_IN_PROGRESS',
+    );
+    now += 120_000;
+    expect(store.advanceDueRounds()).toEqual([display.room.code]);
+    expectRoomError(
+      () => store.returnToLobby(controllerSession, 'stale-controller-socket'),
+      'UNAUTHORIZED',
+    );
+  });
+
   it('starts Round 2 after temporary Round 1 results are discarded', () => {
     let now = Date.parse('2026-07-29T20:00:00.000Z');
     const { store, controllerSession } = createRoundRoom({ now: () => now });

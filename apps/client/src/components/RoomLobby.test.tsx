@@ -149,6 +149,7 @@ function lobbyProps(
     onTransferController: async () => null,
     onUpdateSettings: async () => null,
     onStartRound: async () => null,
+    onReturnToLobby: async () => null,
     submissionState: createSubmissionState(),
     onSubmitWord,
   };
@@ -398,6 +399,57 @@ describe('RoomLobby word entry', () => {
     }
 
     expect(onSubmitWord).not.toHaveBeenCalled();
+  });
+
+  it('shows one primary Return to Lobby action below the phone results only for the connected controller', async () => {
+    const user = userEvent.setup();
+    const onReturnToLobby = vi.fn(async () => null);
+    render(
+      <RoomLobby
+        {...lobbyProps(undefined, {
+          room: createRoom({ phase: 'ROUND_ENDED' }),
+        })}
+        onReturnToLobby={onReturnToLobby}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: 'Return to Lobby' });
+    expect(button).toHaveClass('button', 'button--primary');
+    expect(
+      screen
+        .getByRole('region', { name: 'Round summary' })
+        .closest('.board-panel')?.nextElementSibling,
+    ).toContainElement(button);
+    await user.click(button);
+    expect(onReturnToLobby).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides Return to Lobby from ordinary players, displays, active rounds, and lobbies', () => {
+    for (const phase of ['LOBBY', 'ROUND_ACTIVE'] as const) {
+      const view = renderLobby(undefined, { room: createRoom({ phase }) });
+      expect(
+        screen.queryByRole('button', { name: 'Return to Lobby' }),
+      ).toBeNull();
+      view.unmount();
+    }
+    const ordinary = createRoom({
+      phase: 'ROUND_ENDED',
+      controllerPlayerId: '00000000-0000-4000-8000-000000000099',
+      players: [{ ...createRoom().players[0]!, isController: false }],
+    });
+    const ordinaryView = renderLobby(undefined, { room: ordinary });
+    expect(
+      screen.queryByRole('button', { name: 'Return to Lobby' }),
+    ).toBeNull();
+    ordinaryView.unmount();
+    renderLobby(undefined, {
+      room: createRoom({ phase: 'ROUND_ENDED' }),
+      sessionRole: 'display',
+      currentPlayerId: null,
+    });
+    expect(
+      screen.queryByRole('button', { name: 'Return to Lobby' }),
+    ).toBeNull();
   });
 
   it('keeps Trace selected through the same phase transitions', () => {

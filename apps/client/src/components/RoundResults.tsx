@@ -1,9 +1,12 @@
 import type { RoundResults as RoundResultsState } from '@words/shared';
+import { generateResultFireworks } from '../utils/result-fireworks';
+import { getResultQuip } from '../utils/result-quip';
 
 type RoundResultsProps = {
   results: RoundResultsState;
   currentPlayerId?: string | null;
   isDisplay?: boolean;
+  roundNumber?: number;
 };
 
 function uniqueLimit(count: number): number {
@@ -13,12 +16,36 @@ function uniqueLimit(count: number): number {
   return 2;
 }
 
-export function RoundResults({ results }: RoundResultsProps) {
+export function RoundResults({ results, roundNumber = 1 }: RoundResultsProps) {
   const limit = uniqueLimit(results.players.length);
   const celebrate = (results.players[0]?.finalScore ?? 0) > 0;
+  const quip = getResultQuip(results, roundNumber);
+  const fireworks = generateResultFireworks(roundNumber);
   return (
     <section className="display-results" aria-labelledby="round-results-title">
       <h1 id="round-results-title">Round Results</h1>
+      <div className="display-results__fireworks" aria-hidden="true">
+        {fireworks.map((firework, index) => (
+          <i
+            className="display-results__firework"
+            key={index}
+            style={
+              {
+                '--firework-x': `${firework.x}%`,
+                '--firework-y': `${firework.y}%`,
+                '--firework-delay': `${firework.delay}s`,
+                '--firework-scale': firework.scale,
+                color: firework.color,
+              } as React.CSSProperties
+            }
+          >
+            {Array.from({ length: 8 }, (_, spark) => (
+              <b key={spark} />
+            ))}
+          </i>
+        ))}
+      </div>
+      <p className="display-results__quip">{quip.text}</p>
       <ol
         className={`display-results__cards display-results__cards--${results.players.length}`}
         data-result-card-count={results.players.length}

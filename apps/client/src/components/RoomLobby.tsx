@@ -39,6 +39,7 @@ type RoomLobbyProps = {
   onTransferController: (targetPlayerId: string) => Promise<RoomError | null>;
   onUpdateSettings: (settings: RoomSettings) => Promise<RoomError | null>;
   onStartRound: () => Promise<RoomError | null>;
+  onReturnToLobby: () => Promise<RoomError | null>;
   submissionState: PlayerRoundSubmissionState | null;
   onSubmitWord: (input: SubmitWordInput) => Promise<SubmitWordResponse>;
 };
@@ -57,6 +58,7 @@ export function RoomLobby({
   onTransferController,
   onUpdateSettings,
   onStartRound,
+  onReturnToLobby,
   onSubmitWord,
 }: RoomLobbyProps) {
   const [actionPending, setActionPending] = useState(false);
@@ -289,6 +291,17 @@ export function RoomLobby({
     setActionPending(false);
   };
 
+  const runReturnToLobby = async () => {
+    if (!isConnectedController || !roundIsEnded || actionPending) {
+      return;
+    }
+    setActionPending(true);
+    setActionError(null);
+    const error = await onReturnToLobby();
+    setActionError(error);
+    setActionPending(false);
+  };
+
   if (isDisplay) {
     const currentPlayerIds = new Set(room.players.map((player) => player.id));
     const visiblePlayers = [
@@ -331,7 +344,10 @@ export function RoomLobby({
     return (
       <div className="room-page display-room-page">
         {roundIsEnded && room.round?.results ? (
-          <RoundResults results={room.round.results} />
+          <RoundResults
+            results={room.round.results}
+            roundNumber={room.round.number}
+          />
         ) : (
           <div className="display-room-layout">
             <aside
@@ -601,6 +617,18 @@ export function RoomLobby({
                   {actionPending ? 'Working…' : 'Start Round'}
                 </button>
               }
+            </div>
+          )}
+          {isConnectedController && roundIsEnded && (
+            <div className="round-action">
+              <button
+                className="button button--primary"
+                type="button"
+                disabled={actionPending}
+                onClick={() => void runReturnToLobby()}
+              >
+                {actionPending ? 'Working…' : 'Return to Lobby'}
+              </button>
             </div>
           )}
           {showControllerAdministration && (

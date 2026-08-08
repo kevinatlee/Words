@@ -80,6 +80,8 @@ The round result contains the deterministically ordered player results and
 
 The finished display presents this projection under the stable `Round Results`
 heading; round numbering remains result data rather than visible heading copy.
+It also adds a deterministic contextual result line and display-only finite
+firework and winner-card celebration treatment without altering result data.
 
 The strict shared schemas reject missing or extra participants, changed names,
 duplicate IDs or words, incorrect sharing, score totals, ordering, ranks,
@@ -182,7 +184,7 @@ not publish obsolete results.
 
 ## Timed results interface and return to lobby
 
-`ROUND_ENDED` is a 20-second server-authoritative results window, not a fourth
+`ROUND_ENDED` is a 15-second server-authoritative results window, not a fourth
 phase. The display replaces its header with redesigned result cards for every
 authoritative participant, including departed players, plus the join URL footer.
 Compact dark cards show final integer points, separate Words and Unique words counts, and a
@@ -204,7 +206,8 @@ and same-version changes to the finalized result projection. This prevents a
 conflicting rank or winner snapshot from replacing an accepted result while
 preserving established same-version lobby refresh behavior.
 
-After the results window, the lifecycle sweep automatically returns the room to
+The connected game host can also return the room to the lobby early. After the
+results window, the lifecycle sweep automatically returns the room to
 `LOBBY`, permanently discarding the round result and private submissions while
 retaining only bounded last-round and room-record highlights. Settings and start
 requests are rejected during the window and return only once the lobby snapshot

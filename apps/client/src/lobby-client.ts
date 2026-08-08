@@ -46,6 +46,7 @@ export type LobbyClient = {
     input: UpdateRoomSettingsInput,
   ) => Promise<ControllerActionResponse>;
   startRound: () => Promise<ControllerActionResponse>;
+  returnToLobby: () => Promise<ControllerActionResponse>;
   submitWord: (input: SubmitWordInput) => Promise<SubmitWordResponse>;
   onRoomState: (listener: (room: RoomState) => void) => () => void;
   onRoomError: (listener: (error: RoomError) => void) => () => void;
@@ -264,6 +265,25 @@ export class SocketLobbyClient implements LobbyClient {
       this.socket
         .timeout(5_000)
         .emit('controller:start-round', {}, (error, response) => {
+          const parsed = controllerActionResponseSchema.safeParse(response);
+          resolve(
+            error || !parsed.success
+              ? controllerConnectionFailure
+              : parsed.data,
+          );
+        });
+    });
+  }
+
+  async returnToLobby(): Promise<ControllerActionResponse> {
+    if (!this.socket.connected) {
+      return controllerConnectionFailure;
+    }
+
+    return new Promise((resolve) => {
+      this.socket
+        .timeout(5_000)
+        .emit('controller:return-to-lobby', {}, (error, response) => {
           const parsed = controllerActionResponseSchema.safeParse(response);
           resolve(
             error || !parsed.success

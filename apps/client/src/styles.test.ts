@@ -153,9 +153,15 @@ describe('tile typography', () => {
       /\.result-player-card\[data-podium-level='4'\]\s*\{[^}]*margin-top: clamp\(1\.35rem, 4vh, 2\.75rem\);/s,
     );
     expect(styles).toMatch(
-      /\.result-player-card--celebrate\s*\{[^}]*animation: result-winner-arrival 1\.2s ease-out both;/s,
+      /\.result-player-card--celebrate\s*\{[^}]*animation: result-winner-arrival 5s ease-out both;/s,
     );
     expect(styles).toMatch(/@keyframes result-winner-arrival\s*\{/);
+    expect(styles).toMatch(
+      /@keyframes result-winner-arrival[\s\S]*translateY\(/,
+    );
+    expect(styles).not.toMatch(
+      /@keyframes result-winner-arrival[\s\S]*scale\(/,
+    );
     expect(styles).toMatch(
       /\.result-player-card--winner h2 \[aria-label='Game Host winner'\]\s*\{[^}]*color: var\(--sun\);/s,
     );
@@ -200,6 +206,44 @@ describe('tile typography', () => {
     expect(qrTileRule).toContain('background: var(--paper);');
     expect(qrTileRule).not.toMatch(/#fff|#ffffff/i);
     expect(qrTileRule).not.toContain('box-shadow:');
+  });
+
+  it('keeps display fireworks behind result content with a uniform radial burst', () => {
+    expect(styles).toMatch(
+      /\.display-results\s*\{[^}]*position: relative;[^}]*isolation: isolate;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-results__fireworks\s*\{[^}]*position: absolute;[^}]*inset: 0;[^}]*z-index: 0;[^}]*pointer-events: none;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-results > h1,\s*\.display-results__quip\s*\{[^}]*position: relative;[^}]*z-index: 1;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-results__cards\s*\{[^}]*position: relative;[^}]*z-index: 1;/s,
+    );
+
+    for (const [spark, direction] of [
+      [1, 0],
+      [2, 45],
+      [3, 90],
+      [4, 135],
+      [5, 180],
+      [6, 225],
+      [7, 270],
+      [8, 315],
+    ]) {
+      expect(styles).toMatch(
+        new RegExp(
+          `\\.display-results__firework b:nth-child\\(${spark}\\)\\s*\\{[^}]*transform: rotate\\(${direction}deg\\) translateY\\(-28px\\);`,
+          's',
+        ),
+      );
+    }
+
+    expect(styles).not.toMatch(
+      /\.display-results__firework b:nth-child\([^)]*\)\s*\{[^}]*translateY\(-18px\);/s,
+    );
+    expect(styles).not.toContain('var(--spark');
   });
 
   it('keeps the display footer URL dark green, unadorned, and keyboard-visible', () => {
