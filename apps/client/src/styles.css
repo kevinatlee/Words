@@ -177,6 +177,7 @@ button:disabled {
 }
 .display-results {
   position: relative;
+  isolation: isolate;
   min-height: 70vh;
   display: flex;
   flex-direction: column;
@@ -185,6 +186,7 @@ button:disabled {
   gap: 1rem;
   padding-inline: 2vw;
 }
+.display-results > h1,
 .display-results__quip {
   position: relative;
   z-index: 1;
@@ -197,6 +199,7 @@ button:disabled {
 .display-results__fireworks {
   position: absolute;
   inset: 0;
+  z-index: 0;
   overflow: hidden;
   pointer-events: none;
 }
@@ -225,7 +228,9 @@ button:disabled {
   height: 5px;
   border-radius: 50%;
   background: currentColor;
-  transform: rotate(calc(var(--spark, 1) * 45deg)) translateY(-28px);
+}
+.display-results__firework b:nth-child(1) {
+  transform: rotate(0deg) translateY(-28px);
 }
 .display-results__firework b:nth-child(2) {
   transform: rotate(45deg) translateY(-28px);
@@ -234,19 +239,19 @@ button:disabled {
   transform: rotate(90deg) translateY(-28px);
 }
 .display-results__firework b:nth-child(4) {
-  transform: rotate(135deg) translateY(-18px);
+  transform: rotate(135deg) translateY(-28px);
 }
 .display-results__firework b:nth-child(5) {
-  transform: rotate(180deg) translateY(-18px);
+  transform: rotate(180deg) translateY(-28px);
 }
 .display-results__firework b:nth-child(6) {
-  transform: rotate(225deg) translateY(-18px);
+  transform: rotate(225deg) translateY(-28px);
 }
 .display-results__firework b:nth-child(7) {
-  transform: rotate(270deg) translateY(-18px);
+  transform: rotate(270deg) translateY(-28px);
 }
 .display-results__firework b:nth-child(8) {
-  transform: rotate(315deg) translateY(-18px);
+  transform: rotate(315deg) translateY(-28px);
 }
 @keyframes firework-pop {
   0% {
@@ -263,6 +268,8 @@ button:disabled {
   }
 }
 .display-results__cards {
+  position: relative;
+  z-index: 1;
   display: grid;
   width: fit-content;
   max-width: 96vw;

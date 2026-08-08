@@ -208,6 +208,44 @@ describe('tile typography', () => {
     expect(qrTileRule).not.toContain('box-shadow:');
   });
 
+  it('keeps display fireworks behind result content with a uniform radial burst', () => {
+    expect(styles).toMatch(
+      /\.display-results\s*\{[^}]*position: relative;[^}]*isolation: isolate;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-results__fireworks\s*\{[^}]*position: absolute;[^}]*inset: 0;[^}]*z-index: 0;[^}]*pointer-events: none;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-results > h1,\s*\.display-results__quip\s*\{[^}]*position: relative;[^}]*z-index: 1;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-results__cards\s*\{[^}]*position: relative;[^}]*z-index: 1;/s,
+    );
+
+    for (const [spark, direction] of [
+      [1, 0],
+      [2, 45],
+      [3, 90],
+      [4, 135],
+      [5, 180],
+      [6, 225],
+      [7, 270],
+      [8, 315],
+    ]) {
+      expect(styles).toMatch(
+        new RegExp(
+          `\\.display-results__firework b:nth-child\\(${spark}\\)\\s*\\{[^}]*transform: rotate\\(${direction}deg\\) translateY\\(-28px\\);`,
+          's',
+        ),
+      );
+    }
+
+    expect(styles).not.toMatch(
+      /\.display-results__firework b:nth-child\([^)]*\)\s*\{[^}]*translateY\(-18px\);/s,
+    );
+    expect(styles).not.toContain('var(--spark');
+  });
+
   it('keeps the display footer URL dark green, unadorned, and keyboard-visible', () => {
     const footerLinkRule = styles.match(
       /\.display-room-footer__link\s*\{[^}]*\}/s,
