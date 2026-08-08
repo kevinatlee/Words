@@ -202,8 +202,8 @@ button:disabled {
 }
 .display-results__firework {
   position: absolute;
-  left: calc((var(--firework, 1) * 13%) % 96%);
-  top: calc((var(--firework, 1) * 19%) % 88%);
+  left: var(--firework-x);
+  top: var(--firework-y);
   width: 4px;
   height: 4px;
   opacity: 0;
@@ -311,26 +311,35 @@ button:disabled {
   margin-top: clamp(1.35rem, 4vh, 2.75rem);
 }
 .result-player-card--celebrate {
-  animation: result-winner-arrival 5s ease-out both;
+  animation: result-winner-arrival 2.2s ease-out both;
 }
 @media (prefers-reduced-motion: reduce) {
-  .display-results__celebration,
   .result-player-card--celebrate {
     animation: none;
   }
 }
 @keyframes result-winner-arrival {
-  0% {
-    scale: 0.96;
-    box-shadow: 0 0 0 rgba(112, 231, 162, 0);
-  }
-  45% {
-    scale: 1.025;
-    box-shadow: 0 0 1.4rem rgba(112, 231, 162, 0.34);
-  }
+  0%,
   100% {
-    scale: 1;
-    box-shadow: var(--shadow);
+    transform: translateY(0);
+  }
+  15% {
+    transform: translateY(-9px);
+  }
+  28% {
+    transform: translateY(4px);
+  }
+  41% {
+    transform: translateY(-5px);
+  }
+  54% {
+    transform: translateY(2px);
+  }
+  66% {
+    transform: translateY(-2px);
+  }
+  77% {
+    transform: translateY(1px);
   }
 }
 .result-player-card--winner h2 [aria-label='Game Host winner'] {

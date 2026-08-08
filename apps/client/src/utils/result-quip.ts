@@ -9,11 +9,11 @@ const phrases = {
     "Let's all agree that was the warm-up.",
   ],
   tie: [
-    '{winners} refuse to settle this like adults.',
-    'Nobody blinked. {winners} share the crown.',
-    '{winners} tied. Clearly we need another round.',
-    'The scoreboard gave up: {winners} are tied.',
-    '{winners} split the glory. Rematch energy detected.',
+    'Nobody blinked. We have a tie.',
+    'Clearly we need another round.',
+    'The scoreboard refuses to pick a winner.',
+    'Split decision. Rematch energy detected.',
+    'Apparently first place is a shared resource.',
   ],
   solo: [
     '{winner} wins. The opposition has filed for non-attendance.',
@@ -24,13 +24,13 @@ const phrases = {
   ],
   'nail-biter': [
     '{winner} wins by {margin}. Somebody check the replay.',
-    '{winner} by a whisker. {runnerUp} was that close.',
+    '{winner} by a whisker. That was close.',
     "{winner} squeaks it out. That's a photo finish.",
     '{winner} survives the nail-biter.',
     '{winner} steals it by {margin}. Absolute robbery.',
   ],
   close: [
-    '{winner} edges past {runnerUp} by {margin}.',
+    '{winner} edges past the field by {margin}.',
     '{winner} had just enough alphabet left in the tank.',
     '{winner} wins the argument by {margin} points.',
     '{winner} found one more gear — and a few more words.',
@@ -89,7 +89,6 @@ export function getResultQuip(results: RoundResults, roundNumber: number) {
     text: phrase
       .replaceAll('{winner}', winners[0]?.displayName ?? '')
       .replaceAll('{winners}', formatNames(winners.map((p) => p.displayName)))
-      .replaceAll('{runnerUp}', runner?.displayName ?? '')
       .replaceAll('{margin}', String(margin)),
   };
 }

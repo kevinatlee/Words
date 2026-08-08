@@ -1,6 +1,27 @@
 import type { RoundResults as RoundResultsState } from '@words/shared';
 import { getResultQuip } from '../utils/result-quip';
 
+const fireworkPositions = [
+  ['8%', '14%'],
+  ['25%', '28%'],
+  ['47%', '12%'],
+  ['70%', '22%'],
+  ['90%', '16%'],
+  ['14%', '48%'],
+  ['34%', '62%'],
+  ['58%', '44%'],
+  ['78%', '57%'],
+  ['92%', '48%'],
+  ['7%', '78%'],
+  ['24%', '86%'],
+  ['45%', '75%'],
+  ['66%', '88%'],
+  ['88%', '76%'],
+  ['18%', '35%'],
+  ['52%', '82%'],
+  ['82%', '36%'],
+] as const;
+
 type RoundResultsProps = {
   results: RoundResultsState;
   currentPlayerId?: string | null;
@@ -23,11 +44,17 @@ export function RoundResults({ results, roundNumber = 1 }: RoundResultsProps) {
     <section className="display-results" aria-labelledby="round-results-title">
       <h1 id="round-results-title">Round Results</h1>
       <div className="display-results__fireworks" aria-hidden="true">
-        {Array.from({ length: 18 }, (_, index) => (
+        {fireworkPositions.map(([x, y], index) => (
           <i
             className="display-results__firework"
             key={index}
-            style={{ '--firework': index } as React.CSSProperties}
+            style={
+              {
+                '--firework-x': x,
+                '--firework-y': y,
+                '--firework': index,
+              } as React.CSSProperties
+            }
           >
             {Array.from({ length: 8 }, (_, spark) => (
               <b key={spark} />
