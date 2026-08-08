@@ -242,6 +242,25 @@ describe('RoundResults', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
+  it('renders 24 inaccessible, round-stable firework bursts', () => {
+    const view = render(<RoundResults results={result()} roundNumber={5} />);
+    const firstShow = [
+      ...document.querySelectorAll('.display-results__firework'),
+    ].map((firework) => firework.getAttribute('style'));
+
+    expect(firstShow).toHaveLength(24);
+    expect(
+      document.querySelector('.display-results__fireworks'),
+    ).toHaveAttribute('aria-hidden', 'true');
+
+    view.rerender(<RoundResults results={result()} roundNumber={5} />);
+    expect(
+      [...document.querySelectorAll('.display-results__firework')].map(
+        (firework) => firework.getAttribute('style'),
+      ),
+    ).toEqual(firstShow);
+  });
+
   it('keeps long player names and unique words inside the card contract', () => {
     const longName = 'A very long player name that must wrap safely on a card';
     const longWord = 'EXTRAORDINARILYLONGUNIQUEWORD';

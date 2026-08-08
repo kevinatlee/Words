@@ -207,20 +207,12 @@ button:disabled {
   position: absolute;
   left: var(--firework-x);
   top: var(--firework-y);
+  scale: var(--firework-scale);
   width: 5px;
   height: 5px;
   opacity: 0;
   animation: firework-pop 1.25s ease-out both;
   animation-delay: var(--firework-delay);
-}
-.display-results__firework:nth-child(3n) {
-  color: var(--coral);
-}
-.display-results__firework:nth-child(4n) {
-  color: var(--sun);
-}
-.display-results__firework:nth-child(5n) {
-  color: var(--blue);
 }
 .display-results__firework b {
   position: absolute;

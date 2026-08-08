@@ -3,6 +3,7 @@
 ## 2026-08-07 — Display result celebration (draft)
 
 - Added deterministic, context-sensitive display result lines, finite firework-style background pops across the 15-second results screen, and a short vertical winner-card spring; phone, scoring, and server behavior are unchanged.
+- Result fireworks now use deterministic round-seeded variation, giving each round a different spatial and timing pattern while remaining stable across rerenders.
 
 ## 2026-08-07 — Results return control (draft)
 

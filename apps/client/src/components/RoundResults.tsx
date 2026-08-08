@@ -1,32 +1,6 @@
 import type { RoundResults as RoundResultsState } from '@words/shared';
+import { generateResultFireworks } from '../utils/result-fireworks';
 import { getResultQuip } from '../utils/result-quip';
-
-const fireworkPositions = [
-  ['8%', '14%', '.2s'],
-  ['25%', '28%', '.4s'],
-  ['47%', '12%', '.6s'],
-  ['70%', '22%', '2.1s'],
-  ['90%', '16%', '2.3s'],
-  ['14%', '48%', '2.5s'],
-  ['34%', '62%', '4s'],
-  ['58%', '44%', '4.2s'],
-  ['78%', '57%', '4.4s'],
-  ['92%', '48%', '5.8s'],
-  ['7%', '78%', '6s'],
-  ['24%', '86%', '6.2s'],
-  ['45%', '75%', '7.7s'],
-  ['66%', '88%', '7.9s'],
-  ['88%', '76%', '8.1s'],
-  ['18%', '35%', '9.7s'],
-  ['52%', '82%', '9.9s'],
-  ['82%', '36%', '10.1s'],
-  ['38%', '32%', '11.6s'],
-  ['62%', '68%', '11.8s'],
-  ['12%', '62%', '12s'],
-  ['74%', '14%', '13.1s'],
-  ['30%', '48%', '13.3s'],
-  ['90%', '88%', '13.5s'],
-] as const;
 
 type RoundResultsProps = {
   results: RoundResultsState;
@@ -46,19 +20,22 @@ export function RoundResults({ results, roundNumber = 1 }: RoundResultsProps) {
   const limit = uniqueLimit(results.players.length);
   const celebrate = (results.players[0]?.finalScore ?? 0) > 0;
   const quip = getResultQuip(results, roundNumber);
+  const fireworks = generateResultFireworks(roundNumber);
   return (
     <section className="display-results" aria-labelledby="round-results-title">
       <h1 id="round-results-title">Round Results</h1>
       <div className="display-results__fireworks" aria-hidden="true">
-        {fireworkPositions.map(([x, y, delay], index) => (
+        {fireworks.map((firework, index) => (
           <i
             className="display-results__firework"
             key={index}
             style={
               {
-                '--firework-x': x,
-                '--firework-y': y,
-                '--firework-delay': delay,
+                '--firework-x': `${firework.x}%`,
+                '--firework-y': `${firework.y}%`,
+                '--firework-delay': `${firework.delay}s`,
+                '--firework-scale': firework.scale,
+                color: firework.color,
               } as React.CSSProperties
             }
           >
