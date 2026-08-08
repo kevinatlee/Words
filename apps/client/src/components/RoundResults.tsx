@@ -22,9 +22,17 @@ export function RoundResults({ results, roundNumber = 1 }: RoundResultsProps) {
   return (
     <section className="display-results" aria-labelledby="round-results-title">
       <h1 id="round-results-title">Round Results</h1>
-      <div className="display-results__celebration" aria-hidden="true">
-        {Array.from({ length: 20 }, (_, index) => (
-          <i key={index} />
+      <div className="display-results__fireworks" aria-hidden="true">
+        {Array.from({ length: 18 }, (_, index) => (
+          <i
+            className="display-results__firework"
+            key={index}
+            style={{ '--firework': index } as React.CSSProperties}
+          >
+            {Array.from({ length: 8 }, (_, spark) => (
+              <b key={spark} />
+            ))}
+          </i>
         ))}
       </div>
       <p className="display-results__quip">{quip.text}</p>

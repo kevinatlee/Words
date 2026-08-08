@@ -80,6 +80,8 @@ The round result contains the deterministically ordered player results and
 
 The finished display presents this projection under the stable `Round Results`
 heading; round numbering remains result data rather than visible heading copy.
+It also adds a deterministic contextual result line and display-only finite
+firework and winner-card celebration treatment without altering result data.
 
 The strict shared schemas reject missing or extra participants, changed names,
 duplicate IDs or words, incorrect sharing, score totals, ordering, ranks,

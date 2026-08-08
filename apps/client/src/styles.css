@@ -194,37 +194,72 @@ button:disabled {
   font-weight: 700;
   font-size: clamp(1rem, 2vw, 1.4rem);
 }
-.display-results__celebration {
+.display-results__fireworks {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
 }
-.display-results__celebration i {
+.display-results__firework {
   position: absolute;
-  width: 8px;
-  height: 12px;
-  opacity: 0.45;
-  background: var(--mint);
-  animation: confetti-fall 4s ease-out both;
-  left: calc((var(--i, 1) * 5%));
+  left: calc((var(--firework, 1) * 13%) % 96%);
+  top: calc((var(--firework, 1) * 19%) % 88%);
+  width: 4px;
+  height: 4px;
+  opacity: 0;
+  animation: firework-pop 1.25s ease-out both;
+  animation-delay: calc(var(--firework, 1) * 0.8s + 0.2s);
 }
-.display-results__celebration i:nth-child(3n) {
-  background: var(--coral);
+.display-results__firework:nth-child(3n) {
+  color: var(--coral);
 }
-.display-results__celebration i:nth-child(4n) {
-  background: var(--sun);
+.display-results__firework:nth-child(4n) {
+  color: var(--sun);
 }
-.display-results__celebration i:nth-child(5n) {
-  background: var(--blue);
+.display-results__firework:nth-child(5n) {
+  color: var(--blue);
 }
-@keyframes confetti-fall {
-  from {
-    transform: translateY(-20px) rotate(0);
-  }
-  to {
-    transform: translateY(280px) rotate(360deg);
+.display-results__firework b {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  transform: rotate(calc(var(--spark, 1) * 45deg)) translateY(-18px);
+}
+.display-results__firework b:nth-child(2) {
+  transform: rotate(45deg) translateY(-18px);
+}
+.display-results__firework b:nth-child(3) {
+  transform: rotate(90deg) translateY(-18px);
+}
+.display-results__firework b:nth-child(4) {
+  transform: rotate(135deg) translateY(-18px);
+}
+.display-results__firework b:nth-child(5) {
+  transform: rotate(180deg) translateY(-18px);
+}
+.display-results__firework b:nth-child(6) {
+  transform: rotate(225deg) translateY(-18px);
+}
+.display-results__firework b:nth-child(7) {
+  transform: rotate(270deg) translateY(-18px);
+}
+.display-results__firework b:nth-child(8) {
+  transform: rotate(315deg) translateY(-18px);
+}
+@keyframes firework-pop {
+  0% {
     opacity: 0;
+    transform: scale(0.2);
+  }
+  20% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
   }
 }
 .display-results__cards {
@@ -276,7 +311,7 @@ button:disabled {
   margin-top: clamp(1.35rem, 4vh, 2.75rem);
 }
 .result-player-card--celebrate {
-  animation: result-winner-arrival 1s ease-out both;
+  animation: result-winner-arrival 5s ease-out both;
 }
 @media (prefers-reduced-motion: reduce) {
   .display-results__celebration,
