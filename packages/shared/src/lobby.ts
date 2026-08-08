@@ -87,6 +87,7 @@ export const reconnectPlayerInputSchema = z
 
 export const leaveSessionInputSchema = z.object({}).strict();
 export const startRoundInputSchema = z.object({}).strict();
+export const returnToLobbyInputSchema = z.object({}).strict();
 
 export const playerIdSchema = z.string().max(36).uuid();
 export const roundIdSchema = z.string().max(36).uuid();
@@ -997,6 +998,7 @@ export type ReconnectDisplayInput = z.infer<typeof reconnectDisplayInputSchema>;
 export type ReconnectPlayerInput = z.infer<typeof reconnectPlayerInputSchema>;
 export type LeaveSessionInput = z.infer<typeof leaveSessionInputSchema>;
 export type StartRoundInput = z.infer<typeof startRoundInputSchema>;
+export type ReturnToLobbyInput = z.infer<typeof returnToLobbyInputSchema>;
 export type SubmitWordInput = z.infer<typeof submitWordInputSchema>;
 export type TransferControllerInput = z.infer<
   typeof transferControllerInputSchema
@@ -1099,6 +1101,10 @@ export interface ClientToServerEvents {
   ) => void;
   'controller:start-round': (
     payload: StartRoundInput,
+    acknowledge: ControllerActionAcknowledgement,
+  ) => void;
+  'controller:return-to-lobby': (
+    payload: ReturnToLobbyInput,
     acknowledge: ControllerActionAcknowledgement,
   ) => void;
 }

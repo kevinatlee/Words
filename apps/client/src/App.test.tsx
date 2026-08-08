@@ -289,6 +289,10 @@ function createFakeClient(overrides: Partial<LobbyClient> = {}): LobbyClient {
       ok: true,
       room: createRoom([controllerPlayer]),
     })),
+    returnToLobby: vi.fn(async (): Promise<ControllerActionResponse> => ({
+      ok: true,
+      room: createRoom([controllerPlayer]),
+    })),
     submitWord: vi.fn(async (): Promise<SubmitWordResponse> => ({
       ok: false,
       error: {

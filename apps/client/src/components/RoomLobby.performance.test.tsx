@@ -98,6 +98,7 @@ function props(
     onTransferController: async () => null,
     onUpdateSettings: async () => null,
     onStartRound: async () => null,
+    onReturnToLobby: async () => null,
     submissionState: null,
     onSubmitWord,
   };

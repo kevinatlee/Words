@@ -139,6 +139,7 @@ Controller events:
 | `controller:transfer`        | `targetPlayerId`        | Current controller assigns a connected player     |
 | `controller:update-settings` | complete `RoomSettings` | Current controller configures the next round      |
 | `controller:start-round`     | none                    | Current controller starts one authoritative round |
+| `controller:return-to-lobby` | none                    | Current controller ends final results early       |
 
 The server emits:
 

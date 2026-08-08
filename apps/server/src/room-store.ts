@@ -610,6 +610,24 @@ export class RoomStore {
     return { room: this.toRoomState(room) };
   }
 
+  returnToLobby(
+    session: BoundPlayerSession,
+    socketId: string,
+  ): ControllerActionResult {
+    const room = this.requireActiveRoom(session.roomCode);
+    this.requireConnectedController(room, session, socketId);
+
+    if (room.phase !== 'ROUND_ENDED') {
+      throw new RoomOperationError(
+        'ROUND_IN_PROGRESS',
+        'Wait for the current round results to finish.',
+      );
+    }
+
+    this.returnEndedRoundToLobby(room);
+    return { room: this.toRoomState(room) };
+  }
+
   reconnectDisplay(
     roomCode: string,
     displayReconnectToken: string,
@@ -1394,11 +1412,7 @@ export class RoomStore {
       room.resultsExpiresAt !== null &&
       now >= room.resultsExpiresAt
     ) {
-      room.phase = 'LOBBY';
-      room.round = null;
-      room.roundSubmissions = null;
-      room.resultsExpiresAt = null;
-      room.stateVersion += 1;
+      this.returnEndedRoundToLobby(room);
       return true;
     }
     const round = room.round;
@@ -1544,6 +1558,14 @@ export class RoomStore {
     room.resultsExpiresAt = now + productConfig.resultsDisplaySeconds * 1_000;
     room.stateVersion += 1;
     return true;
+  }
+
+  private returnEndedRoundToLobby(room: InternalRoom): void {
+    room.phase = 'LOBBY';
+    room.round = null;
+    room.roundSubmissions = null;
+    room.resultsExpiresAt = null;
+    room.stateVersion += 1;
   }
 
   private deriveFinalizedHighlights(

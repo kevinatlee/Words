@@ -917,6 +917,22 @@ export function App({
     return null;
   };
 
+  const returnToLobby = async (): Promise<RoomError | null> => {
+    const actionSession = sessionRef.current;
+    const response = await client.returnToLobby();
+
+    if (!isSameSession(sessionRef.current, actionSession)) {
+      return null;
+    }
+    if (!response.ok) {
+      return response.error;
+    }
+
+    acceptRoomSnapshot(response.room, actionSession ?? undefined);
+    setRoomError(null);
+    return null;
+  };
+
   const submitWord = async (
     input: SubmitWordInput,
   ): Promise<SubmitWordResponse> => {
@@ -972,6 +988,7 @@ export function App({
             onTransferController={transferController}
             onUpdateSettings={updateSettings}
             onStartRound={startRound}
+            onReturnToLobby={returnToLobby}
             submissionState={null}
             onSubmitWord={submitWord}
           />
@@ -1036,6 +1053,7 @@ export function App({
             onTransferController={transferController}
             onUpdateSettings={updateSettings}
             onStartRound={startRound}
+            onReturnToLobby={returnToLobby}
             submissionState={submissionState}
             onSubmitWord={submitWord}
           />
