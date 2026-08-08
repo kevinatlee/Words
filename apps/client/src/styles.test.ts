@@ -153,7 +153,7 @@ describe('tile typography', () => {
       /\.result-player-card\[data-podium-level='4'\]\s*\{[^}]*margin-top: clamp\(1\.35rem, 4vh, 2\.75rem\);/s,
     );
     expect(styles).toMatch(
-      /\.result-player-card--celebrate\s*\{[^}]*animation: result-winner-arrival 1\.2s ease-out both;/s,
+      /\.result-player-card--celebrate\s*\{[^}]*animation: result-winner-arrival 5s ease-out both;/s,
     );
     expect(styles).toMatch(/@keyframes result-winner-arrival\s*\{/);
     expect(styles).toMatch(
