@@ -14,6 +14,8 @@ import {
   type TraceRect,
 } from '../utils/trace-resolver';
 
+const TRACE_SAMPLE_INTERVAL_MS = 33;
+
 type LetterGridProps = {
   letters: string[];
   size: number;
@@ -55,8 +57,9 @@ export const LetterGrid = memo(function LetterGrid({
   const previousTracePointRef = useRef<TracePoint | null>(null);
   const tracePathRef = useRef<number[]>([]);
   const traceRectCacheRef = useRef<Map<number, TraceRect>>(new Map());
-  const pendingTracePointsRef = useRef<TracePoint[]>([]);
-  const traceAnimationFrameRef = useRef<number | null>(null);
+  const latestTracePointRef = useRef<TracePoint | null>(null);
+  const traceSampleTimeoutRef = useRef<number | null>(null);
+  const lastTraceSampleAtRef = useRef<number | null>(null);
   const onTraceMoveRef = useRef(onTraceMove);
   const onTraceCancelRef = useRef(onTraceCancel);
   const selectedOrder = new Map(
@@ -89,17 +92,18 @@ export const LetterGrid = memo(function LetterGrid({
     );
   };
 
-  const cancelTraceAnimationFrame = useCallback(() => {
-    if (traceAnimationFrameRef.current !== null) {
-      window.cancelAnimationFrame(traceAnimationFrameRef.current);
-      traceAnimationFrameRef.current = null;
+  const cancelTraceSample = useCallback(() => {
+    if (traceSampleTimeoutRef.current !== null) {
+      window.clearTimeout(traceSampleTimeoutRef.current);
+      traceSampleTimeoutRef.current = null;
     }
   }, []);
 
   const cancelTrace = useCallback(() => {
     const pointerId = activePointerIdRef.current;
-    cancelTraceAnimationFrame();
-    pendingTracePointsRef.current = [];
+    cancelTraceSample();
+    latestTracePointRef.current = null;
+    lastTraceSampleAtRef.current = null;
     activePointerIdRef.current = null;
     previousTracePointRef.current = null;
     tracePathRef.current = [];
@@ -110,7 +114,7 @@ export const LetterGrid = memo(function LetterGrid({
     if (pointerId !== null) {
       onTraceCancelRef.current?.();
     }
-  }, [cancelTraceAnimationFrame]);
+  }, [cancelTraceSample]);
 
   useEffect(() => {
     cancelTrace();
@@ -170,8 +174,9 @@ export const LetterGrid = memo(function LetterGrid({
       return;
     }
     event.preventDefault();
-    cancelTraceAnimationFrame();
-    pendingTracePointsRef.current = [];
+    cancelTraceSample();
+    latestTracePointRef.current = null;
+    lastTraceSampleAtRef.current = null;
     traceRectCacheRef.current.clear();
     activePointerIdRef.current = event.pointerId;
     previousTracePointRef.current = { x: event.clientX, y: event.clientY };
@@ -181,6 +186,12 @@ export const LetterGrid = memo(function LetterGrid({
 
   const processTracePoint = (currentPoint: TracePoint) => {
     const previousPoint = previousTracePointRef.current;
+    if (
+      previousPoint?.x === currentPoint.x &&
+      previousPoint.y === currentPoint.y
+    ) {
+      return;
+    }
     previousTracePointRef.current = currentPoint;
     if (!previousPoint || tracePathRef.current.length === 0) {
       return;
@@ -225,36 +236,36 @@ export const LetterGrid = memo(function LetterGrid({
     }
   };
 
-  const flushPendingTracePoints = () => {
-    const points = pendingTracePointsRef.current;
-    pendingTracePointsRef.current = [];
-    for (const point of points) {
-      processTracePoint(point);
+  const flushLatestTracePoint = () => {
+    const point = latestTracePointRef.current;
+    latestTracePointRef.current = null;
+    if (!point) {
+      return;
     }
+    lastTraceSampleAtRef.current = performance.now();
+    processTracePoint(point);
   };
 
-  const queueTracePoints = (event: PointerEvent<HTMLDivElement>) => {
-    const coalescedEvents = event.nativeEvent.getCoalescedEvents?.() ?? [];
-    const appendPoint = (point: { clientX: number; clientY: number }) => {
-      const previousPendingPoint = pendingTracePointsRef.current.at(-1);
-      if (
-        previousPendingPoint?.x === point.clientX &&
-        previousPendingPoint.y === point.clientY
-      ) {
-        return;
-      }
-      pendingTracePointsRef.current.push({
-        x: point.clientX,
-        y: point.clientY,
-      });
-    };
-    for (const point of coalescedEvents) {
-      appendPoint(point);
+  const scheduleTraceSample = () => {
+    if (traceSampleTimeoutRef.current !== null) {
+      return;
     }
-    // A browser normally includes the dispatched event in its coalesced list,
-    // but appending it defensively guarantees that the newest coordinate is
-    // always processed. Duplicate coordinates are discarded above.
-    appendPoint(event);
+    const lastSampleAt = lastTraceSampleAtRef.current;
+    const remaining =
+      lastSampleAt === null
+        ? 0
+        : Math.max(
+            0,
+            TRACE_SAMPLE_INTERVAL_MS - (performance.now() - lastSampleAt),
+          );
+    if (remaining === 0) {
+      flushLatestTracePoint();
+      return;
+    }
+    traceSampleTimeoutRef.current = window.setTimeout(() => {
+      traceSampleTimeoutRef.current = null;
+      flushLatestTracePoint();
+    }, remaining);
   };
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -262,13 +273,8 @@ export const LetterGrid = memo(function LetterGrid({
       return;
     }
     event.preventDefault();
-    queueTracePoints(event);
-    if (traceAnimationFrameRef.current === null) {
-      traceAnimationFrameRef.current = window.requestAnimationFrame(() => {
-        traceAnimationFrameRef.current = null;
-        flushPendingTracePoints();
-      });
-    }
+    latestTracePointRef.current = { x: event.clientX, y: event.clientY };
+    scheduleTraceSample();
   };
 
   const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
@@ -276,13 +282,14 @@ export const LetterGrid = memo(function LetterGrid({
       return;
     }
     event.preventDefault();
-    cancelTraceAnimationFrame();
-    flushPendingTracePoints();
+    cancelTraceSample();
+    flushLatestTracePoint();
     processTracePoint({ x: event.clientX, y: event.clientY });
     activePointerIdRef.current = null;
     previousTracePointRef.current = null;
     tracePathRef.current = [];
     traceRectCacheRef.current.clear();
+    lastTraceSampleAtRef.current = null;
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }

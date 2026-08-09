@@ -21,7 +21,7 @@ not elapsed-time assertions:
 
 - fake timers count countdown callbacks and visible React updates;
 - React render sentinels and the Profiler count puzzle and snapshot commits;
-- controlled `requestAnimationFrame` mocks count Trace processing passes;
+- fake timers and resolver spies count Trace processing passes;
 - `getBoundingClientRect()` spies count tile geometry reads;
 - listener and timer mocks verify cleanup across repeated lifecycles;
 - client and server event handlers were inspected for active-play network
@@ -59,7 +59,7 @@ not for each visible second.
 ### Page visibility
 
 When the document becomes hidden, the visual countdown timeout is cleared and
-an active Trace gesture is cancelled, including its pending animation frame and
+an active Trace gesture is cancelled, including its pending sample timer and
 pointer capture. The Socket.IO connection remains open, room state remains
 authoritative, and the one-shot deadline gate remains valid. On visibility
 restoration, the timer immediately recomputes from its authoritative anchor; if
@@ -68,11 +68,13 @@ immediately before scheduling anything further.
 
 ### Tap and Trace
 
-Tap activation remains synchronous and unchanged. Trace now queues pointer and
-browser-coalesced coordinates and performs at most one scheduled processing pass
-per animation frame. Every queued segment is still resolved in order, and
-pointer-up synchronously flushes pending coordinates plus the final coordinate,
-so reducing scheduling does not skip crossed tiles.
+Tap activation remains synchronous and unchanged. Trace now retains only the
+newest pointer coordinate and resolves it at most once per approximately 33 ms
+sample interval. It does not read or replay browser-coalesced events. The
+existing segment resolver still resolves every legal crossed tile between the
+previous processed coordinate and the newest sample, and pointer-up
+synchronously flushes the pending coordinate plus a distinct final coordinate.
+There is no repeating timer while the finger is stationary.
 
 Tile element references are retained by the grid and each tile rectangle is
 read at most once during a gesture. The geometry cache is invalidated on resize,
@@ -138,17 +140,17 @@ verify that new countdown timers and visibility listeners return to zero.
 
 ## Deterministic before and after counts
 
-| Active-phone work                                           |                                 Before |                                             After |
-| ----------------------------------------------------------- | -------------------------------------: | ------------------------------------------------: |
-| Countdown callbacks/state assignments in a 120-second round |                              about 480 |                    120 visible-second transitions |
-| Visible updates per displayed second                        |                                      4 |                                         at most 1 |
-| Recurring visual countdown work while hidden                |                     4 callbacks/second |                                                 0 |
-| LetterGrid commits caused only by countdown seconds         |                        about 480/round |                                                 0 |
-| Broad RoomLobby commits caused only by countdown seconds    |                        about 480/round |              0, plus one deadline-gate transition |
-| Trace processing callbacks for several moves in one frame   |                           one per move | 1 animation-frame callback, all segments retained |
-| Geometry reads for the same tile in one gesture             |                   potentially repeated |             at most 1 until explicit invalidation |
-| React commits for an exact duplicate ACK/broadcast snapshot |                 2 assignments possible |                  second snapshot causes 0 commits |
-| Active-play network messages                                | event-driven submissions/state changes |                                         unchanged |
+| Active-phone work                                           |                                 Before |                                  After |
+| ----------------------------------------------------------- | -------------------------------------: | -------------------------------------: |
+| Countdown callbacks/state assignments in a 120-second round |                              about 480 |         120 visible-second transitions |
+| Visible updates per displayed second                        |                                      4 |                              at most 1 |
+| Recurring visual countdown work while hidden                |                     4 callbacks/second |                                      0 |
+| LetterGrid commits caused only by countdown seconds         |                        about 480/round |                                      0 |
+| Broad RoomLobby commits caused only by countdown seconds    |                        about 480/round |   0, plus one deadline-gate transition |
+| Trace resolver calls for 240 pointer moves in one second    |                        up to 240 calls | 31 sampled calls, including first move |
+| Geometry reads for the same tile in one gesture             |                   potentially repeated |  at most 1 until explicit invalidation |
+| React commits for an exact duplicate ACK/broadcast snapshot |                 2 assignments possible |       second snapshot causes 0 commits |
+| Active-play network messages                                | event-driven submissions/state changes |                              unchanged |
 
 ## Bundle comparison
 
@@ -169,6 +171,18 @@ explicit authoritative snapshot comparison, and Trace lifecycle handling.
   reconnect reliability.
 - Radio quality, screen brightness, display technology, device temperature,
   and battery health can dominate a short battery comparison.
+
+## Trace sampling follow-up
+
+Physical testing found expected power use in Tap mode and with an idle active
+board, while severe drain was isolated to Trace mode. The earlier animation-frame
+batching still replayed every browser-coalesced coordinate through trace
+resolution. Trace now samples only the newest coordinate at approximately 30 Hz,
+while segment resolution preserves fast multi-tile swipes and pointer-up flushes
+the final position synchronously. The deterministic 240-events-per-second test
+reduces resolver work to 31 calls over one simulated second, but this work-count
+reduction is not proof of a battery-percentage improvement; real-device battery
+testing remains required.
 
 ## Final practical phone validation
 
