@@ -805,7 +805,8 @@ export function App({
   useEffect(() => cancelDisplayRecovery, [cancelDisplayRecovery]);
 
   useEffect(() => {
-    const roomCode = roomCodeFromPath(currentPath);
+    const roomCode =
+      roomCodeFromPath(currentPath) ?? joinRoomCodeFromPath(currentPath);
 
     if (
       !roomCode ||
@@ -815,7 +816,10 @@ export function App({
       return;
     }
 
-    const storedSession = sessionStore.load(roomCode);
+    const storedSession =
+      sessionStore.load(roomCode) ??
+      sessionStore.loadPlayer?.(roomCode) ??
+      null;
 
     if (!storedSession) {
       attemptedRoomCodeRef.current = roomCode;

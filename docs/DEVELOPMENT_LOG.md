@@ -16,6 +16,9 @@
   pointer moves used only 38.6 ms total. Active Trace now uses non-native tile
   targets as a controlled WebKit experiment; Tap buttons and all Trace
   pointer/resolver behavior remain unchanged.
+## 2026-08-09 — Player reconnect and controller lifecycle (draft)
+
+- Player identities and names remain reserved through reconnect grace, including after tab closure through a room-scoped persistent player pointer. Controller authority is immediately reassigned away from an offline player; explicit Leave still removes identity immediately.
 
 ## 2026-08-07 — Display result celebration (draft)
 

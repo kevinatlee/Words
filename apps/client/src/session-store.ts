@@ -26,12 +26,17 @@ export type StoredLobbySession = StoredDisplaySession | StoredPlayerSession;
 export type LobbySessionStore = {
   save: (session: StoredLobbySession) => void;
   load: (roomCode: string) => StoredLobbySession | null;
+  loadPlayer?: (roomCode: string) => StoredPlayerSession | null;
   loadDisplay: () => StoredDisplaySession | null;
   clear: (session: StoredLobbySession | null) => void;
 };
 
 const activeSessionKey = 'words:active-lobby-session';
 const activeDisplayKey = 'words:active-display-session';
+
+function activePlayerKey(roomCode: string): string {
+  return `words:active-player-session:${roomCode}`;
+}
 
 type StoredSessionPointer = {
   role: StoredLobbySession['role'];
@@ -199,6 +204,15 @@ export function createLobbySessionStore(
             sessionId: id,
           }),
         );
+      } else {
+        localStorage.setItem(
+          activePlayerKey(session.roomCode),
+          JSON.stringify({
+            role: session.role,
+            roomCode: session.roomCode,
+            sessionId: id,
+          }),
+        );
       }
       sessionStorage.setItem(
         activeSessionKey,
@@ -232,6 +246,24 @@ export function createLobbySessionStore(
 
       return storedSession;
     },
+    loadPlayer: (roomCode) => {
+      const key = activePlayerKey(roomCode);
+      const pointer = parsePointer(localStorage.getItem(key));
+      if (
+        !pointer ||
+        pointer.role !== 'player' ||
+        pointer.roomCode !== roomCode
+      ) {
+        localStorage.removeItem(key);
+        return null;
+      }
+      const storedSession = loadFromPointer(localStorage, pointer);
+      if (storedSession?.role !== 'player') {
+        localStorage.removeItem(key);
+        return null;
+      }
+      return storedSession;
+    },
     clear: (session) => {
       let removedCredential = false;
 
@@ -260,6 +292,18 @@ export function createLobbySessionStore(
           )
         ) {
           localStorage.removeItem(activeDisplayKey);
+        }
+        if (
+          session.role === 'player' &&
+          removedCredential &&
+          pointerMatchesSession(
+            parsePointer(
+              localStorage.getItem(activePlayerKey(session.roomCode)),
+            ),
+            session,
+          )
+        ) {
+          localStorage.removeItem(activePlayerKey(session.roomCode));
         }
       }
       sessionStorage.removeItem(activeSessionKey);
