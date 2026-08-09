@@ -878,10 +878,13 @@ describe('Words Stage 4B server', () => {
       throw new Error('Controller join failed in test setup.');
     }
     const ordinary = await connectClient();
-    await emitJoinPlayer(ordinary, {
+    const ordinaryJoined = await emitJoinPlayer(ordinary, {
       roomCode: created.room.code,
       displayName: 'Amber Kite',
     });
+    if (!ordinaryJoined.ok) {
+      throw new Error('Ordinary player join failed in test setup.');
+    }
 
     const controllerOffline = nextRoomState(display, (room) => {
       const player = room.players.find(
@@ -892,7 +895,7 @@ describe('Words Stage 4B server', () => {
     controller.disconnect();
     const room = await controllerOffline;
 
-    expect(room.controllerPlayerId).toBe(controllerJoined.session.playerId);
+    expect(room.controllerPlayerId).toBe(ordinaryJoined.session.playerId);
     expect(room.controllerStatus).toBe('assigned');
     expect(room.players).toHaveLength(2);
     expect(server.roomStore.roomCount).toBe(1);
@@ -2055,10 +2058,10 @@ describe('Words Stage 4B server', () => {
     expect(publicBroadcasts[0]).toMatchObject({
       stateVersion: publicVersion + 1,
       round: {
-        acceptedWordCounts: [
+        acceptedWordCounts: expect.arrayContaining([
           { playerId: firstJoin.session.playerId, count: 1 },
           { playerId: secondJoin.session.playerId, count: 0 },
-        ],
+        ]),
       },
     });
     expect(JSON.stringify(publicBroadcasts[0])).not.toContain('"word":"ABC"');

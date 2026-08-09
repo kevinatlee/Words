@@ -687,7 +687,11 @@ describe('RoomStore display and player sessions', () => {
       'Silver Owl',
       'socket-controller',
     );
-    store.joinPlayer(created.room.code, 'Amber Kite', 'socket-player');
+    const successor = store.joinPlayer(
+      created.room.code,
+      'Amber Kite',
+      'socket-player',
+    );
 
     const result = store.disconnect(
       {
@@ -702,13 +706,18 @@ describe('RoomStore display and player sessions', () => {
     expect(store.roomCount).toBe(1);
     expect(store.getRoomState(created.room.code)).toMatchObject({
       controllerStatus: 'assigned',
-      controllerPlayerId: expect.any(String),
+      controllerPlayerId: successor.session.playerId,
     });
     expect(
       store
         .getRoomState(created.room.code)
         ?.players.find((player) => player.id === controller.session.playerId),
     ).toMatchObject({ connected: false, isController: false });
+    expect(
+      store
+        .getRoomState(created.room.code)
+        ?.players.find((player) => player.id === successor.session.playerId),
+    ).toMatchObject({ connected: true, isController: true });
   });
 
   it('removes an ordinary disconnected player after the grace period', () => {

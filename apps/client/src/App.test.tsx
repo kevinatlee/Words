@@ -314,6 +314,7 @@ function createFakeSessionStore(
   return {
     save: vi.fn(),
     load: vi.fn(() => stored),
+    loadPlayer: vi.fn(() => null),
     loadDisplay: vi.fn(() => (stored?.role === 'display' ? stored : null)),
     clear: vi.fn(),
   };
@@ -330,6 +331,7 @@ function createStatefulSessionStore(
     },
     load: (roomCode) =>
       storedSession?.roomCode === roomCode ? storedSession : null,
+    loadPlayer: () => null,
     loadDisplay: () =>
       storedSession?.role === 'display' ? storedSession : null,
     clear: (session) => {
@@ -1108,6 +1110,41 @@ describe('Stage 4B display and player room routes', () => {
     expect(client.reconnectDisplay).not.toHaveBeenCalled();
   });
 
+  it('recovers a player from the persistent room pointer after tab closure', async () => {
+    const stored: StoredLobbySession = {
+      role: 'player',
+      roomCode: 'ABC234',
+      playerId: ordinaryPlayer.id,
+      playerReconnectToken: 'p'.repeat(43),
+      displayName: ordinaryPlayer.displayName,
+    };
+    const store = createFakeSessionStore(null);
+    store.loadPlayer = vi.fn((roomCode) =>
+      roomCode === stored.roomCode ? stored : null,
+    );
+    const client = createFakeClient();
+
+    render(
+      <App routePath="/room/ABC234" client={client} sessionStore={store} />,
+    );
+
+    await waitFor(() =>
+      expect(client.reconnectPlayer).toHaveBeenCalledWith({
+        roomCode: stored.roomCode,
+        playerReconnectToken: stored.playerReconnectToken,
+      }),
+    );
+    expect(client.joinPlayer).not.toHaveBeenCalled();
+    expect(await screen.findByRole('region', { name: 'Puzzle' })).toBeVisible();
+    expect(store.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: 'player',
+        playerId: ordinaryPlayer.id,
+        playerReconnectToken: ordinarySuccess.session.playerReconnectToken,
+      }),
+    );
+  });
+
   it('offers one explicit same-name rejoin after a player reconnect expires', async () => {
     const user = userEvent.setup();
     const stored: StoredLobbySession = {
@@ -1214,6 +1251,7 @@ describe('Stage 4B display and player room routes', () => {
       load: vi.fn((roomCode) =>
         roomCode === firstStored.roomCode ? firstStored : secondStored,
       ),
+      loadPlayer: vi.fn(() => null),
       loadDisplay: vi.fn(() => null),
       clear: vi.fn(),
     };

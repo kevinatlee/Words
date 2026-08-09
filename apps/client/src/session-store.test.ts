@@ -217,4 +217,76 @@ describe('temporary role-specific lobby session storage', () => {
     expect(staleTabStore.load('ABC234')).toBeNull();
     expect(currentTabStore.load('ABC234')).toEqual(currentSession);
   });
+
+  it('recovers a player after tab closure without exposing its reconnect token', () => {
+    const firstTab = createLobbySessionStore(
+      window.localStorage,
+      window.sessionStorage,
+    );
+    const session: StoredPlayerSession = {
+      role: 'player',
+      roomCode: 'ABC234',
+      playerId: '00000000-0000-4000-8000-000000000001',
+      playerReconnectToken: 'l'.repeat(43),
+      displayName: 'Silver Owl',
+    };
+    firstTab.save(session);
+    const reopenedTab = createLobbySessionStore(
+      window.localStorage,
+      createMemoryStorage(),
+    );
+    const pointer = window.localStorage.getItem(
+      'words:active-player-session:ABC234',
+    );
+
+    expect(reopenedTab.loadPlayer('ABC234')).toEqual(session);
+    expect(reopenedTab.loadPlayer('XYZ789')).toBeNull();
+    expect(pointer).not.toContain('playerReconnectToken');
+    expect(pointer).not.toContain(session.playerReconnectToken);
+  });
+
+  it('keeps the persistent player pointer through rotation and stale-tab clearing', () => {
+    const staleTab = createLobbySessionStore(
+      window.localStorage,
+      window.sessionStorage,
+    );
+    const currentTab = createLobbySessionStore(
+      window.localStorage,
+      createMemoryStorage(),
+    );
+    const stale: StoredPlayerSession = {
+      role: 'player',
+      roomCode: 'ABC234',
+      playerId: '00000000-0000-4000-8000-000000000001',
+      playerReconnectToken: 'm'.repeat(43),
+      displayName: 'Silver Owl',
+    };
+    const current = { ...stale, playerReconnectToken: 'n'.repeat(43) };
+    staleTab.save(stale);
+    currentTab.save(current);
+    staleTab.clear(stale);
+
+    expect(currentTab.loadPlayer('ABC234')).toEqual(current);
+    currentTab.clear(current);
+    expect(currentTab.loadPlayer('ABC234')).toBeNull();
+    expect(
+      window.localStorage.getItem('words:active-player-session:ABC234'),
+    ).toBeNull();
+  });
+
+  it('cleans malformed player pointers without deleting unrelated credentials', () => {
+    const store = createLobbySessionStore(
+      window.localStorage,
+      window.sessionStorage,
+    );
+    window.localStorage.setItem('words:active-player-session:ABC234', '{bad');
+    window.localStorage.setItem('words:reconnect:player:XYZ789:other', '{}');
+    expect(store.loadPlayer('ABC234')).toBeNull();
+    expect(
+      window.localStorage.getItem('words:active-player-session:ABC234'),
+    ).toBeNull();
+    expect(
+      window.localStorage.getItem('words:reconnect:player:XYZ789:other'),
+    ).toBe('{}');
+  });
 });

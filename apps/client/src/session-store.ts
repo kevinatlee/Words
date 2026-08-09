@@ -26,7 +26,7 @@ export type StoredLobbySession = StoredDisplaySession | StoredPlayerSession;
 export type LobbySessionStore = {
   save: (session: StoredLobbySession) => void;
   load: (roomCode: string) => StoredLobbySession | null;
-  loadPlayer?: (roomCode: string) => StoredPlayerSession | null;
+  loadPlayer: (roomCode: string) => StoredPlayerSession | null;
   loadDisplay: () => StoredDisplaySession | null;
   clear: (session: StoredLobbySession | null) => void;
 };
