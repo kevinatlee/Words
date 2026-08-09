@@ -1042,6 +1042,7 @@ export function App({
       <JoinRoomForm
         initialRoomCode={routeJoinRoomCode}
         roomCodeLocked
+        disabled={reconnecting}
         onJoin={joinPlayer}
       />
     );
