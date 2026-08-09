@@ -1,7 +1,8 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LetterGrid } from './LetterGrid';
+import * as traceResolver from '../utils/trace-resolver';
 
 const originalElementFromPointDescriptor = Object.getOwnPropertyDescriptor(
   document,
@@ -56,31 +57,6 @@ function mockTraceGeometry() {
     },
   );
   return reads;
-}
-
-function mockAnimationFrames() {
-  let nextId = 1;
-  const callbacks = new Map<number, FrameRequestCallback>();
-  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-    const id = nextId;
-    nextId += 1;
-    callbacks.set(id, callback);
-    return id;
-  });
-  const cancel = vi
-    .spyOn(window, 'cancelAnimationFrame')
-    .mockImplementation((id) => {
-      callbacks.delete(id);
-    });
-  return {
-    cancel,
-    flush: () => {
-      const pending = [...callbacks.values()];
-      callbacks.clear();
-      act(() => pending.forEach((callback) => callback(0)));
-    },
-    pending: () => callbacks.size,
-  };
 }
 
 function renderTraceGrid(
@@ -193,8 +169,26 @@ describe('LetterGrid accepted feedback', () => {
 });
 
 describe('LetterGrid Trace runtime', () => {
-  it('coalesces pointer moves into one animation-frame pass without losing crossed tiles', () => {
-    const frames = mockAnimationFrames();
+  let monotonicTime = 0;
+
+  const advanceTraceTime = (milliseconds: number) => {
+    act(() => {
+      monotonicTime += milliseconds;
+      vi.advanceTimersByTime(milliseconds);
+    });
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    monotonicTime = 0;
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('samples only the latest movement while preserving crossed tiles', () => {
     const reads = mockTraceGeometry();
     const { callbacks, grid, tiles } = renderTraceGrid();
 
@@ -204,6 +198,7 @@ describe('LetterGrid Trace runtime', () => {
       pointerId: 1,
       pointerType: 'touch',
     });
+    expect(callbacks.onTraceStart).toHaveBeenCalledWith(0);
     for (const clientX of [150, 250, 350]) {
       fireEvent.pointerMove(grid, {
         clientX,
@@ -213,16 +208,15 @@ describe('LetterGrid Trace runtime', () => {
       });
     }
 
-    expect(frames.pending()).toBe(1);
-    expect(callbacks.onTraceMove).not.toHaveBeenCalled();
-    frames.flush();
+    expect(callbacks.getPath()).toEqual([0, 1]);
+    expect(vi.getTimerCount()).toBe(1);
+    advanceTraceTime(33);
     expect(callbacks.getPath()).toEqual([0, 1, 2, 3]);
     expect(callbacks.onTraceMove).toHaveBeenCalledTimes(3);
     expect([...reads.values()].every((count) => count === 1)).toBe(true);
   });
 
   it('flushes pending movement before pointer-up submits the final complete path', () => {
-    const frames = mockAnimationFrames();
     mockTraceGeometry();
     const callbacks = traceCallbacks();
     const onTraceEnd = vi.fn(() => callbacks.getPath());
@@ -235,12 +229,18 @@ describe('LetterGrid Trace runtime', () => {
       pointerType: 'touch',
     });
     fireEvent.pointerMove(grid, {
+      clientX: 150,
+      clientY: 50,
+      pointerId: 2,
+      pointerType: 'touch',
+    });
+    fireEvent.pointerMove(grid, {
       clientX: 250,
       clientY: 50,
       pointerId: 2,
       pointerType: 'touch',
     });
-    expect(frames.pending()).toBe(1);
+    expect(vi.getTimerCount()).toBe(1);
     fireEvent.pointerUp(grid, {
       clientX: 350,
       clientY: 50,
@@ -249,11 +249,10 @@ describe('LetterGrid Trace runtime', () => {
     });
 
     expect(onTraceEnd).toHaveReturnedWith([0, 1, 2, 3]);
-    expect(frames.pending()).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('preserves diagonal, vertical, and backtracking paths through queued segments', () => {
-    const frames = mockAnimationFrames();
+  it('preserves diagonal, vertical, and backtracking paths through sampled segments', () => {
     mockTraceGeometry();
     const callbacks = traceCallbacks();
     const { grid, tiles } = renderTraceGrid(callbacks);
@@ -276,12 +275,11 @@ describe('LetterGrid Trace runtime', () => {
         pointerType: 'touch',
       });
     }
-    frames.flush();
+    advanceTraceTime(33);
     expect(callbacks.getPath()).toEqual([0, 5, 9]);
   });
 
   it('invalidates gesture geometry on resize and never rereads it otherwise', () => {
-    const frames = mockAnimationFrames();
     const reads = mockTraceGeometry();
     const { grid, tiles } = renderTraceGrid();
     fireEvent.pointerDown(tiles[0]!, {
@@ -296,7 +294,6 @@ describe('LetterGrid Trace runtime', () => {
       pointerId: 4,
       pointerType: 'touch',
     });
-    frames.flush();
     expect([...reads.values()].every((count) => count === 1)).toBe(true);
     const readsBeforeResize = [...reads.values()].reduce(
       (total, count) => total + count,
@@ -310,14 +307,13 @@ describe('LetterGrid Trace runtime', () => {
       pointerId: 4,
       pointerType: 'touch',
     });
-    frames.flush();
+    advanceTraceTime(33);
     expect(
       [...reads.values()].reduce((total, count) => total + count, 0),
     ).toBeGreaterThan(readsBeforeResize);
   });
 
-  it('cancels pending frame work on cancel, reset, hidden visibility, and unmount', () => {
-    const frames = mockAnimationFrames();
+  it('cancels pending sample work on cancel, reset, hidden visibility, and unmount', () => {
     mockTraceGeometry();
     const { grid, onTraceCancel, tiles, view } = renderTraceGrid();
     const beginPendingMove = (pointerId: number) => {
@@ -333,12 +329,18 @@ describe('LetterGrid Trace runtime', () => {
         pointerId,
         pointerType: 'touch',
       });
-      expect(frames.pending()).toBe(1);
+      fireEvent.pointerMove(grid, {
+        clientX: 151,
+        clientY: 50,
+        pointerId,
+        pointerType: 'touch',
+      });
+      expect(vi.getTimerCount()).toBe(1);
     };
 
     beginPendingMove(5);
     fireEvent.pointerCancel(grid, { pointerId: 5, pointerType: 'touch' });
-    expect(frames.pending()).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
 
     beginPendingMove(6);
     view.rerender(
@@ -351,7 +353,7 @@ describe('LetterGrid Trace runtime', () => {
         traceResetKey="new-round"
       />,
     );
-    expect(frames.pending()).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
 
     const refreshedTiles = within(screen.getByRole('grid')).getAllByRole(
       'button',
@@ -368,21 +370,25 @@ describe('LetterGrid Trace runtime', () => {
       pointerId: 7,
       pointerType: 'touch',
     });
+    fireEvent.pointerMove(screen.getByRole('grid'), {
+      clientX: 151,
+      clientY: 50,
+      pointerId: 7,
+      pointerType: 'touch',
+    });
     Object.defineProperty(document, 'visibilityState', {
       configurable: true,
       value: 'hidden',
     });
     act(() => document.dispatchEvent(new Event('visibilitychange')));
-    expect(frames.pending()).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
     expect(onTraceCancel).toHaveBeenCalled();
 
     view.unmount();
-    expect(frames.pending()).toBe(0);
-    expect(frames.cancel).toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('keeps Tap activation immediate without scheduling animation-frame work', () => {
-    const frames = mockAnimationFrames();
+  it('keeps Tap activation immediate without scheduling trace work', () => {
     const onSelect = vi.fn();
     render(
       <LetterGrid
@@ -396,6 +402,59 @@ describe('LetterGrid Trace runtime', () => {
     );
     fireEvent.click(screen.getAllByRole('button')[0]!);
     expect(onSelect).toHaveBeenCalledWith(0);
-    expect(frames.pending()).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('bounds 240 incoming moves over one second to the 30 Hz trace work budget', () => {
+    const resolver = vi.spyOn(traceResolver, 'resolveTraceSegment');
+    mockTraceGeometry();
+    const { grid, tiles } = renderTraceGrid();
+
+    fireEvent.pointerDown(tiles[0]!, {
+      clientX: 50,
+      clientY: 50,
+      pointerId: 8,
+      pointerType: 'touch',
+    });
+    for (let eventNumber = 0; eventNumber < 240; eventNumber += 1) {
+      fireEvent.pointerMove(grid, {
+        clientX: 150 + eventNumber / 240,
+        clientY: 50,
+        pointerId: 8,
+        pointerType: 'touch',
+      });
+      advanceTraceTime(1000 / 240);
+    }
+
+    expect(resolver).toHaveBeenCalledTimes(31);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('does not replay browser coalesced coordinates', () => {
+    const getCoalescedEvents = vi.fn(() => [
+      { clientX: 150, clientY: 50 },
+      { clientX: 250, clientY: 50 },
+    ]);
+    mockTraceGeometry();
+    const { callbacks, grid, tiles } = renderTraceGrid();
+
+    fireEvent.pointerDown(tiles[0]!, {
+      clientX: 50,
+      clientY: 50,
+      pointerId: 9,
+      pointerType: 'touch',
+    });
+    const move = new Event('pointermove', { bubbles: true, cancelable: true });
+    Object.defineProperties(move, {
+      clientX: { value: 350 },
+      clientY: { value: 50 },
+      getCoalescedEvents: { value: getCoalescedEvents },
+      pointerId: { value: 9 },
+      pointerType: { value: 'touch' },
+    });
+    fireEvent(grid, move);
+
+    expect(getCoalescedEvents).not.toHaveBeenCalled();
+    expect(callbacks.getPath()).toEqual([0, 1, 2, 3]);
   });
 });
