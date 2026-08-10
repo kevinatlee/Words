@@ -1361,6 +1361,11 @@ button:disabled {
   user-select: none;
 }
 
+/* iOS 18 WebKit profiling found repeated Trace updates paint/composite-heavy with tile shadows. */
+.room-dashboard--phone .letter-grid--trace .letter-tile {
+  box-shadow: none;
+}
+
 .letter-tile {
   position: relative;
   display: grid;
@@ -1494,6 +1499,7 @@ button:disabled {
   gap: 1rem;
 }
 
+/* Avoid large descendant repaint regions during iOS 18 WebKit Trace updates. */
 .phone-frame {
   position: relative;
   padding: clamp(1rem, 3vw, 1.5rem);
@@ -1503,7 +1509,6 @@ button:disabled {
   background:
     linear-gradient(rgba(16, 38, 58, 0.95), rgba(9, 24, 39, 0.98)),
     var(--ink-900);
-  box-shadow: var(--shadow);
 }
 
 .phone-frame::before {

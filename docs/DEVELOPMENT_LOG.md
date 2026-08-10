@@ -1,5 +1,16 @@
 # Development log
 
+## 2026-08-09 — iOS 18 Trace rendering cost (draft)
+
+- iPhone 16 Pro Max testing on iOS 18.7.2 found Trace battery and thermal cost
+  fell materially at 60 Hz; Safari Web Inspector attributed the hot path to
+  Paint/compositing rather than pointer JavaScript.
+- Four-way shadow A/B profiling isolated the phone-frame shadow as the cause of
+  large repaint regions and tile shadows as a material composite cost. The
+  frame shadow is removed and only active phone Trace tiles are shadow-free.
+- PR #31's Trace sampling and crossed-tile resolver remain intact. Physical
+  120 Hz Safari validation is still required.
+
 ## 2026-08-07 — Display result celebration (draft)
 
 - Added deterministic, context-sensitive display result lines, finite firework-style background pops across the 15-second results screen, and a short vertical winner-card spring; phone, scoring, and server behavior are unchanged.
