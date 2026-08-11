@@ -10,6 +10,12 @@
   frame shadow is removed and only active phone Trace tiles are shadow-free.
 - PR #31's Trace sampling and crossed-tile resolver remain intact. Physical
   120 Hz Safari validation is still required.
+- The shadow reduction lowered paint/composite measurements but failed physical
+  acceptance: the phone still lost about 6% battery in 11 minutes. A follow-up
+  capture found roughly 50,000 transition lifecycle events, while about 1,884
+  pointer moves used only 38.6 ms total. Active Trace now uses non-native tile
+  targets as a controlled WebKit experiment; Tap buttons and all Trace
+  pointer/resolver behavior remain unchanged.
 
 ## 2026-08-07 — Display result celebration (draft)
 

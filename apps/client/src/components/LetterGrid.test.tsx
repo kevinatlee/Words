@@ -80,7 +80,9 @@ function renderTraceGrid(
     />,
   );
   const grid = screen.getByRole('grid');
-  const tiles = within(grid).getAllByRole('button');
+  const tiles = Array.from(
+    grid.querySelectorAll<HTMLElement>('[data-tile-index]'),
+  );
   Object.defineProperty(document, 'elementFromPoint', {
     configurable: true,
     value: vi.fn().mockReturnValue(tiles[0]),
@@ -186,6 +188,34 @@ describe('LetterGrid Trace runtime', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('uses non-native, keyboard-accessible tile targets only for interactive Trace mode', () => {
+    const onSelect = vi.fn();
+    const { container } = render(
+      <LetterGrid
+        letters={letters.slice(0, 4)}
+        size={2}
+        label="Trace grid"
+        interactive
+        entryMode="trace"
+        selectedIndices={[1]}
+        onSelect={onSelect}
+      />,
+    );
+
+    const traceTiles = screen.getAllByRole('button');
+    expect(container.querySelectorAll('button')).toHaveLength(0);
+    expect(traceTiles).toHaveLength(4);
+    expect(traceTiles[1]).toHaveAttribute('data-tile-index', '1');
+    expect(traceTiles[1]).toHaveAccessibleName('B, selection number 1');
+    expect(traceTiles[1]).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(traceTiles[0]!, { detail: 1 });
+    fireEvent.keyDown(traceTiles[0]!, { key: 'Enter' });
+    fireEvent.keyDown(traceTiles[1]!, { key: ' ' });
+    expect(onSelect).toHaveBeenNthCalledWith(1, 0);
+    expect(onSelect).toHaveBeenNthCalledWith(2, 1);
   });
 
   it('samples only the latest movement while preserving crossed tiles', () => {
@@ -355,8 +385,10 @@ describe('LetterGrid Trace runtime', () => {
     );
     expect(vi.getTimerCount()).toBe(0);
 
-    const refreshedTiles = within(screen.getByRole('grid')).getAllByRole(
-      'button',
+    const refreshedTiles = Array.from(
+      screen
+        .getByRole('grid')
+        .querySelectorAll<HTMLElement>('[data-tile-index]'),
     );
     fireEvent.pointerDown(refreshedTiles[0]!, {
       clientX: 50,
@@ -403,6 +435,21 @@ describe('LetterGrid Trace runtime', () => {
     fireEvent.click(screen.getAllByRole('button')[0]!);
     expect(onSelect).toHaveBeenCalledWith(0);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('keeps interactive Tap tiles as native buttons', () => {
+    render(
+      <LetterGrid
+        letters={letters.slice(0, 4)}
+        size={2}
+        label="Tap grid"
+        interactive
+        entryMode="touch"
+      />,
+    );
+
+    expect(screen.getAllByRole('button')).toHaveLength(4);
+    expect(screen.getAllByRole('button')[0]?.tagName).toBe('BUTTON');
   });
 
   it('bounds 240 incoming moves over one second to the 30 Hz trace work budget', () => {

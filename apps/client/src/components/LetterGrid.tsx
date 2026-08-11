@@ -4,6 +4,7 @@ import {
   useEffect,
   useRef,
   type CSSProperties,
+  type KeyboardEvent,
   type PointerEvent,
 } from 'react';
 
@@ -52,7 +53,7 @@ export const LetterGrid = memo(function LetterGrid({
   onTraceCancel,
 }: LetterGridProps) {
   const gridRef = useRef<HTMLDivElement>(null);
-  const tileElementsRef = useRef<Array<HTMLButtonElement | null>>([]);
+  const tileElementsRef = useRef<Array<HTMLElement | null>>([]);
   const activePointerIdRef = useRef<number | null>(null);
   const previousTracePointRef = useRef<TracePoint | null>(null);
   const tracePathRef = useRef<number[]>([]);
@@ -329,6 +330,44 @@ export const LetterGrid = memo(function LetterGrid({
             ? `${letter}, tile ${index + 1}`
             : letter;
 
+        const selectWithKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
+          if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+          }
+          event.preventDefault();
+          onSelect?.(index);
+        };
+
+        if (traceEnabled) {
+          return (
+            <div
+              className="letter-grid__cell"
+              role="gridcell"
+              key={`${letter}-${index}`}
+            >
+              <div
+                className={`${className} letter-tile--trace-target`}
+                role="button"
+                tabIndex={0}
+                aria-label={ariaLabel}
+                aria-pressed={order !== undefined}
+                data-tile-index={index}
+                ref={(tile) => {
+                  tileElementsRef.current[index] = tile;
+                }}
+                onKeyDown={selectWithKeyboard}
+                onClick={(event) => {
+                  if (event.detail === 0) {
+                    onSelect?.(index);
+                  }
+                }}
+              >
+                {content}
+              </div>
+            </div>
+          );
+        }
+
         return interactive ? (
           <div
             className="letter-grid__cell"
@@ -345,10 +384,7 @@ export const LetterGrid = memo(function LetterGrid({
               ref={(tile) => {
                 tileElementsRef.current[index] = tile;
               }}
-              onClick={(event) => {
-                if (entryMode === 'trace' && event.detail !== 0) {
-                  return;
-                }
+              onClick={() => {
                 onSelect?.(index);
               }}
             >
