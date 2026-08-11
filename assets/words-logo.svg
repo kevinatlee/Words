@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" role="img" aria-labelledby="title desc">
+  <title id="title">Words logo</title>
+  <desc id="desc">The Words product mark: a coral W tile followed by the word Words.</desc>
+  <g transform="translate(28 28)">
+    <rect width="264" height="264" rx="58" fill="#ff816d"/>
+    <text x="132" y="187"
+          text-anchor="middle"
+          fill="#06101b"
+          font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+          font-size="158"
+          font-weight="900"
+          letter-spacing="-10">W</text>
+  </g>
+  <text x="330" y="224"
+        fill="#f5f1e7"
+        font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        font-size="220"
+        font-weight="900"
+        letter-spacing="-16">Words</text>
+</svg>
