@@ -1465,11 +1465,10 @@ describe('RoomLobby word entry', () => {
   });
 
   it('keeps QU as two candidate letters', async () => {
-    const user = userEvent.setup();
     renderLobby();
     const tiles = tileButtons();
-    await user.click(tiles[6]!);
-    await user.click(tiles[7]!);
+    fireEvent.keyDown(tiles[6]!, { key: 'Enter' });
+    fireEvent.keyDown(tiles[7]!, { key: 'Enter' });
 
     expect(screen.getByRole('heading', { name: 'GQU' })).toBeVisible();
   });
