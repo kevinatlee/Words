@@ -1,0 +1,7 @@
+<CommunityApplications>
+  <Profile>
+    Words is a self-hosted real-time letter-grid party game for one shared display and a room full of phones. This repository contains the official Words source, container packaging, and Unraid Community Applications template. For support, bug reports, or feature requests, use the GitHub issue tracker.
+  </Profile>
+  <Icon>https://raw.githubusercontent.com/kevinatlee/Words/main/assets/words-icon.png</Icon>
+  <WebPage>https://github.com/kevinatlee/Words</WebPage>
+</CommunityApplications>
