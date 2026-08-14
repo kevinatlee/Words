@@ -36,11 +36,7 @@ This is intentional: Words is designed around temporary drop-in rooms rather tha
 
 ## Updates
 
-The Community Applications template tracks:
-
-`ghcr.io/kevinatlee/words:latest`
-
-The `latest` image is published from the tested `main` branch release workflow. Use Unraid's normal Docker update mechanism to pull newer images.
+The Community Applications template tracks the project's `latest` production image. That image is published from the tested `main` branch release workflow. Use Unraid's normal Docker update mechanism to pull newer images.
 
 ## Health check
 
@@ -52,13 +48,7 @@ on the same mapped WebUI port.
 
 ## Support and source
 
-Source code, issues, and development history are maintained at:
-
-https://github.com/kevinatlee/Words
-
-Report bugs or request features at:
-
-https://github.com/kevinatlee/Words/issues
+Use the **Project** and **Support** links in the Community Applications listing to view the source, report bugs, or request features.
 
 ## License
 
