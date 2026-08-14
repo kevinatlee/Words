@@ -2121,7 +2121,9 @@ button:disabled {
 
 @media (min-width: 62rem) {
   .room-dashboard--phone .board-panel,
-  .room-dashboard--phone .round-action {
+  .room-dashboard--phone .round-action,
+  .room-dashboard--phone .settings-panel,
+  .room-dashboard--phone .controller-panel {
     width: min(100%, 27.5rem);
     justify-self: center;
   }
