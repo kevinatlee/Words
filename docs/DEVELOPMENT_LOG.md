@@ -1,5 +1,10 @@
 # Development log
 
+## 2026-08-14 — Mid-round player enrollment (draft)
+
+- A playable active round now enrolls each newly connected player server-side while its bounded roster has room. Board, settings, round identity, start time, and deadline remain fixed; late players receive only the remaining authoritative time.
+- Enrolled participants remain in reconciliation after disconnect or explicit Leave. Players who arrive after the deadline, during results, or after the active roster reaches its cap wait for the next round.
+
 ## 2026-08-09 — iOS 18 Trace rendering cost (draft)
 
 - iPhone 16 Pro Max testing on iOS 18.7.2 found Trace battery and thermal cost

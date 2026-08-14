@@ -559,11 +559,11 @@ export function RoomLobby({
                 />
                 {roundIsActive && !isDisplay && !isRoundParticipant && (
                   <PrototypeNotice
-                    title="Waiting this round."
+                    title="Waiting for the next round."
                     ariaLabel="Round participation status"
                   >
-                    You joined after this round began. You can watch this board
-                    and will join the next round.
+                    This round already has the maximum number of participants.
+                    You can watch this board and will join the next round.
                   </PrototypeNotice>
                 )}
                 {sessionRole === 'player' &&

@@ -39,10 +39,8 @@ public deployment.
   indexes.
 
 Stage 4C keeps paths, word decisions, and provisional points server-owned. Only
-the newest connected socket for a current participant can submit; displays,
-mid-round joiners, removed players, and stale replaced sockets are rejected.
-Stage 4D derives final scores, ranks, and winners only from the immutable
-participant snapshot and its server-retained private submission map.
+the newest connected socket for a current participant can submit; displays, removed players, players waiting because the active roster is full, and stale replaced sockets are rejected.
+Stage 4D derives final scores, ranks, and winners only from the append-only participant roster and its server-retained private submission map.
 
 ## Implemented input and output controls
 

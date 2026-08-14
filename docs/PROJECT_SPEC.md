@@ -131,14 +131,13 @@ Stage 4A adds a private server-oriented `@words/game-data` package with:
 Stage 4B connects that package to the server. Controlled startup verifies and
 privately retains the production dictionary before listening. The connected
 controller can set supported room settings and start an authoritative round.
-The server owns the generated board, connected-participant snapshot, start,
-deadline, phase, and automatic ending. Every session reconnects to the same
-current round.
+The server owns the generated board, append-only active-round participant roster, start,
+deadline, phase, and automatic ending. Every session reconnects to the same current round; connected late joiners receive only its remaining authoritative time while participant capacity remains.
 
 Stage 4C adds private current-participant word/path validation and length-based
 provisional scoring.
 
-Stage 4D automatically reconciles every immutable participant at the deadline,
+Stage 4D automatically reconciles every enrolled participant at the deadline,
 uses normalized word length as every accepted word's base points, adds +1 to
 unique three- or four-letter words and +2 to longer unique words, and publishes one strict
 result projection in `ROUND_ENDED`. It adds competition ranks, tied positive
