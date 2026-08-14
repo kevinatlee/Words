@@ -168,6 +168,12 @@ describe('tile typography', () => {
       /\.display-player-list__count\s*\{[^}]*justify-self: end;[^}]*min-width: 3ch;[^}]*color: var\(--mint-strong\);[^}]*font-size: clamp\(1rem, 1\.5vw, 1\.25rem\);[^}]*font-variant-numeric: tabular-nums;[^}]*font-weight: 900;[^}]*text-align: right;/s,
     );
     expect(styles).toMatch(
+      /\.display-results\s*\{[^}]*justify-content: flex-start;[^}]*padding-top: clamp\(0\.75rem, 1\.5vh, 1\.25rem\);[^}]*padding-bottom: 1rem;/s,
+    );
+    expect(styles).not.toMatch(
+      /\.display-results\s*\{[^}]*justify-content: center;/s,
+    );
+    expect(styles).toMatch(
       /\.display-results__cards\s*\{[^}]*width: fit-content;[^}]*max-width: 96vw;[^}]*grid-template-columns: repeat\(2, minmax\(16rem, max-content\)\);/s,
     );
     expect(styles).toMatch(

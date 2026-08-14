@@ -182,8 +182,10 @@ button:disabled {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 1rem;
+  padding-top: clamp(0.75rem, 1.5vh, 1.25rem);
+  padding-bottom: 1rem;
   padding-inline: 2vw;
 }
 .display-results > h1,
