@@ -43,7 +43,7 @@ An active round has `endedAt: null` and `results: null`. At or after its
 deadline, the server reconciles it once to `ROUND_ENDED`, sets `endedAt` to the
 official `deadlineAt`, and attaches one non-null finalized result projection.
 Ending a round does not update room activity or extend room TTL. The server then
-keeps that result for a single authoritative 20-second window. The connected
+keeps that result for a single authoritative 30-second window. The connected
 controller may also return to the lobby early. The same 250 ms
 lifecycle sweep changes it to `LOBBY`, clears the public round and private
 submission map, and increments the version once without changing activity,
@@ -82,7 +82,7 @@ when nobody submitted a scoring word the all-zero round has no winner. An
 all-shared positive round can have tied winners. Accepted timestamps, paths,
 private versions, sockets, and credentials remain absent.
 
-The room retains only its current round. After the authoritative 20-second
+The room retains only its current round. After the authoritative 30-second
 window, the lifecycle sweep clears the ended snapshot and private submissions;
 the next lobby start creates the next numbered round. Only bounded highlights
 remain, so round history and cumulative scoring cannot grow without bound.

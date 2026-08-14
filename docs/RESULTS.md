@@ -181,7 +181,7 @@ not publish obsolete results.
 
 ## Timed results interface and return to lobby
 
-`ROUND_ENDED` is a 20-second server-authoritative results window, not a fourth
+`ROUND_ENDED` is a 30-second server-authoritative results window, not a fourth
 phase. The display replaces its header with redesigned result cards for every
 authoritative participant, including departed players, plus the join URL footer.
 Compact dark cards show final integer points, separate Words and Unique words counts, and a

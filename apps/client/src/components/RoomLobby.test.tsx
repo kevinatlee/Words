@@ -402,7 +402,7 @@ describe('RoomLobby word entry', () => {
     expect(onSubmitWord).not.toHaveBeenCalled();
   });
 
-  it('shows one primary Return to Lobby action below the phone results only for the connected controller', async () => {
+  it('shows one primary Return to Lobby action between the board and summary only for the connected controller', async () => {
     const user = userEvent.setup();
     const onReturnToLobby = vi.fn(async () => null);
     render(
@@ -421,8 +421,8 @@ describe('RoomLobby word entry', () => {
     });
     const summary = screen.getByRole('region', { name: 'Look at the TV!' });
     expect(board).toHaveClass('panel', 'board-panel');
-    expect(board.nextElementSibling).toBe(summary);
-    expect(summary.nextElementSibling).toContainElement(button);
+    expect(board.nextElementSibling).toContainElement(button);
+    expect(button.closest('.round-action')?.nextElementSibling).toBe(summary);
     await user.click(button);
     expect(onReturnToLobby).toHaveBeenCalledTimes(1);
   });
@@ -883,6 +883,9 @@ describe('RoomLobby word entry', () => {
     ]);
     expect(within(grid).queryByRole('button')).toBeNull();
     expect(board.nextElementSibling).toBe(summary);
+    expect(
+      screen.queryByRole('button', { name: 'Return to Lobby' }),
+    ).toBeNull();
     expect(summary).toHaveClass('panel', 'phone-round-summary');
     expect(screen.getByText('Look at the TV!')).toBeVisible();
     expect(screen.queryByRole('timer')).toBeNull();

@@ -632,6 +632,18 @@ export function RoomLobby({
               </>
             )}
           </section>
+          {isConnectedController && roundIsEnded && (
+            <div className="round-action">
+              <button
+                className="button button--primary"
+                type="button"
+                disabled={actionPending}
+                onClick={() => void runReturnToLobby()}
+              >
+                {actionPending ? 'Working…' : 'Return to Lobby'}
+              </button>
+            </div>
+          )}
           {roundIsEnded && (
             <PhoneRoundSummary
               results={room.round?.results ?? null}
@@ -650,18 +662,6 @@ export function RoomLobby({
                   {actionPending ? 'Working…' : 'Start Round'}
                 </button>
               }
-            </div>
-          )}
-          {isConnectedController && roundIsEnded && (
-            <div className="round-action">
-              <button
-                className="button button--primary"
-                type="button"
-                disabled={actionPending}
-                onClick={() => void runReturnToLobby()}
-              >
-                {actionPending ? 'Working…' : 'Return to Lobby'}
-              </button>
             </div>
           )}
           {showControllerAdministration && (

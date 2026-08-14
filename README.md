@@ -45,7 +45,7 @@ contract.
 - The server loads and verifies the 79,370-word production dictionary before
   listening, then uses cryptographic randomness for bounded board generation.
 - A single 250 ms server lifecycle sweep ends due rounds at their exact
-  deadline, keeps final results for one server-owned 20-second window, then
+  deadline, keeps final results for one server-owned 30-second window, then
   resets the room to `LOBBY`. Disconnects, reconnects, and controller
   transfers do not pause or extend it.
 - Browser countdowns use `serverTime` plus a monotonic elapsed clock; only the
@@ -108,7 +108,7 @@ contract.
 
 Each round stands alone. Words is designed for casual drop-in play rather than
 a committed match or campaign. The server destroys detailed results and private
-submissions after its 20-second results window, retaining only bounded room
+submissions after its 30-second results window, retaining only bounded room
 highlights. Players can join, play a round, see that round's result, continue,
 or leave. Starting the next round does not restore a previous result.
 

@@ -1759,7 +1759,7 @@ describe('Words Stage 4B server', () => {
       display,
       (room) => room.phase === 'LOBBY' && room.round === null,
     );
-    now += 19_999;
+    now += 29_999;
     lifecycleSweep?.();
     await new Promise<void>((resolve) => setImmediate(resolve));
     expect(observedPhases).toHaveLength(broadcastCountBeforeReset);
