@@ -436,10 +436,10 @@ describe('RoomStore display and player sessions', () => {
       'socket-new-returned',
     );
 
-    expect(oldReconnected.player.isController).toBe(false);
-    expect(newReconnected.player.isController).toBe(true);
+    expect(oldReconnected.player.isController).toBe(true);
+    expect(newReconnected.player.isController).toBe(false);
     expect(newReconnected.room.controllerPlayerId).toBe(
-      newController.session.playerId,
+      oldController.session.playerId,
     );
   });
 
@@ -687,7 +687,11 @@ describe('RoomStore display and player sessions', () => {
       'Silver Owl',
       'socket-controller',
     );
-    store.joinPlayer(created.room.code, 'Amber Kite', 'socket-player');
+    const successor = store.joinPlayer(
+      created.room.code,
+      'Amber Kite',
+      'socket-player',
+    );
 
     const result = store.disconnect(
       {
@@ -702,13 +706,18 @@ describe('RoomStore display and player sessions', () => {
     expect(store.roomCount).toBe(1);
     expect(store.getRoomState(created.room.code)).toMatchObject({
       controllerStatus: 'assigned',
-      controllerPlayerId: controller.session.playerId,
+      controllerPlayerId: successor.session.playerId,
     });
     expect(
       store
         .getRoomState(created.room.code)
         ?.players.find((player) => player.id === controller.session.playerId),
-    ).toMatchObject({ connected: false, isController: true });
+    ).toMatchObject({ connected: false, isController: false });
+    expect(
+      store
+        .getRoomState(created.room.code)
+        ?.players.find((player) => player.id === successor.session.playerId),
+    ).toMatchObject({ connected: true, isController: true });
   });
 
   it('removes an ordinary disconnected player after the grace period', () => {
@@ -1020,10 +1029,10 @@ describe('RoomStore display and player sessions', () => {
       controller.session.playerReconnectToken,
       'socket-controller-returned',
     );
-    expect(reconnected.player.isController).toBe(true);
+    expect(reconnected.player.isController).toBe(false);
     expect(reconnected.room.controllerStatus).toBe('assigned');
     expect(store.cleanupExpired().updatedRoomCodes).toEqual([]);
-    expect(store.getRoomState(created.room.code)?.controllerPlayerId).toBe(
+    expect(store.getRoomState(created.room.code)?.controllerPlayerId).not.toBe(
       controller.session.playerId,
     );
   });
@@ -1189,7 +1198,7 @@ describe('RoomStore display and player sessions', () => {
       'socket-later',
     );
     expect(store.getRoomState(created.room.code)?.controllerPlayerId).toBe(
-      later.session.playerId,
+      null,
     );
   });
 
@@ -1284,14 +1293,14 @@ describe('RoomStore display and player sessions', () => {
     store.cleanupExpired();
 
     expect(store.getRoomState(created.room.code)?.controllerPlayerId).toBe(
-      earlier.session.playerId,
+      later.session.playerId,
     );
     expect(
       store
         .getRoomState(created.room.code)
         ?.players.find((player) => player.id === later.session.playerId)
         ?.isController,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('does not let stale lifecycle work overwrite a newer controller', () => {

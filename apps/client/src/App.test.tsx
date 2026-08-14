@@ -314,6 +314,7 @@ function createFakeSessionStore(
   return {
     save: vi.fn(),
     load: vi.fn(() => stored),
+    loadPlayer: vi.fn(() => null),
     loadDisplay: vi.fn(() => (stored?.role === 'display' ? stored : null)),
     clear: vi.fn(),
   };
@@ -330,6 +331,7 @@ function createStatefulSessionStore(
     },
     load: (roomCode) =>
       storedSession?.roomCode === roomCode ? storedSession : null,
+    loadPlayer: () => null,
     loadDisplay: () =>
       storedSession?.role === 'display' ? storedSession : null,
     clear: (session) => {
@@ -1108,6 +1110,217 @@ describe('Stage 4B display and player room routes', () => {
     expect(client.reconnectDisplay).not.toHaveBeenCalled();
   });
 
+  it('recovers a player from the persistent room pointer after tab closure', async () => {
+    const stored: StoredLobbySession = {
+      role: 'player',
+      roomCode: 'ABC234',
+      playerId: ordinaryPlayer.id,
+      playerReconnectToken: 'p'.repeat(43),
+      displayName: ordinaryPlayer.displayName,
+    };
+    const store = createFakeSessionStore(null);
+    store.loadPlayer = vi.fn((roomCode) =>
+      roomCode === stored.roomCode ? stored : null,
+    );
+    const client = createFakeClient();
+
+    render(
+      <App routePath="/room/ABC234" client={client} sessionStore={store} />,
+    );
+
+    await waitFor(() =>
+      expect(client.reconnectPlayer).toHaveBeenCalledWith({
+        roomCode: stored.roomCode,
+        playerReconnectToken: stored.playerReconnectToken,
+      }),
+    );
+    expect(client.joinPlayer).not.toHaveBeenCalled();
+    expect(await screen.findByRole('region', { name: 'Puzzle' })).toBeVisible();
+    expect(store.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: 'player',
+        playerId: ordinaryPlayer.id,
+        playerReconnectToken: ordinarySuccess.session.playerReconnectToken,
+      }),
+    );
+  });
+
+  it('recovers a persistent player on the join link before the form can submit', async () => {
+    const stored: StoredLobbySession = {
+      role: 'player',
+      roomCode: 'ABC234',
+      playerId: ordinaryPlayer.id,
+      playerReconnectToken: 'j'.repeat(43),
+      displayName: ordinaryPlayer.displayName,
+    };
+    const reconnect = deferred<PlayerActionResponse>();
+    const store = createFakeSessionStore(null);
+    store.loadPlayer = vi.fn((roomCode) =>
+      roomCode === stored.roomCode ? stored : null,
+    );
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(() => reconnect.promise),
+    });
+
+    render(
+      <App routePath="/join/ABC234" client={client} sessionStore={store} />,
+    );
+
+    await waitFor(() =>
+      expect(client.reconnectPlayer).toHaveBeenCalledWith({
+        roomCode: stored.roomCode,
+        playerReconnectToken: stored.playerReconnectToken,
+      }),
+    );
+    expect(screen.getByRole('button', { name: 'Join Room' })).toBeDisabled();
+    expect(client.joinPlayer).not.toHaveBeenCalled();
+
+    reconnect.resolve(ordinarySuccess);
+    expect(await screen.findByRole('region', { name: 'Puzzle' })).toBeVisible();
+    expect(client.joinPlayer).not.toHaveBeenCalled();
+  });
+
+  it('reconnects a stored player before a generic join submission', async () => {
+    const user = userEvent.setup();
+    const stored: StoredLobbySession = {
+      role: 'player',
+      roomCode: 'ABC234',
+      playerId: ordinaryPlayer.id,
+      playerReconnectToken: 'v'.repeat(43),
+      displayName: ordinaryPlayer.displayName,
+    };
+    const store = createFakeSessionStore(null);
+    store.loadPlayer = vi.fn((roomCode) =>
+      roomCode === 'ABC234' ? stored : null,
+    );
+    const client = createFakeClient();
+    render(<App routePath="/join" client={client} sessionStore={store} />);
+    await user.type(
+      screen.getByRole('textbox', { name: 'Room code' }),
+      ' abc234 ',
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: 'Display name' }),
+      'Different Name',
+    );
+    await user.click(screen.getByRole('button', { name: 'Join Room' }));
+
+    expect(await screen.findByRole('region', { name: 'Puzzle' })).toBeVisible();
+    expect(client.reconnectPlayer).toHaveBeenCalledWith({
+      roomCode: 'ABC234',
+      playerReconnectToken: stored.playerReconnectToken,
+    });
+    expect(client.joinPlayer).not.toHaveBeenCalled();
+    expect(store.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        playerId: ordinaryPlayer.id,
+        displayName: ordinaryPlayer.displayName,
+        playerReconnectToken: ordinarySuccess.session.playerReconnectToken,
+      }),
+    );
+  });
+
+  it('joins normally when a generic join has no persistent player', async () => {
+    const user = userEvent.setup();
+    const client = createFakeClient();
+    render(
+      <App
+        routePath="/join"
+        client={client}
+        sessionStore={createFakeSessionStore()}
+      />,
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: 'Room code' }),
+      ' abc234 ',
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: 'Display name' }),
+      'Different Name',
+    );
+    await user.click(screen.getByRole('button', { name: 'Join Room' }));
+
+    expect(await screen.findByRole('region', { name: 'Puzzle' })).toBeVisible();
+    expect(client.reconnectPlayer).not.toHaveBeenCalled();
+    expect(client.joinPlayer).toHaveBeenCalledWith({
+      roomCode: 'ABC234',
+      displayName: 'Different Name',
+    });
+  });
+
+  it('falls through to one fresh join only after RECONNECT_FAILED in the same submission', async () => {
+    const user = userEvent.setup();
+    const stored: StoredLobbySession = {
+      role: 'player',
+      roomCode: 'ABC234',
+      playerId: ordinaryPlayer.id,
+      playerReconnectToken: 'f'.repeat(43),
+      displayName: ordinaryPlayer.displayName,
+    };
+    const store = createFakeSessionStore(null);
+    store.loadPlayer = vi.fn(() => stored);
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+        ok: false,
+        error: { code: 'RECONNECT_FAILED', message: 'Expired.' },
+      })),
+    });
+    render(<App routePath="/join" client={client} sessionStore={store} />);
+    await user.type(
+      screen.getByRole('textbox', { name: 'Room code' }),
+      ' abc234 ',
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: 'Display name' }),
+      'Different Name',
+    );
+    await user.click(screen.getByRole('button', { name: 'Join Room' }));
+
+    expect(await screen.findByRole('region', { name: 'Puzzle' })).toBeVisible();
+    expect(client.reconnectPlayer).toHaveBeenCalledTimes(1);
+    expect(store.clear).toHaveBeenCalledWith(stored);
+    expect(client.joinPlayer).toHaveBeenCalledTimes(1);
+    expect(client.joinPlayer).toHaveBeenCalledWith({
+      roomCode: 'ABC234',
+      displayName: 'Different Name',
+    });
+  });
+
+  it.each(['ROOM_NOT_FOUND', 'ROOM_EXPIRED'] as const)(
+    'does not fresh join after a generic stored-player %s error',
+    async (code) => {
+      const user = userEvent.setup();
+      const stored: StoredLobbySession = {
+        role: 'player',
+        roomCode: 'ABC234',
+        playerId: ordinaryPlayer.id,
+        playerReconnectToken: 'x'.repeat(43),
+        displayName: ordinaryPlayer.displayName,
+      };
+      const store = createFakeSessionStore(null);
+      store.loadPlayer = vi.fn(() => stored);
+      const client = createFakeClient({
+        reconnectPlayer: vi.fn(async (): Promise<PlayerActionResponse> => ({
+          ok: false,
+          error: { code, message: 'Unavailable.' },
+        })),
+      });
+      render(<App routePath="/join" client={client} sessionStore={store} />);
+      await user.type(
+        screen.getByRole('textbox', { name: 'Room code' }),
+        'ABC234',
+      );
+      await user.type(
+        screen.getByRole('textbox', { name: 'Display name' }),
+        'Different Name',
+      );
+      await user.click(screen.getByRole('button', { name: 'Join Room' }));
+
+      await waitFor(() => expect(store.clear).toHaveBeenCalledWith(stored));
+      expect(client.joinPlayer).not.toHaveBeenCalled();
+    },
+  );
+
   it('offers one explicit same-name rejoin after a player reconnect expires', async () => {
     const user = userEvent.setup();
     const stored: StoredLobbySession = {
@@ -1214,6 +1427,7 @@ describe('Stage 4B display and player room routes', () => {
       load: vi.fn((roomCode) =>
         roomCode === firstStored.roomCode ? firstStored : secondStored,
       ),
+      loadPlayer: vi.fn(() => null),
       loadDisplay: vi.fn(() => null),
       clear: vi.fn(),
     };

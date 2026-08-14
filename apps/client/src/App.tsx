@@ -476,10 +476,10 @@ export function App({
   );
 
   const reconnectSession = useCallback(
-    async (storedSession: StoredLobbySession): Promise<void> => {
+    async (storedSession: StoredLobbySession): Promise<RoomError | null> => {
       if (reconnectingRef.current) {
         pendingReconnectRef.current = storedSession;
-        return;
+        return null;
       }
 
       reconnectingRef.current = true;
@@ -508,7 +508,7 @@ export function App({
                   : await client.leavePlayer();
               if (!leaveResponse.ok) {
                 setRoomError(leaveResponse.error);
-                return;
+                return leaveResponse.error;
               }
             }
 
@@ -528,7 +528,7 @@ export function App({
               !shouldClearPlayerSession
             ) {
               setRoomError(response.error);
-              return;
+              return response.error;
             }
 
             sessionStore.clear(requestedSession);
@@ -551,7 +551,7 @@ export function App({
               });
             }
             setRoomError(response.error);
-            return;
+            return response.error;
           }
 
           if (
@@ -564,7 +564,7 @@ export function App({
               ...response.session,
             });
             setSubmissionState(null);
-            return;
+            return null;
           }
 
           if (
@@ -591,9 +591,10 @@ export function App({
             } else {
               setSubmissionState(null);
             }
-            return;
+            return null;
           }
         }
+        return null;
       } finally {
         pendingReconnectRef.current = null;
         reconnectingRef.current = false;
@@ -805,7 +806,8 @@ export function App({
   useEffect(() => cancelDisplayRecovery, [cancelDisplayRecovery]);
 
   useEffect(() => {
-    const roomCode = roomCodeFromPath(currentPath);
+    const roomCode =
+      roomCodeFromPath(currentPath) ?? joinRoomCodeFromPath(currentPath);
 
     if (
       !roomCode ||
@@ -815,7 +817,8 @@ export function App({
       return;
     }
 
-    const storedSession = sessionStore.load(roomCode);
+    const storedSession =
+      sessionStore.load(roomCode) ?? sessionStore.loadPlayer(roomCode) ?? null;
 
     if (!storedSession) {
       attemptedRoomCodeRef.current = roomCode;
@@ -835,8 +838,17 @@ export function App({
     roomCode: string,
     displayName: string,
   ): Promise<RoomError | null> => {
+    const normalizedRoomCode = normalizeRoomCode(roomCode);
+    const storedPlayer = sessionStore.loadPlayer(normalizedRoomCode);
+    if (storedPlayer) {
+      sessionRef.current = storedPlayer;
+      const reconnectError = await reconnectSession(storedPlayer);
+      if (reconnectError?.code !== 'RECONNECT_FAILED') {
+        return reconnectError;
+      }
+    }
     const response = await client.joinPlayer({
-      roomCode: normalizeRoomCode(roomCode),
+      roomCode: normalizedRoomCode,
       displayName,
     });
 
@@ -1030,6 +1042,7 @@ export function App({
       <JoinRoomForm
         initialRoomCode={routeJoinRoomCode}
         roomCodeLocked
+        disabled={reconnecting}
         onJoin={joinPlayer}
       />
     );

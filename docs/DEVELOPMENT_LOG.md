@@ -17,6 +17,11 @@
   targets as a controlled WebKit experiment; Tap buttons and all Trace
   pointer/resolver behavior remain unchanged.
 
+## 2026-08-09 — Player reconnect and controller lifecycle (draft)
+
+- Physical iPhone reproduction showed that closing a player tab left the credential persisted but its active pointer tab-scoped, causing a later same-name fresh join to receive `INVALID_NAME`. The room-scoped player pointer now persists in `localStorage`, reconnect is attempted before a fresh join, and identity grace remains separate from immediate controller failover.
+- Added a small phone-only gap below the mid-round `Waiting this round.` notice; display and active-player layouts are unchanged.
+
 ## 2026-08-07 — Display result celebration (draft)
 
 - Added deterministic, context-sensitive display result lines, finite firework-style background pops across the 15-second results screen, and a short vertical winner-card spring; phone, scoring, and server behavior are unchanged.

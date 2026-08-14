@@ -953,6 +953,9 @@ export class RoomStore {
     player.connected = false;
     player.socketId = null;
     player.disconnectExpiresAt = now + this.options.reconnectGraceMs;
+    if (player.id === room.controllerPlayerId) {
+      this.assignEarliestConnectedController(room);
+    }
     this.touch(room, now);
 
     return {

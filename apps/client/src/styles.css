@@ -2008,6 +2008,10 @@ button:disabled {
   padding: 0.75rem;
 }
 
+.room-dashboard--phone .board-panel .letter-grid + .prototype-notice {
+  margin-top: 0.75rem;
+}
+
 .phone-round-summary {
   display: grid;
   min-height: min(17rem, 52vh);

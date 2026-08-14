@@ -8,6 +8,7 @@ type JoinRoomFormProps = {
   initialRoomCode?: string | undefined;
   initialDisplayName?: string | undefined;
   roomCodeLocked?: boolean;
+  disabled?: boolean;
   recoveryMessage?: string | undefined;
   submitLabel?: string | undefined;
   onJoin: (roomCode: string, displayName: string) => Promise<RoomError | null>;
@@ -17,6 +18,7 @@ export function JoinRoomForm({
   initialRoomCode = '',
   initialDisplayName = '',
   roomCodeLocked = false,
+  disabled = false,
   recoveryMessage,
   submitLabel,
   onJoin,
@@ -74,7 +76,7 @@ export function JoinRoomForm({
         <button
           className="button button--accent"
           type="submit"
-          disabled={submitting}
+          disabled={submitting || disabled}
         >
           {submitting ? 'Joining room…' : (submitLabel ?? 'Join Room')}
         </button>

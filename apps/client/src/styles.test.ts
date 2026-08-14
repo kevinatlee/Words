@@ -198,6 +198,12 @@ describe('tile typography', () => {
     );
   });
 
+  it('keeps the mid-round phone waiting notice deliberately spaced below the puzzle', () => {
+    expect(styles).toMatch(
+      /\.room-dashboard--phone \.board-panel \.letter-grid \+ \.prototype-notice\s*\{[^}]*margin-top: 0\.75rem;/s,
+    );
+  });
+
   it('keeps the embedded TV QR on the letter-tile background', () => {
     const qrTileRule = styles.match(
       /\.display-join-board__qr\s*\{[^}]*\}/s,
