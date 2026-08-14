@@ -51,7 +51,7 @@ describe('RoundResults', () => {
     ).not.toHaveClass('result-player-card--winner');
   });
 
-  it.each([1, 2, 3, 4, 6, 8])(
+  it.each([1, 2, 3, 4, 5, 6, 7, 8])(
     'keeps %i result cards in an explicit intrinsic-width layout variant',
     (count) => {
       render(<RoundResults results={result(count)} />);

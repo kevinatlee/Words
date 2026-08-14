@@ -225,7 +225,10 @@ describe('RoomLobby word entry', () => {
     const { container } = renderLobby();
 
     const preview = container.querySelector('.room-dashboard__preview');
-    expect(preview?.firstElementChild).toHaveClass('board-panel');
+    expect(preview?.firstElementChild).toHaveClass(
+      'board-panel',
+      'board-panel--active',
+    );
     const puzzle = screen.getByRole('region', { name: 'Puzzle' });
     const modePanel = screen.getByRole('group', { name: 'Word entry mode' });
     expect(puzzle).toBeVisible();
@@ -415,6 +418,11 @@ describe('RoomLobby word entry', () => {
 
     const button = screen.getByRole('button', { name: 'Return to Lobby' });
     expect(button).toHaveClass('button', 'button--primary');
+    expect(
+      screen
+        .getByRole('region', { name: 'Round summary' })
+        .closest('.board-panel'),
+    ).not.toHaveClass('board-panel--active');
     expect(
       screen
         .getByRole('region', { name: 'Round summary' })
@@ -673,6 +681,7 @@ describe('RoomLobby word entry', () => {
     const startRound = screen.getByRole('button', { name: 'Start Round' });
 
     expect(startRound).toBeVisible();
+    expect(puzzle).not.toHaveClass('board-panel--active');
     expect(startRound.closest('.round-action')).not.toBeNull();
     expect(startRound.closest('.round-action')).not.toBe(puzzle);
     expect(puzzle).not.toContainElement(settings);
