@@ -2817,7 +2817,7 @@ describe('Stage 4B display and player room routes', () => {
     expect(screen.getByRole('heading', { name: 'A'.repeat(64) })).toBeVisible();
   });
 
-  it('keeps the display and a mid-round joiner passive', async () => {
+  it('keeps the display and a capacity-waiting player passive', async () => {
     const activeRoom = createRoundRoom(
       [controllerPlayer, ordinaryPlayer, thirdPlayer],
       [controllerPlayer, ordinaryPlayer],
@@ -2846,7 +2846,9 @@ describe('Stage 4B display and player room routes', () => {
         })}
       />,
     );
-    expect(await screen.findByText('Waiting this round.')).toBeVisible();
+    expect(
+      await screen.findByText('Waiting for the next round.'),
+    ).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Submit' })).toBeNull();
     expect(screen.queryByText(/Provisional points:/)).toBeNull();
     expect(
@@ -3132,7 +3134,7 @@ describe('Stage 4B display and player room routes', () => {
     );
 
     expect(
-      await screen.findByText(/joined after this round began/i),
+      await screen.findByText(/maximum number of participants/i),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Start Round' })).toBeNull();
   });

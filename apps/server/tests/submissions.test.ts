@@ -270,14 +270,20 @@ describe('RoomStore private submissions', () => {
     });
   });
 
-  it('rejects a mid-round joiner as a nonparticipant', () => {
+  it('enrolls a mid-round joiner for normal private submission', () => {
     const game = setup();
     const late = game.store.joinPlayer(
       game.display.room.code,
       'Late Lynx',
       'late-socket',
     );
-    expect(late.submissionState).toBeNull();
+    expect(late.submissionState).toMatchObject({
+      roundId: game.roundId,
+      playerId: late.session.playerId,
+      submissionVersion: 0,
+      acceptedWords: [],
+      provisionalScore: 0,
+    });
     const result = game.store.submitWord(
       {
         role: 'player',
@@ -290,9 +296,8 @@ describe('RoomStore private submissions', () => {
       () => true,
     );
     expect(result.response).toMatchObject({
-      ok: false,
-      error: { code: 'NOT_ROUND_PARTICIPANT' },
-      state: null,
+      ok: true,
+      state: { playerId: late.session.playerId, submissionVersion: 1 },
     });
     expect(
       game.store
@@ -300,7 +305,7 @@ describe('RoomStore private submissions', () => {
         ?.round?.acceptedWordCounts.some(
           (entry) => entry.playerId === late.session.playerId,
         ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('restores only the reconnecting player private state and rejects the stale socket', () => {
@@ -360,7 +365,10 @@ describe('RoomStore private submissions', () => {
     expect(replacement.session.playerId).not.toBe(
       explicit.first.session.playerId,
     );
-    expect(replacement.submissionState).toBeNull();
+    expect(replacement.submissionState).toMatchObject({
+      acceptedWords: [],
+      provisionalScore: 0,
+    });
     expect(() =>
       explicit.store.reconnectPlayer(
         explicit.display.room.code,
@@ -388,7 +396,10 @@ describe('RoomStore private submissions', () => {
     expect(afterGrace.session.playerId).not.toBe(
       expired.first.session.playerId,
     );
-    expect(afterGrace.submissionState).toBeNull();
+    expect(afterGrace.submissionState).toMatchObject({
+      acceptedWords: [],
+      provisionalScore: 0,
+    });
   });
 
   it('reconciles and reports the ended room at the exact deadline', () => {
@@ -661,7 +672,7 @@ describe('RoomStore private submissions', () => {
     }
   });
 
-  it('uses the immutable participant snapshot after leave and excludes a mid-round joiner', () => {
+  it('keeps departed participants and late enrollees in final reconciliation', () => {
     const game = setup();
     const gameDictionary = dictionary(['CAT', 'DOG']);
     game.store.submitWord(
@@ -693,16 +704,18 @@ describe('RoomStore private submissions', () => {
     expect(results?.players.map((player) => player.playerId)).toEqual([
       game.first.session.playerId,
       game.second.session.playerId,
+      late.session.playerId,
     ]);
     expect(results?.players.map((player) => player.displayName)).toEqual([
       'Silver Owl',
       'Copper Fox',
+      'Late Lynx',
     ]);
     expect(
       results?.players.some(
         (player) => player.playerId === late.session.playerId,
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('keeps a former controller identity when a departed name is reused', () => {
@@ -743,7 +756,7 @@ describe('RoomStore private submissions', () => {
       results?.players.some(
         (player) => player.playerId === replacement.session.playerId,
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('retains a disconnected and grace-expired participant in final results', () => {

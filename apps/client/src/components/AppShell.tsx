@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 
+import { type ConnectionStatus, type RoomState } from '@words/shared';
+
 import { ProductTitle } from './ProductTitle';
-import type { ConnectionStatus, RoomState } from '@words/shared';
 import { formatDisplaySettings } from './display-format';
 
 type AppShellProps = {

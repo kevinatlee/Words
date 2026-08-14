@@ -63,7 +63,7 @@ The current `round` is either `null` or one strict snapshot:
 - server UUID and positive safe round number;
 - copied room settings;
 - board size and canonical row-major tile array;
-- connected participant IDs and names in deterministic join order;
+- participant IDs and names in deterministic enrollment order;
 - ISO start, deadline, and optional end timestamps;
 - nullable strict final results;
 - bounded positive generation-attempt count.
@@ -73,7 +73,7 @@ squared. Tokens are uppercase ASCII engine tokens; `QU` remains one tile.
 Deadline is exactly start plus the snapshotted configured duration. Unknown
 keys are rejected at every new schema level.
 
-Final results contain every immutable participant exactly once, ordered by
+Final results contain every enrolled participant exactly once, ordered by
 final score descending and participant snapshot order for ties. Each entry
 contains canonical accepted words, traditional base values, shared/unique
 state, integer unique bonuses, final values, exact base/bonus/final totals,
@@ -91,15 +91,11 @@ state.
 
 ## Participant and reconnect semantics
 
-Participants are the connected players at the instant a round starts. At least
-the connected controller is included. IDs and display names are copied and
-ordered by `joinedAt`, then player ID.
+Connected players at round start are the initial participants, ordered by join time and player ID. While an active round remains before its authoritative deadline, its roster is append-only: a newly connected player who is not already enrolled is appended in connection order when the bounded participant cap allows it. Each late enrollee receives only the existing remaining time and an empty private submission state.
 
-- A disconnected player is excluded if already offline at start.
-- A player joining during the round appears in room presence but not in that
-  round’s participant snapshot and sees a wait-for-next-round message.
-- Disconnect, explicit leave, grace expiry, reconnect, and controller transfer
-  never rewrite the current participant snapshot.
+- A disconnected player is excluded if already offline at start, but reconnecting during a playable active round appends them when capacity allows.
+- An enrolled participant is never removed by disconnect, explicit leave, grace expiry, reconnect, or controller transfer.
+- No participant is added at or after the deadline or during ended results; a full active roster leaves the room player waiting for the next round.
 - Display and player reconnects restore the same board, round ID, phase, and
   official deadline.
 - Reconnect does not pause or extend a round.
@@ -157,8 +153,7 @@ transfers, settings updates, starts, and cleanup decisions, the room store
 reconciles an active round whose deadline has arrived. This prevents a stale
 `ROUND_ACTIVE` snapshot from authorizing a forbidden action.
 
-Reconciliation reads only the immutable participant snapshot and the exact
-private map created for those participants. It calculates and validates the
+Reconciliation reads only the append-only participant roster and the exact private map created for those enrolled players. It calculates and validates the
 complete result candidate before mutating phase, `endedAt`, results, or version.
 Repeated reconciliation is a no-op. If `controller:start-round` arrives after
 the deadline, the ended Round 1 snapshot is published before Round 2 starts.

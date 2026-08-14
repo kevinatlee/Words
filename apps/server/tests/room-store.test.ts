@@ -1882,12 +1882,17 @@ describe('RoomStore authoritative settings and rounds', () => {
     ]);
   });
 
-  it('does not add a mid-round joiner to the participant snapshot', () => {
-    const { store, display, controllerSession } = createRoundRoom();
+  it('appends a mid-round joiner with empty private submission state without changing immutable round fields', () => {
+    let now = Date.parse('2026-07-29T20:00:00.000Z');
+    const { store, display, controllerSession } = createRoundRoom({
+      now: () => now,
+    });
     const started = store.startRound(
       controllerSession,
       'socket-controller',
     ).room;
+    now += 30_000;
+
     const joined = store.joinPlayer(
       display.room.code,
       'Amber Kite',
@@ -1895,10 +1900,71 @@ describe('RoomStore authoritative settings and rounds', () => {
     );
 
     expect(joined.room.phase).toBe('ROUND_ACTIVE');
-    expect(joined.room.round?.participants).toEqual(
-      started.round?.participants,
+    expect(joined.room.round).toMatchObject({
+      id: started.round?.id,
+      number: started.round?.number,
+      settings: started.round?.settings,
+      board: started.round?.board,
+      startedAt: started.round?.startedAt,
+      deadlineAt: started.round?.deadlineAt,
+      generationAttempts: started.round?.generationAttempts,
+    });
+    expect(joined.room.round?.participants).toEqual([
+      ...(started.round?.participants ?? []),
+      { playerId: joined.session.playerId, displayName: 'Amber Kite' },
+    ]);
+    expect(joined.room.round?.acceptedWordCounts).toEqual([
+      ...(started.round?.acceptedWordCounts ?? []),
+      { playerId: joined.session.playerId, count: 0 },
+    ]);
+    expect(joined.submissionState).toEqual({
+      roundId: started.round?.id,
+      playerId: joined.session.playerId,
+      submissionVersion: 0,
+      acceptedWords: [],
+      provisionalScore: 0,
+    });
+  });
+
+  it('enrolls a reconnecting player who was offline at round start exactly once', () => {
+    const { store, display, controllerSession } = createRoundRoom();
+    const offline = store.joinPlayer(
+      display.room.code,
+      'Amber Kite',
+      'socket-offline',
     );
-    expect(joined.room.players).toHaveLength(2);
+    const offlineSession = {
+      role: 'player' as const,
+      roomCode: display.room.code,
+      playerId: offline.session.playerId,
+    };
+    store.disconnect(offlineSession, 'socket-offline');
+    const started = store.startRound(
+      controllerSession,
+      'socket-controller',
+    ).room;
+
+    const reconnected = store.reconnectPlayer(
+      display.room.code,
+      offline.session.playerReconnectToken,
+      'socket-returned',
+    );
+
+    expect(reconnected.room.round?.participants).toEqual([
+      ...(started.round?.participants ?? []),
+      { playerId: offline.session.playerId, displayName: 'Amber Kite' },
+    ]);
+    expect(reconnected.room.round?.acceptedWordCounts.at(-1)).toEqual({
+      playerId: offline.session.playerId,
+      count: 0,
+    });
+    expect(reconnected.submissionState).toMatchObject({
+      roundId: started.round?.id,
+      playerId: offline.session.playerId,
+      submissionVersion: 0,
+      acceptedWords: [],
+      provisionalScore: 0,
+    });
   });
 
   it('keeps a participant snapshot after disconnect, leave, and reconnect', () => {
@@ -1918,6 +1984,72 @@ describe('RoomStore authoritative settings and rounds', () => {
     expect(afterReconnect?.round?.participants).toEqual(
       started.round?.participants,
     );
+  });
+
+  it('does not enroll a joiner once the authoritative deadline has ended the round', () => {
+    let now = Date.parse('2026-07-29T20:00:00.000Z');
+    const { store, display, controllerSession } = createRoundRoom({
+      now: () => now,
+    });
+    const started = store.startRound(
+      controllerSession,
+      'socket-controller',
+    ).room;
+    now = Date.parse(started.round?.deadlineAt ?? '');
+
+    const joined = store.joinPlayer(
+      display.room.code,
+      'Amber Kite',
+      'socket-after-deadline',
+    );
+
+    expect(joined.room.phase).toBe('ROUND_ENDED');
+    expect(joined.room.round?.participants).toEqual(
+      started.round?.participants,
+    );
+    expect(joined.submissionState).toBeNull();
+  });
+
+  it('keeps a full active roster bounded when a replacement joins after a participant leaves', () => {
+    const { store, display, controllerSession } = createRoundRoom();
+    const names = [
+      'Amber Kite',
+      'Copper Lynx',
+      'Daring Wren',
+      'Eager Finch',
+      'Frosty Hare',
+      'Golden Otter',
+      'Harbor Tern',
+    ];
+    const players = names.map((displayName, index) =>
+      store.joinPlayer(display.room.code, displayName, 'socket-' + index),
+    );
+    const started = store.startRound(
+      controllerSession,
+      'socket-controller',
+    ).room;
+    const departed = players.at(-1);
+    if (!departed) throw new Error('Expected a departed player.');
+    store.leave(
+      {
+        role: 'player',
+        roomCode: display.room.code,
+        playerId: departed.session.playerId,
+      },
+      'socket-6',
+    );
+
+    const replacement = store.joinPlayer(
+      display.room.code,
+      'Ivory Lark',
+      'socket-replacement',
+    );
+
+    expect(replacement.room.round?.participants).toEqual(
+      started.round?.participants,
+    );
+    expect(replacement.room.round?.participants).toHaveLength(8);
+    expect(replacement.submissionState).toBeNull();
   });
 
   it('rejects settings changes and another start while active', () => {

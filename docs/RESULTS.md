@@ -112,7 +112,7 @@ positive final score exceeds its current record.
 
 ## Participant lifecycle
 
-Identity comes from the round's immutable participant snapshot, not the current
+Identity comes from the round's append-only participant roster, not the current
 player list or display name. Results therefore retain:
 
 - connected and disconnected participants
@@ -120,15 +120,13 @@ player list or display name. Results therefore retain:
 - participants whose reconnect grace expired
 - former controllers
 
-A mid-round joiner is not a participant and does not appear. Reusing a departed
-display name creates a different player identity and cannot replace the
-snapshotted participant.
+A player enrolled before the authoritative active-round deadline appears exactly once, including a late joiner with no accepted words. Reusing a departed display name creates a different player identity and cannot replace an already enrolled participant.
 
 ## Timed privacy transition
 
 While `ROUND_ACTIVE`, accepted word identities, provisional scores, submission
 versions, and shared status remain private. The common room snapshot exposes
-only each immutable participant's accepted-word count for TV progress and
+only each enrolled participant's accepted-word count for TV progress and
 display-only tone selection.
 
 Only after submissions close does the detached public result projection reveal
@@ -160,8 +158,7 @@ before mutating the room.
 Finalization:
 
 - changes phase, `endedAt`, results, and `stateVersion` as one transition
-- never changes the board, round identity, settings snapshot, participant
-  snapshot, start time, deadline, generation attempts, private states, room
+- never changes the board, round identity, settings snapshot, participant roster, start time, deadline, generation attempts, private states, room
   activity, or TTL
 - is synchronous, bounded, deterministic, and idempotent
 - publishes no partial state

@@ -426,6 +426,7 @@ export class RoomStore {
       playerId: player.id,
     });
 
+    this.enrollPlayerInActiveRound(room, player);
     if (room.controllerPlayerId === null) {
       this.assignEarliestConnectedController(room);
     }
@@ -725,6 +726,7 @@ export class RoomStore {
       roomCode: room.code,
       playerId: player.id,
     });
+    this.enrollPlayerInActiveRound(room, player);
     if (room.controllerPlayerId === null) {
       this.assignEarliestConnectedController(room);
     }
@@ -1397,6 +1399,55 @@ export class RoomStore {
       joinedAt: new Date(player.joinedAt).toISOString(),
       isController: player.id === room.controllerPlayerId,
     };
+  }
+
+  private enrollPlayerInActiveRound(
+    room: InternalRoom,
+    player: InternalPlayer,
+  ): boolean {
+    const round = room.round;
+    if (
+      room.phase !== 'ROUND_ACTIVE' ||
+      round === null ||
+      round.participants.some(
+        (participant) => participant.playerId === player.id,
+      ) ||
+      round.participants.length >= this.options.maxPlayers
+    ) {
+      return false;
+    }
+
+    const roundSubmissions = room.roundSubmissions;
+    if (roundSubmissions === null) {
+      throw new RoomOperationError(
+        'INTERNAL_ERROR',
+        'The authoritative round could not be updated.',
+      );
+    }
+
+    const participant = Object.freeze({
+      playerId: player.id,
+      displayName: player.displayName,
+    });
+    room.round = Object.freeze({
+      ...round,
+      participants: Object.freeze([...round.participants, participant]),
+      acceptedWordCounts: Object.freeze([
+        ...round.acceptedWordCounts,
+        Object.freeze({ playerId: player.id, count: 0 }),
+      ]),
+    });
+    roundSubmissions.set(
+      player.id,
+      Object.freeze({
+        roundId: round.id,
+        playerId: player.id,
+        submissionVersion: 0,
+        acceptedWords: Object.freeze([]),
+        provisionalScore: 0,
+      }),
+    );
+    return true;
   }
 
   private touch(room: InternalRoom, now: number): void {

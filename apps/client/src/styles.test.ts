@@ -79,12 +79,30 @@ describe('tile typography', () => {
     expect(styles).toMatch(
       /\.site-header--display\s*\{[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/s,
     );
+    expect(styles).not.toContain('.display-header__qr');
+    expect(styles).not.toContain('.display-header__join-qr');
     expect(styles).toMatch(
       /\.display-room-layout\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\) auto minmax\(0, 1fr\);/s,
     );
     expect(styles).toMatch(
       /\.display-room-page\s*\{[^}]*min-height: calc\(100dvh - 4\.75rem\);/s,
     );
+    expect(styles).toMatch(
+      /\.display-side-stack\s*\{[^}]*display: grid;[^}]*width: 100%;[^}]*justify-items: center;[^}]*gap: clamp\(0\.75rem, 1\.5vh, 1rem\);/s,
+    );
+    expect(styles).toMatch(
+      /\.display-side-panel,\s*\.panel\.display-active-join-qr\s*\{[^}]*width: min\(100%, 19rem\);[^}]*justify-self: center;/s,
+    );
+    expect(styles).toMatch(
+      /\.panel\.display-active-join-qr\s*\{[^}]*display: grid;[^}]*place-items: center;[^}]*padding: 0\.65rem;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-active-join-qr__visual\s*\{[^}]*display: block;[^}]*width: 100%;[^}]*aspect-ratio: 1;[^}]*overflow: hidden;[^}]*border-radius: calc\(var\(--radius-lg\) - 0\.65rem\);[^}]*background: #fff;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-active-join-qr__visual svg\s*\{[^}]*display: block;[^}]*width: 100%;[^}]*height: 100%;/s,
+    );
+    expect(styles).not.toMatch(/\.display-active-join-qr__visual[^}]*7rem/s);
     expect(styles).not.toContain('100dvh - 14.5rem');
     expect(styles).not.toMatch(
       /\.panel\.display-puzzle-panel--active\s*\{[^}]*padding:/s,

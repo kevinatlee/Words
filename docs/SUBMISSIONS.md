@@ -23,8 +23,7 @@ map only after the deadline. Starting the next round replaces every private
 submission map; there is no previous-round history or persistence.
 
 Player join and reconnect acknowledgements include `submissionState`, which is
-`null` before a round and for a mid-round joiner. A reconnecting participant
-receives only their own state. Display acknowledgements have no such field.
+null before a round, after it ends, or for a player waiting because the active roster is full. A late joiner or reconnecter enrolled during a playable active round receives a newly initialized private state; an existing participant receives their preserved state. Display acknowledgements have no such field.
 
 ## Wire and authorization contract
 
@@ -38,7 +37,7 @@ path/word match.
 The server captures one receipt time, applies a separate 20-per-1,000-ms
 socket submission limit before payload parsing, checks the current
 player-bound newest socket, reconciles the deadline, requires the active
-matching round and immutable participant membership, and then applies the
+matching round and participant membership, and then applies the
 10-per-1,000-ms stable room/player limiter before `validateWordPath()`.
 Personal duplicates, the 256-word bound, length-based points, and the complete
 next private state are validated before one atomic private commit.
@@ -84,9 +83,7 @@ final totals, ranks, and winners. `acceptedAt`, private sequence and version,
 paths, rejected attempts, and rate-limit state remain private. The owner can
 still recover their unchanged private state on reconnect until the next round.
 
-The accepted-count list follows immutable `round.participants` order. It starts
-at zero each round, survives disconnect/reconnect, excludes late joiners, and
-must agree with finalized result word counts. Phones do not render it.
+The accepted-count list follows append-only participant enrollment order. Initial participants start at zero, each playable active-round enrollee appends a zero entry, and entries survive disconnect/reconnect and must agree with finalized result word counts. Phones do not render it.
 
 See [`RESULTS.md`](RESULTS.md) for the timed visibility transition, integer
 unique-word bonus, rankings, and next-round lifecycle. Touch and Trace entry

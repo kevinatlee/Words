@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { buildJoinUrl } from '@words/shared';
 const { qrCodeSvgMock, shouldThrow } = vi.hoisted(() => ({
   qrCodeSvgMock: vi.fn(),
   shouldThrow: { value: false },
@@ -36,15 +37,40 @@ describe('display join QR code', () => {
   });
   it('uses compact active presentation', () => {
     renderQr('active-round');
-    expect(
-      screen.getByRole('heading', { name: 'Join Next Round' }),
-    ).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Scan to Join' })).toBeVisible();
+    expect(screen.queryByText('Join Next Round')).toBeNull();
     expect(screen.getByRole('region')).toHaveClass('join-qr--compact');
   });
   it('encodes the exact join URL', () => {
     renderQr();
     expect(qrCodeSvgMock).toHaveBeenCalledWith(
       expect.objectContaining({ value: url }),
+    );
+  });
+  it('preserves a long self-hosted origin and ordinary join path exactly', () => {
+    const longUrl = buildJoinUrl(
+      'https://soomanywords.myveryowndomain.com',
+      'ABC234',
+    );
+    render(
+      <JoinQrCode
+        joinUrl={longUrl}
+        roomCode="ABC234"
+        presentation="compact"
+        context="active-round"
+      />,
+    );
+    expect(qrCodeSvgMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        value: 'https://soomanywords.myveryowndomain.com/join/ABC234',
+        size: 320,
+        level: 'M',
+        boostLevel: false,
+        marginSize: 4,
+        bgColor: '#FFFFFF',
+        fgColor: '#000000',
+        'aria-hidden': 'true',
+      }),
     );
   });
   it('renders inline SVG', () => {
