@@ -274,10 +274,12 @@ button:disabled {
 .display-results__cards--1 {
   grid-template-columns: minmax(16rem, max-content);
 }
-.display-results__cards--5,
-.display-results__cards--6 {
+.display-results__cards--3 {
   grid-template-columns: repeat(3, minmax(16rem, max-content));
 }
+.display-results__cards--4,
+.display-results__cards--5,
+.display-results__cards--6,
 .display-results__cards--7,
 .display-results__cards--8 {
   grid-template-columns: repeat(4, minmax(16rem, max-content));
@@ -1624,7 +1626,7 @@ button:disabled {
   align-items: stretch;
   flex-direction: column;
   gap: 1rem;
-  margin-block: 1rem;
+  margin: 1rem 0 0;
   padding: 0.75rem 0.9rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -2030,6 +2032,15 @@ button:disabled {
   gap: 0.65rem;
 }
 
+.room-dashboard--phone .round-action {
+  justify-content: center;
+  margin-top: 0;
+}
+
+.room-dashboard--phone .round-action .button {
+  width: 100%;
+}
+
 .room-dashboard--phone .board-panel {
   padding: 0.75rem;
 }
@@ -2106,6 +2117,48 @@ button:disabled {
   --letter-grid-gap: clamp(0.22rem, 1vw, 0.45rem);
 
   width: min(100%, 26rem);
+}
+
+@media (min-width: 62rem) {
+  .room-dashboard--phone .board-panel,
+  .room-dashboard--phone .round-action,
+  .room-dashboard--phone .settings-panel,
+  .room-dashboard--phone .controller-panel {
+    width: min(100%, 27.5rem);
+    justify-self: center;
+  }
+}
+
+@media (orientation: portrait) {
+  .display-room-page .display-room-layout {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    justify-items: center;
+  }
+
+  .display-room-layout > .display-puzzle-panel {
+    width: min(100%, 44rem);
+    order: 1;
+  }
+
+  .display-room-layout > .display-side-panel {
+    order: 2;
+  }
+
+  .display-room-layout > .display-side-stack {
+    order: 3;
+  }
+
+  .display-results__cards,
+  .display-results__cards--1,
+  .display-results__cards--3,
+  .display-results__cards--4,
+  .display-results__cards--5,
+  .display-results__cards--6,
+  .display-results__cards--7,
+  .display-results__cards--8 {
+    grid-template-columns: minmax(16rem, min(24rem, 90vw));
+  }
 }
 
 @media (max-width: 430px) and (max-height: 760px) {

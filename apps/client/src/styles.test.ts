@@ -73,6 +73,31 @@ describe('tile typography', () => {
       /\.choice-group \+ \.choice-group\s*\{[^}]*margin-top: 0\.8rem;/s,
     );
     expect(styles).toMatch(/\.word-entry__actions\s*\{[^}]*margin-top: 0;/s);
+    expect(styles).toMatch(/\.word-entry\s*\{[^}]*margin: 1rem 0 0;/s);
+    expect(styles).toMatch(
+      /\.room-dashboard--phone \.round-action\s*\{[^}]*justify-content: center;[^}]*margin-top: 0;/s,
+    );
+    expect(styles).toMatch(
+      /\.room-dashboard--phone \.round-action \.button\s*\{[^}]*width: 100%;/s,
+    );
+    expect(styles).toMatch(
+      /\.room-dashboard--phone \.room-dashboard__preview\s*\{[^}]*gap: 0\.65rem;/s,
+    );
+    expect(styles).toMatch(
+      /\.room-dashboard--phone \.letter-grid\s*\{[^}]*width: min\(100%, 26rem\);/s,
+    );
+    expect(styles).toMatch(
+      /@media \(min-width: 62rem\)[\s\S]*?\.room-dashboard--phone \.board-panel,\s*\.room-dashboard--phone \.round-action,\s*\.room-dashboard--phone \.settings-panel,\s*\.room-dashboard--phone \.controller-panel\s*\{[^}]*width: min\(100%, 27\.5rem\);[^}]*justify-self: center;/s,
+    );
+    const basePlayerStyles = styles.slice(
+      styles.indexOf('.room-dashboard--phone {'),
+      styles.indexOf('@media (min-width: 62rem)'),
+    );
+    expect(basePlayerStyles).not.toContain('27.5rem');
+    expect(styles).not.toContain('.board-panel--active');
+    expect(styles).toMatch(
+      /@media \(max-width: 44rem\)[\s\S]*?\.round-action \.button\s*\{[^}]*width: 100%;/s,
+    );
   });
 
   it('keeps the display presentation centered and within TV-height bounds', () => {
@@ -149,7 +174,10 @@ describe('tile typography', () => {
       /\.display-results__cards--1\s*\{[^}]*grid-template-columns: minmax\(16rem, max-content\);/s,
     );
     expect(styles).toMatch(
-      /\.display-results__cards--7,\s*\.display-results__cards--8\s*\{[^}]*repeat\(4, minmax\(16rem, max-content\)\);/s,
+      /\.display-results__cards--3\s*\{[^}]*repeat\(3, minmax\(16rem, max-content\)\);/s,
+    );
+    expect(styles).toMatch(
+      /\.display-results__cards--4,\s*\.display-results__cards--5,\s*\.display-results__cards--6,\s*\.display-results__cards--7,\s*\.display-results__cards--8\s*\{[^}]*repeat\(4, minmax\(16rem, max-content\)\);/s,
     );
     expect(styles).not.toMatch(/\.display-results__cards\s*\{[^}]*\b1fr\b/s);
     expect(styles).toMatch(
@@ -214,6 +242,30 @@ describe('tile typography', () => {
     expect(styles).toMatch(
       /\.phone-round-summary__winner-names\s*\{[^}]*color: var\(--paper-muted\);[^}]*overflow-wrap: anywhere;/s,
     );
+  });
+
+  it('stacks the display puzzle and side panels safely in portrait orientation', () => {
+    const portraitDisplayStyles = styles.match(
+      /@media \(orientation: portrait\) \{([\s\S]*?)\n\}\n\n@media \(max-width: 430px\)/,
+    )?.[1];
+
+    expect(portraitDisplayStyles).toBeDefined();
+    expect(portraitDisplayStyles).toMatch(
+      /\.display-room-page \.display-room-layout\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\);[^}]*align-items: start;[^}]*justify-items: center;/s,
+    );
+    expect(portraitDisplayStyles).toMatch(
+      /\.display-room-layout > \.display-puzzle-panel\s*\{[^}]*width: min\(100%, 44rem\);[^}]*order: 1;/s,
+    );
+    expect(portraitDisplayStyles).toMatch(
+      /\.display-room-layout > \.display-side-panel\s*\{[^}]*order: 2;/s,
+    );
+    expect(portraitDisplayStyles).toMatch(
+      /\.display-room-layout > \.display-side-stack\s*\{[^}]*order: 3;/s,
+    );
+    expect(portraitDisplayStyles).toMatch(
+      /\.display-results__cards,[^}]*grid-template-columns: minmax\(16rem, min\(24rem, 90vw\)\);/s,
+    );
+    expect(portraitDisplayStyles).not.toContain('55vw');
   });
 
   it('keeps the mid-round phone waiting notice deliberately spaced below the puzzle', () => {
