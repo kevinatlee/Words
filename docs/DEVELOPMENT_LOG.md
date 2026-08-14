@@ -1,5 +1,12 @@
 # Development log
 
+## 2026-08-14 — Post-round player board review (draft)
+
+- Player phones now retain the exact authoritative finished board as a frozen,
+  noninteractive grid above the existing round summary during `ROUND_ENDED`.
+- The server-authoritative results window is restored to 20 seconds; the
+  connected controller can still return the room to the lobby early.
+
 ## 2026-08-14 — Active-round display join QR (draft)
 
 - The shared TV now keeps an approximately 7rem direct-join QR in its own

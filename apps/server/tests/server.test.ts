@@ -1759,7 +1759,12 @@ describe('Words Stage 4B server', () => {
       display,
       (room) => room.phase === 'LOBBY' && room.round === null,
     );
-    now += 20_000;
+    now += 19_999;
+    lifecycleSweep?.();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(observedPhases).toHaveLength(broadcastCountBeforeReset);
+
+    now += 1;
     lifecycleSweep?.();
     const lobby = await lobbyState;
     await new Promise<void>((resolve) => setImmediate(resolve));

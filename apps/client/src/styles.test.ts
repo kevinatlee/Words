@@ -87,7 +87,7 @@ describe('tile typography', () => {
       /\.room-dashboard--phone \.letter-grid\s*\{[^}]*width: min\(100%, 26rem\);/s,
     );
     expect(styles).toMatch(
-      /@media \(min-width: 62rem\)[\s\S]*?\.room-dashboard--phone \.board-panel,\s*\.room-dashboard--phone \.round-action,\s*\.room-dashboard--phone \.settings-panel,\s*\.room-dashboard--phone \.controller-panel\s*\{[^}]*width: min\(100%, 27\.5rem\);[^}]*justify-self: center;/s,
+      /@media \(min-width: 62rem\)[\s\S]*?\.room-dashboard--phone \.board-panel,\s*\.room-dashboard--phone \.phone-round-summary,\s*\.room-dashboard--phone \.round-action,\s*\.room-dashboard--phone \.settings-panel,\s*\.room-dashboard--phone \.controller-panel\s*\{[^}]*width: min\(100%, 27\.5rem\);[^}]*justify-self: center;/s,
     );
     const basePlayerStyles = styles.slice(
       styles.indexOf('.room-dashboard--phone {'),

@@ -2533,8 +2533,9 @@ describe('RoomStore authoritative settings and rounds', () => {
     const ended = store.getRoomState('ABC234');
     expect(ended?.phase).toBe('ROUND_ENDED');
     const version = ended?.stateVersion;
-    now += productConfig.resultsDisplaySeconds * 1_000 - 1;
+    now += 19_999;
     expect(store.advanceDueRounds()).toEqual([]);
+    expect(store.getRoomState('ABC234')?.phase).toBe('ROUND_ENDED');
     expect(store.getRoomState('ABC234')?.round).not.toBeNull();
     now += 1;
     expect(store.advanceDueRounds()).toEqual(['ABC234']);

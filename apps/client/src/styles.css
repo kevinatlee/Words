@@ -2121,6 +2121,7 @@ button:disabled {
 
 @media (min-width: 62rem) {
   .room-dashboard--phone .board-panel,
+  .room-dashboard--phone .phone-round-summary,
   .room-dashboard--phone .round-action,
   .room-dashboard--phone .settings-panel,
   .room-dashboard--phone .controller-panel {

@@ -16,7 +16,7 @@ describe('product configuration', () => {
       reconnectGraceSeconds: 300,
       roomTtlMinutes: 120,
     });
-    expect(productConfig.resultsDisplaySeconds).toBe(15);
+    expect(productConfig.resultsDisplaySeconds).toBe(20);
   });
 
   it('supports every planned grid size and no fixed sixteen-tile assumption', () => {

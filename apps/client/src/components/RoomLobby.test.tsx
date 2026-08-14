@@ -314,7 +314,7 @@ describe('RoomLobby word entry', () => {
     ).toBeVisible();
   });
 
-  it('keeps the selected mode through active, ended, and next lobby phases', async () => {
+  it('keeps the selected mode through ended results and the next lobby', async () => {
     const user = userEvent.setup();
     const view = renderLobby();
     const mode = screen.getByRole('group', { name: 'Word entry mode' });
@@ -416,16 +416,13 @@ describe('RoomLobby word entry', () => {
 
     const button = screen.getByRole('button', { name: 'Return to Lobby' });
     expect(button).toHaveClass('button', 'button--primary');
-    expect(
-      screen
-        .getByRole('region', { name: 'Round summary' })
-        .closest('.board-panel'),
-    ).toHaveClass('panel', 'board-panel');
-    expect(
-      screen
-        .getByRole('region', { name: 'Round summary' })
-        .closest('.board-panel')?.nextElementSibling,
-    ).toContainElement(button);
+    const board = screen.getByRole('region', {
+      name: 'Previous round puzzle',
+    });
+    const summary = screen.getByRole('region', { name: 'Look at the TV!' });
+    expect(board).toHaveClass('panel', 'board-panel');
+    expect(board.nextElementSibling).toBe(summary);
+    expect(summary.nextElementSibling).toContainElement(button);
     await user.click(button);
     expect(onReturnToLobby).toHaveBeenCalledTimes(1);
   });
@@ -725,9 +722,18 @@ describe('RoomLobby word entry', () => {
     renderLobby(undefined, {
       room: createRoom({ phase: 'ROUND_ENDED' }),
     });
-    expect(screen.getByRole('region', { name: 'Round summary' })).toBeVisible();
+    expect(
+      screen.getByRole('region', { name: 'Previous round puzzle' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('region', { name: 'Look at the TV!' }),
+    ).toBeVisible();
     expect(screen.getByText('Look at the TV!')).toBeVisible();
-    expect(screen.queryByRole('grid')).toBeNull();
+    expect(
+      screen.getByRole('grid', {
+        name: '4 by 4 previous round letter grid',
+      }),
+    ).toBeVisible();
     expect(
       screen.getByRole('group', { name: 'Word entry mode' }),
     ).toBeVisible();
@@ -802,7 +808,7 @@ describe('RoomLobby word entry', () => {
       ).toBeNull();
       expect(
         screen.getByRole('region', {
-          name: phase === 'ROUND_ENDED' ? 'Round summary' : 'Puzzle',
+          name: phase === 'ROUND_ENDED' ? 'Previous round puzzle' : 'Puzzle',
         }),
       ).toHaveClass('panel', 'board-panel');
       expect(
@@ -824,7 +830,7 @@ describe('RoomLobby word entry', () => {
     expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
   });
 
-  it('replaces an ended phone puzzle with a round summary and restores the lobby cleanly', () => {
+  it('shows the exact frozen ended board above the phone summary and restores the lobby cleanly', () => {
     const ordinaryPlayerId = '00000000-0000-4000-8000-000000000002';
     const room = createRoom({
       phase: 'ROUND_ENDED',
@@ -845,9 +851,40 @@ describe('RoomLobby word entry', () => {
       currentPlayerId: ordinaryPlayerId,
     });
 
-    expect(screen.getByRole('region', { name: 'Round summary' })).toBeVisible();
+    const board = screen.getByRole('region', {
+      name: 'Previous round puzzle',
+    });
+    const grid = screen.getByRole('grid', {
+      name: '4 by 4 previous round letter grid',
+    });
+    const summary = screen.getByRole('region', { name: 'Look at the TV!' });
+    expect(board).toContainElement(grid);
+    expect(
+      within(grid)
+        .getAllByRole('gridcell')
+        .map((cell) => cell.textContent),
+    ).toEqual([
+      'A',
+      'B',
+      'C',
+      'D',
+      'E',
+      'F',
+      'G',
+      'QU',
+      'I',
+      'J',
+      'K',
+      'L',
+      'M',
+      'N',
+      'O',
+      'P',
+    ]);
+    expect(within(grid).queryByRole('button')).toBeNull();
+    expect(board.nextElementSibling).toBe(summary);
+    expect(summary).toHaveClass('panel', 'phone-round-summary');
     expect(screen.getByText('Look at the TV!')).toBeVisible();
-    expect(screen.queryByRole('grid')).toBeNull();
     expect(screen.queryByRole('timer')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Submit' })).toBeNull();
     expect(
@@ -1354,8 +1391,14 @@ describe('RoomLobby word entry', () => {
     act(() => {
       vi.advanceTimersByTime(500);
     });
-    expect(screen.queryByRole('grid')).toBeNull();
-    expect(screen.getByRole('region', { name: 'Round summary' })).toBeVisible();
+    expect(
+      screen
+        .getByRole('grid', { name: '4 by 4 previous round letter grid' })
+        .querySelectorAll('.letter-tile--accepted'),
+    ).toHaveLength(0);
+    expect(
+      screen.getByRole('region', { name: 'Look at the TV!' }),
+    ).toBeVisible();
     firstView.unmount();
 
     const response = deferred<SubmitWordResponse>();

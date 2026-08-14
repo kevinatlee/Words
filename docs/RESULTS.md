@@ -181,7 +181,7 @@ not publish obsolete results.
 
 ## Timed results interface and return to lobby
 
-`ROUND_ENDED` is a 15-second server-authoritative results window, not a fourth
+`ROUND_ENDED` is a 20-second server-authoritative results window, not a fourth
 phase. The display replaces its header with redesigned result cards for every
 authoritative participant, including departed players, plus the join URL footer.
 Compact dark cards show final integer points, separate Words and Unique words counts, and a
@@ -190,11 +190,12 @@ rather than stretching across the display. Positive-scoring rounds use
 authoritative competition ranks for restrained vertical podium levels; ties
 share a level, while all-zero rounds remain flat and do not celebrate. There is
 no board, QR, timer, side
-bubble, control, table, or word review. Phones replace their puzzle with a
-concise `ROUND OVER` / `Look at the TV!` summary showing only their own final
-score and the winning score (or `No scoring winner`). Below a positive winning
-score, it shows the authoritative winner name or tied winner names in result
-order; they receive no administration or detailed opponent results. Result
+bubble, control, table, or word review. Phones keep the authoritative finished
+board as a frozen, observational grid above a concise `ROUND OVER` / `Look at
+the TV!` summary showing only their own final score and the winning score (or
+`No scoring winner`). Below a positive winning score, it shows the authoritative
+winner name or tied winner names in result order; they receive no administration
+or detailed opponent results. Result
 cards use the established dark Words panel treatment while retaining their
 centred intrinsic layout.
 

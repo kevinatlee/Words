@@ -2900,7 +2900,7 @@ describe('Stage 4B display and player room routes', () => {
     expect(screen.queryByLabelText('Room joining QR code')).toBeNull();
   });
 
-  it('replaces the completed phone board with an authoritative summary', async () => {
+  it('keeps the completed phone board above an authoritative summary', async () => {
     const activeRoom = createRoundRoom();
     const endedRoom: RoomState = {
       ...activeRoom,
@@ -2947,12 +2947,19 @@ describe('Stage 4B display and player room routes', () => {
     );
 
     expect(
-      await screen.findByRole('region', { name: 'Round summary' }),
+      await screen.findByRole('region', { name: 'Previous round puzzle' }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('grid', {
+        name: '4 by 4 previous round letter grid',
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('region', { name: 'Look at the TV!' }),
+    ).toBeVisible();
     expect(screen.getByText('Look at the TV!')).toBeInTheDocument();
     expect(screen.getByText('Your Score')).toBeInTheDocument();
     expect(screen.getByText('No scoring winner')).toBeInTheDocument();
-    expect(screen.queryByRole('grid')).toBeNull();
     expect(screen.queryByRole('timer')).toBeNull();
     expect(
       screen.getByRole('group', { name: 'Word entry mode' }),
@@ -3018,7 +3025,10 @@ describe('Stage 4B display and player room routes', () => {
     );
 
     expect(
-      await screen.findByRole('region', { name: 'Round summary' }),
+      await screen.findByRole('region', { name: 'Previous round puzzle' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('region', { name: 'Look at the TV!' }),
     ).toBeVisible();
     expect(
       screen.queryByText('Round complete — results are on the TV.'),
@@ -3029,7 +3039,11 @@ describe('Stage 4B display and player room routes', () => {
     expect(screen.queryByText('<Bright Fox> (You)')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Start Round' })).toBeNull();
     expect(screen.getByText('Look at the TV!')).toBeVisible();
-    expect(screen.queryByRole('grid')).toBeNull();
+    expect(
+      screen.getByRole('grid', {
+        name: '4 by 4 previous round letter grid',
+      }),
+    ).toBeVisible();
     expect(screen.queryByRole('timer')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Make Game Host' })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Game settings' })).toBeNull();
