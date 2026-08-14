@@ -27,7 +27,7 @@ buildJoinUrl(window.location.origin, room.code);
 ```
 
 The completed string is passed to the lobby `DisplayJoinBoard` and reused by
-the active display-header QR. Neither presentation parses, normalizes, or
+the active display-side QR. Neither presentation parses, normalizes, or
 rebuilds it. The same authoritative string is the QR payload and the display
 footer URL. No shortener, redirect, lookup service, alternate room identifier,
 or server-side registration is involved.
@@ -96,10 +96,10 @@ The shared QR visual renders locally with:
 The lobby canvas stays square through CSS and is hidden from the accessibility
 tree. It remains embedded in one merged letter-tile-tone 3 × 3 center region
 of a noninteractive 5 × 5 demonstration board; the five top tiles spell
-`WORDS`. During an active round, the same policy is rendered as a 4rem square
-inline SVG on white in the true center of the display header. Its surrounding
-region is labelled for assistive technology while the visual encoding remains
-hidden.
+`WORDS`. During an active round, the same policy is rendered as a 7rem square
+inline SVG on white in its own compact bubble above the right-side Time
+Remaining / Room Highlights panel. Its surrounding region is labelled for
+assistive technology while the visual encoding remains hidden.
 The exact URL appears in the display footer. No live region or automatic focus
 movement is used.
 
@@ -111,9 +111,9 @@ gameplay, and reconnect behavior remain available outside that visual boundary.
 
 - **Lobby:** the QR is merged into the centered demonstration board, with
   Players and Room Highlights side bubbles and the join URL footer.
-- **Active round:** a small direct-join QR occupies the fixed center column of
-  the five-region display header. The official board, Time Remaining, side
-  bubbles, and footer remain unchanged.
+- **Active round:** a direct-join QR occupies its own compact bubble above the
+  right-side Time Remaining / Room Highlights panel. The original four-region
+  header, official board, Players bubble, and footer remain unchanged.
 - **Ended round:** the header QR, board, timer, and side bubbles are absent;
   only result cards and the footer remain.
 
@@ -158,7 +158,7 @@ display or player.
 Automated coverage verifies:
 
 - the exact payload and renderer options;
-- merged lobby presentation, centered active-header presentation, and ended
+- merged lobby presentation, right-side active presentation, and ended
   absence;
 - display-only role enforcement and route exclusions;
 - accessible text and visual-tree hiding;
@@ -169,9 +169,9 @@ Automated coverage verifies:
 - direct active-round joining with remaining-time-only gameplay.
 
 Browser validation verifies the exact credential-free payload, lobby
-placement, active-header placement, ended absence, manual room-code fallback,
+placement, active right-side placement, ended absence, manual room-code fallback,
 reconnect behavior, and phone-route exclusion. Native-camera scan reliability
-at the initial 4rem header size still depends on the physical display and
+at the 7rem active size still depends on the physical display and
 device; automated tests do not claim a physical scan.
 
 ## Known limitations and Stage 4H boundary

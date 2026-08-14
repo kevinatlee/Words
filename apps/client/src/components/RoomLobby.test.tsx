@@ -501,6 +501,15 @@ describe('RoomLobby word entry', () => {
       name: 'Room Highlights',
     });
     const puzzle = screen.getByRole('region', { name: 'Puzzle' });
+    const joinQr = screen.getByRole('region', {
+      name: 'Scan to join room ABC234',
+    });
+    const sideStack = highlights.parentElement;
+    expect(sideStack).toHaveClass('display-side-stack');
+    expect(sideStack?.firstElementChild).toBe(joinQr);
+    expect(sideStack?.lastElementChild).toBe(highlights);
+    expect(highlights).not.toContainElement(joinQr);
+    expect(joinQr.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
     expect(timer).toHaveClass('display-highlights-timer');
     expect(timer).not.toHaveClass('round-clock');
     expect(timer).toHaveAttribute('aria-live', 'off');
@@ -526,6 +535,28 @@ describe('RoomLobby word entry', () => {
       vi.advanceTimersByTime(1_000);
     });
     expect(within(timer).getByText('59')).toBeVisible();
+  });
+
+  it('shows the compact display QR only during an active round', () => {
+    for (const room of [
+      createRoom({ phase: 'LOBBY', round: null }),
+      createRoom({ phase: 'ROUND_ENDED' }),
+    ]) {
+      const view = renderLobby(undefined, {
+        room,
+        sessionRole: 'display',
+        currentPlayerId: null,
+      });
+      expect(
+        screen.queryByRole('region', { name: 'Scan to join room ABC234' }),
+      ).toBeNull();
+      view.unmount();
+    }
+
+    renderLobby(undefined, { room: createRoom(), sessionRole: 'player' });
+    expect(
+      screen.queryByRole('region', { name: 'Scan to join room ABC234' }),
+    ).toBeNull();
   });
 
   it('shows authoritative active counts by participant ID without exposing them on phones or in the lobby', () => {

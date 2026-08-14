@@ -1,12 +1,7 @@
 import type { ReactNode } from 'react';
 
-import {
-  buildJoinUrl,
-  type ConnectionStatus,
-  type RoomState,
-} from '@words/shared';
+import { type ConnectionStatus, type RoomState } from '@words/shared';
 
-import { JoinQrVisual } from './JoinQrCode';
 import { ProductTitle } from './ProductTitle';
 import { formatDisplaySettings } from './display-format';
 
@@ -64,29 +59,6 @@ export function AppShell({
                   'No Game Host'
                 )}
               </span>
-            </div>
-            <div
-              className="display-header__region display-header__qr"
-              data-display-header-region="qr"
-            >
-              {displayRoom.phase === 'ROUND_ACTIVE' && (
-                <section
-                  className="display-header__join-qr"
-                  aria-label={`Scan to join room ${displayRoom.code}`}
-                >
-                  <div
-                    className="display-header__join-qr-visual"
-                    aria-hidden="true"
-                  >
-                    <JoinQrVisual
-                      joinUrl={buildJoinUrl(
-                        window.location.origin,
-                        displayRoom.code,
-                      )}
-                    />
-                  </div>
-                </section>
-              )}
             </div>
             <div
               className="display-header__region display-header__settings-region"

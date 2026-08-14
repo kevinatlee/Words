@@ -77,16 +77,21 @@ describe('tile typography', () => {
 
   it('keeps the display presentation centered and within TV-height bounds', () => {
     expect(styles).toMatch(
-      /\.site-header--display\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1fr\) auto minmax\(0, 1fr\)\s*minmax\(0, 1fr\);/s,
+      /\.site-header--display\s*\{[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/s,
     );
-    expect(styles).toMatch(
-      /\.display-header__join-qr,[^}]*width: 4rem;[^}]*height: 4rem;/s,
-    );
+    expect(styles).not.toContain('.display-header__qr');
+    expect(styles).not.toContain('.display-header__join-qr');
     expect(styles).toMatch(
       /\.display-room-layout\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\) auto minmax\(0, 1fr\);/s,
     );
     expect(styles).toMatch(
       /\.display-room-page\s*\{[^}]*min-height: calc\(100dvh - 4\.75rem\);/s,
+    );
+    expect(styles).toMatch(
+      /\.display-side-stack\s*\{[^}]*display: grid;[^}]*width: 100%;[^}]*justify-items: center;[^}]*gap: clamp\(0\.75rem, 1\.5vh, 1rem\);/s,
+    );
+    expect(styles).toMatch(
+      /\.display-active-join-qr__visual,[^}]*width: 7rem;[^}]*height: 7rem;/s,
     );
     expect(styles).not.toContain('100dvh - 14.5rem');
     expect(styles).not.toMatch(

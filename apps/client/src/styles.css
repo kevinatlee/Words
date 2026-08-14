@@ -142,9 +142,7 @@ button:disabled {
 }
 
 .site-header--display {
-  grid-template-columns:
-    minmax(0, 1fr) minmax(0, 1fr) auto minmax(0, 1fr)
-    minmax(0, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   min-height: 4.5rem;
   padding-inline: clamp(0.25rem, 1vw, 0.75rem);
 }
@@ -169,20 +167,6 @@ button:disabled {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 800;
-}
-.display-header__qr {
-  padding-inline: 0;
-}
-.display-header__join-qr,
-.display-header__join-qr-visual,
-.display-header__join-qr-visual svg {
-  display: block;
-  width: 4rem;
-  height: 4rem;
-}
-.display-header__join-qr-visual {
-  overflow: hidden;
-  background: #fff;
 }
 .display-header__settings {
   white-space: nowrap;
@@ -812,6 +796,27 @@ button:disabled {
 .display-side-panel {
   width: min(100%, 19rem);
   justify-self: center;
+}
+.display-side-stack {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  justify-items: center;
+  gap: clamp(0.75rem, 1.5vh, 1rem);
+}
+.panel.display-active-join-qr {
+  width: fit-content;
+  padding: 0.65rem;
+}
+.display-active-join-qr__visual,
+.display-active-join-qr__visual svg {
+  display: block;
+  width: 7rem;
+  height: 7rem;
+}
+.display-active-join-qr__visual {
+  overflow: hidden;
+  background: #fff;
 }
 .display-side-panel h2 {
   margin-top: 0;

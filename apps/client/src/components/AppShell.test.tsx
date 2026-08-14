@@ -70,7 +70,7 @@ function createActiveDisplayRoom(): RoomState {
 }
 
 describe('AppShell display header', () => {
-  it('keeps an empty center slot in the five-region lobby display header', () => {
+  it('keeps the four-region display header in its original order', () => {
     const { container } = render(
       <AppShell
         displayRoom={createDisplayRoom()}
@@ -81,17 +81,16 @@ describe('AppShell display header', () => {
     );
 
     const header = container.querySelector('.site-header--display');
-    expect(header?.children).toHaveLength(5);
+    expect(header?.children).toHaveLength(4);
     expect(header?.children[0]).toHaveClass('display-header__logo');
     expect(header?.children[1]).toHaveClass('display-header__host');
-    expect(header?.children[2]).toHaveClass('display-header__qr');
-    expect(header?.children[3]).toHaveClass('display-header__settings-region');
-    expect(header?.children[4]).toHaveClass('display-header__connection');
+    expect(header?.children[2]).toHaveClass('display-header__settings-region');
+    expect(header?.children[3]).toHaveClass('display-header__connection');
     expect(
       Array.from(header?.children ?? []).map((region) =>
         region.getAttribute('data-display-header-region'),
       ),
-    ).toEqual(['logo', 'host', 'qr', 'settings', 'connection']);
+    ).toEqual(['logo', 'host', 'settings', 'connection']);
     expect(screen.queryByLabelText('Scan to join room ABC234')).toBeNull();
     expect(screen.getByRole('link', { name: 'Words home' })).toBeVisible();
     expect(screen.getByLabelText('Game Host')).toBeVisible();
@@ -101,7 +100,7 @@ describe('AppShell display header', () => {
     expect(screen.queryByText('Amber Kite')).toBeNull();
   });
 
-  it('renders the direct join QR as the center child only for an active display', () => {
+  it('does not alter the four-region header during active or ended rounds', () => {
     const { container, rerender } = render(
       <AppShell
         displayRoom={createActiveDisplayRoom()}
@@ -112,11 +111,9 @@ describe('AppShell display header', () => {
     );
 
     const header = container.querySelector('.site-header--display');
-    expect(header?.children[2]).toHaveAttribute(
-      'data-display-header-region',
-      'qr',
-    );
-    expect(screen.getByLabelText('Scan to join room ABC234')).toBeVisible();
+    expect(header?.children).toHaveLength(4);
+    expect(container.querySelector('.display-header__qr')).toBeNull();
+    expect(screen.queryByLabelText('Scan to join room ABC234')).toBeNull();
     expect(screen.getByText('5×5 • 2 minutes')).toBeVisible();
     expect(screen.getByText('Disconnected')).toBeVisible();
 
@@ -129,6 +126,7 @@ describe('AppShell display header', () => {
       </AppShell>,
     );
     expect(screen.queryByLabelText('Scan to join room ABC234')).toBeNull();
+    expect(header?.children).toHaveLength(4);
   });
 
   it('updates the host, truncation hook, and no-host fallback from room state', () => {

@@ -2,10 +2,11 @@
 
 ## 2026-08-14 — Active-round display join QR (draft)
 
-- The shared TV now keeps a 4rem direct-join QR in the geometrically centered
-  header column during active rounds. Lobby and ended presentations are
-  unchanged, and the QR continues to encode the full self-hosted join URL with
-  no redirect or lookup service.
+- The shared TV now keeps an approximately 7rem direct-join QR in its own
+  compact bubble above the right-side Time Remaining / Room Highlights panel
+  during active rounds. The original header, lobby, and ended presentations
+  remain unchanged, and the QR continues to encode the full self-hosted join
+  URL with no redirect or lookup service.
 
 ## 2026-08-14 — Mid-round player enrollment (draft)
 

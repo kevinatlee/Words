@@ -26,6 +26,7 @@ import { ControllerPanel } from './ControllerPanel';
 import { GameSettings } from './GameSettings';
 import { DisplayJoinBoard } from './DisplayJoinBoard';
 import { LetterGrid } from './LetterGrid';
+import { JoinQrVisual } from './JoinQrCode';
 import { PhoneRoundSummary } from './PhoneRoundSummary';
 import { PrototypeNotice } from './PrototypeNotice';
 import { RoundClock } from './RoundClock';
@@ -421,41 +422,58 @@ export function RoomLobby({
                 <DisplayJoinBoard joinUrl={joinUrl} />
               )}
             </section>
-            <aside
-              className="panel display-side-panel"
-              aria-labelledby="display-highlights-title"
-            >
+            <div className="display-side-stack">
               {roundIsActive && (
-                <RoundClock room={room} presentation="display" />
+                <section
+                  className="panel display-active-join-qr"
+                  aria-label={`Scan to join room ${room.code}`}
+                >
+                  <div
+                    className="display-active-join-qr__visual"
+                    aria-hidden="true"
+                  >
+                    <JoinQrVisual joinUrl={joinUrl} />
+                  </div>
+                </section>
               )}
-              <h2 id="display-highlights-title">Room Highlights</h2>
-              <section>
-                <h3>Last Round</h3>
-                {lastRound === null ? (
-                  <p>No scoring rounds yet</p>
-                ) : lastRound.winners.length === 0 ? (
-                  <p>No scoring winner</p>
-                ) : (
-                  <p>
-                    <strong>{formatHighlightNames(lastRound.winners)}</strong>
-                    <br />
-                    {lastRound.winningScore} points
-                  </p>
+              <aside
+                className="panel display-side-panel"
+                aria-labelledby="display-highlights-title"
+              >
+                {roundIsActive && (
+                  <RoundClock room={room} presentation="display" />
                 )}
-              </section>
-              <section>
-                <h3>Room Record</h3>
-                {roomRecord === null ? (
-                  <p>No room record yet</p>
-                ) : (
-                  <p>
-                    <strong>{formatHighlightNames(roomRecord.holders)}</strong>
-                    <br />
-                    {roomRecord.score} points
-                  </p>
-                )}
-              </section>
-            </aside>
+                <h2 id="display-highlights-title">Room Highlights</h2>
+                <section>
+                  <h3>Last Round</h3>
+                  {lastRound === null ? (
+                    <p>No scoring rounds yet</p>
+                  ) : lastRound.winners.length === 0 ? (
+                    <p>No scoring winner</p>
+                  ) : (
+                    <p>
+                      <strong>{formatHighlightNames(lastRound.winners)}</strong>
+                      <br />
+                      {lastRound.winningScore} points
+                    </p>
+                  )}
+                </section>
+                <section>
+                  <h3>Room Record</h3>
+                  {roomRecord === null ? (
+                    <p>No room record yet</p>
+                  ) : (
+                    <p>
+                      <strong>
+                        {formatHighlightNames(roomRecord.holders)}
+                      </strong>
+                      <br />
+                      {roomRecord.score} points
+                    </p>
+                  )}
+                </section>
+              </aside>
+            </div>
           </div>
         )}
         <footer className="display-room-footer">
