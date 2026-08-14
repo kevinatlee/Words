@@ -91,7 +91,16 @@ describe('tile typography', () => {
       /\.display-side-stack\s*\{[^}]*display: grid;[^}]*width: 100%;[^}]*justify-items: center;[^}]*gap: clamp\(0\.75rem, 1\.5vh, 1rem\);/s,
     );
     expect(styles).toMatch(
+      /\.display-side-panel,\s*\.panel\.display-active-join-qr\s*\{[^}]*width: min\(100%, 19rem\);[^}]*justify-self: center;/s,
+    );
+    expect(styles).toMatch(
+      /\.panel\.display-active-join-qr\s*\{[^}]*display: grid;[^}]*place-items: center;[^}]*padding: 0\.65rem;/s,
+    );
+    expect(styles).toMatch(
       /\.display-active-join-qr__visual,[^}]*width: 7rem;[^}]*height: 7rem;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-active-join-qr__visual\s*\{[^}]*overflow: hidden;[^}]*border-radius: calc\(var\(--radius-lg\) - 0\.65rem\);[^}]*background: #fff;/s,
     );
     expect(styles).not.toContain('100dvh - 14.5rem');
     expect(styles).not.toMatch(
