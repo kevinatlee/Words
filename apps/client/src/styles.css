@@ -2037,6 +2037,10 @@ button:disabled {
   margin-top: 0;
 }
 
+.room-dashboard--phone .round-action .button {
+  width: 100%;
+}
+
 .room-dashboard--phone .board-panel {
   padding: 0.75rem;
 }
@@ -2116,7 +2120,8 @@ button:disabled {
 }
 
 @media (min-width: 62rem) {
-  .room-dashboard--phone .board-panel--active {
+  .room-dashboard--phone .board-panel,
+  .room-dashboard--phone .round-action {
     width: min(100%, 27.5rem);
     justify-self: center;
   }

@@ -78,14 +78,18 @@ describe('tile typography', () => {
       /\.room-dashboard--phone \.round-action\s*\{[^}]*justify-content: center;[^}]*margin-top: 0;/s,
     );
     expect(styles).toMatch(
+      /\.room-dashboard--phone \.round-action \.button\s*\{[^}]*width: 100%;/s,
+    );
+    expect(styles).toMatch(
       /\.room-dashboard--phone \.room-dashboard__preview\s*\{[^}]*gap: 0\.65rem;/s,
     );
     expect(styles).toMatch(
       /\.room-dashboard--phone \.letter-grid\s*\{[^}]*width: min\(100%, 26rem\);/s,
     );
     expect(styles).toMatch(
-      /@media \(min-width: 62rem\)[\s\S]*?\.room-dashboard--phone \.board-panel--active\s*\{[^}]*width: min\(100%, 27\.5rem\);[^}]*justify-self: center;/s,
+      /@media \(min-width: 62rem\)[\s\S]*?\.room-dashboard--phone \.board-panel,\s*\.room-dashboard--phone \.round-action\s*\{[^}]*width: min\(100%, 27\.5rem\);[^}]*justify-self: center;/s,
     );
+    expect(styles).not.toContain('.board-panel--active');
     expect(styles).toMatch(
       /@media \(max-width: 44rem\)[\s\S]*?\.round-action \.button\s*\{[^}]*width: 100%;/s,
     );

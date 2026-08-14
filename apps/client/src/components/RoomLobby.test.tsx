@@ -225,10 +225,8 @@ describe('RoomLobby word entry', () => {
     const { container } = renderLobby();
 
     const preview = container.querySelector('.room-dashboard__preview');
-    expect(preview?.firstElementChild).toHaveClass(
-      'board-panel',
-      'board-panel--active',
-    );
+    expect(preview?.firstElementChild).toHaveClass('panel', 'board-panel');
+    expect(container.querySelector('.board-panel--active')).toBeNull();
     const puzzle = screen.getByRole('region', { name: 'Puzzle' });
     const modePanel = screen.getByRole('group', { name: 'Word entry mode' });
     expect(puzzle).toBeVisible();
@@ -422,7 +420,7 @@ describe('RoomLobby word entry', () => {
       screen
         .getByRole('region', { name: 'Round summary' })
         .closest('.board-panel'),
-    ).not.toHaveClass('board-panel--active');
+    ).toHaveClass('panel', 'board-panel');
     expect(
       screen
         .getByRole('region', { name: 'Round summary' })
@@ -681,7 +679,7 @@ describe('RoomLobby word entry', () => {
     const startRound = screen.getByRole('button', { name: 'Start Round' });
 
     expect(startRound).toBeVisible();
-    expect(puzzle).not.toHaveClass('board-panel--active');
+    expect(puzzle).toHaveClass('panel', 'board-panel');
     expect(startRound.closest('.round-action')).not.toBeNull();
     expect(startRound.closest('.round-action')).not.toBe(puzzle);
     expect(puzzle).not.toContainElement(settings);
@@ -801,6 +799,16 @@ describe('RoomLobby word entry', () => {
       ).toBeNull();
       expect(
         screen.queryByRole('region', { name: 'Game settings' }),
+      ).toBeNull();
+      expect(
+        screen.getByRole('region', {
+          name: phase === 'ROUND_ENDED' ? 'Round summary' : 'Puzzle',
+        }),
+      ).toHaveClass('panel', 'board-panel');
+      expect(
+        screen.queryByRole('button', {
+          name: /Start Round|Return to Lobby/,
+        }),
       ).toBeNull();
       view.unmount();
     }

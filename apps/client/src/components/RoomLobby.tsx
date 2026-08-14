@@ -533,7 +533,7 @@ export function RoomLobby({
       >
         <div className="room-dashboard__preview">
           <section
-            className={`panel board-panel${roundIsActive ? ' board-panel--active' : ''}`}
+            className="panel board-panel"
             aria-labelledby={isDisplay ? 'board-title' : undefined}
             aria-label={
               isDisplay ? undefined : roundIsEnded ? 'Round summary' : 'Puzzle'
