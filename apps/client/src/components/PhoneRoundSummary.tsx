@@ -63,7 +63,7 @@ export function PhoneRoundSummary({
 
   return (
     <section
-      className="phone-round-summary"
+      className="panel phone-round-summary"
       aria-labelledby="round-summary-title"
     >
       <p className="eyebrow">ROUND OVER</p>

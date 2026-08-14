@@ -536,15 +536,24 @@ export function RoomLobby({
             className="panel board-panel"
             aria-labelledby={isDisplay ? 'board-title' : undefined}
             aria-label={
-              isDisplay ? undefined : roundIsEnded ? 'Round summary' : 'Puzzle'
+              isDisplay
+                ? undefined
+                : roundIsEnded
+                  ? 'Previous round puzzle'
+                  : 'Puzzle'
             }
             data-round-id={room.round?.id}
             data-round-deadline-at={room.round?.deadlineAt}
           >
-            {roundIsEnded ? (
-              <PhoneRoundSummary
-                results={room.round?.results ?? null}
-                currentPlayerId={currentPlayerId}
+            {roundIsEnded && room.round ? (
+              <LetterGrid
+                letters={[...room.round.board.tiles]}
+                size={room.round.board.size}
+                label={`${room.round.board.size} by ${room.round.board.size} previous round letter grid`}
+                selectedIndices={[]}
+                acceptedIndices={[]}
+                interactive={false}
+                disabled
               />
             ) : (
               <>
@@ -623,6 +632,24 @@ export function RoomLobby({
               </>
             )}
           </section>
+          {isConnectedController && roundIsEnded && (
+            <div className="round-action">
+              <button
+                className="button button--primary"
+                type="button"
+                disabled={actionPending}
+                onClick={() => void runReturnToLobby()}
+              >
+                {actionPending ? 'Working…' : 'Return to Lobby'}
+              </button>
+            </div>
+          )}
+          {roundIsEnded && (
+            <PhoneRoundSummary
+              results={room.round?.results ?? null}
+              currentPlayerId={currentPlayerId}
+            />
+          )}
           {isConnectedController && room.phase === 'LOBBY' && (
             <div className="round-action">
               {
@@ -635,18 +662,6 @@ export function RoomLobby({
                   {actionPending ? 'Working…' : 'Start Round'}
                 </button>
               }
-            </div>
-          )}
-          {isConnectedController && roundIsEnded && (
-            <div className="round-action">
-              <button
-                className="button button--primary"
-                type="button"
-                disabled={actionPending}
-                onClick={() => void runReturnToLobby()}
-              >
-                {actionPending ? 'Working…' : 'Return to Lobby'}
-              </button>
             </div>
           )}
           {showControllerAdministration && (

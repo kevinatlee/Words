@@ -82,9 +82,9 @@ word count. The active TV shows authoritative accepted-word counts only; word
 identities and provisional scores remain private. The production UI does not
 show a development-stage badge.
 Fresh clients default to Trace while an explicit local Tap choice remains
-persisted. During `ROUND_ENDED`, phones replace the board and word-entry UI
-with their own authoritative final score and the winning score; detailed
-results remain on the display. Official grid sizes share their presentation gap
+persisted. During `ROUND_ENDED`, phones keep the exact authoritative finished
+board frozen above their own final score and the winning score; word-entry UI is
+removed and detailed results remain on the display. Official grid sizes share their presentation gap
 system, and the lobby QR board spells `WORDS` / `ATLEE` / `WANNA` / `SHARE`.
 Pre-round demonstrations use fixed, size-keyed presentation boards only; the
 5 × 5 fourth row is `NSEVR`, and they never replace server-generated official

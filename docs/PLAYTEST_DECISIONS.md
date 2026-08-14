@@ -42,7 +42,7 @@ display-only rounding.
 
 ## TV result presentation
 
-- A TV-only dedicated result presentation lasts 20 seconds.
+- A TV-only dedicated result presentation lasts 30 seconds.
 - During it, the board and QR code disappear; every competitor has an
   individual card or column, and every tied winner receives a crown.
 - It will show integer points, accepted-word count, unique-word count, and up
@@ -56,10 +56,10 @@ display-only rounding.
   player's final score and winning score. A positive winner name or all tied
   winner names appear beneath that score in authoritative result order; a
   zero-score round retains `No scoring winner`. Detailed results remain TV-only.
-- During the 20-second `ROUND_ENDED` presentation, phones will not
+- During the 30-second `ROUND_ENDED` presentation, phones will not
   show game-host controls. After the authoritative return to `LOBBY`, Game
   Settings and game-host delegation reappear for the current controller only.
-- After 20 seconds, the server will authoritatively return to `LOBBY`, using
+- After 30 seconds, the server will authoritatively return to `LOBBY`, using
   the existing `ROUND_ENDED` lifecycle rather than adding a fourth phase.
 
 ## Implemented phone information architecture

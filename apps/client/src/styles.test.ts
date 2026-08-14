@@ -87,7 +87,7 @@ describe('tile typography', () => {
       /\.room-dashboard--phone \.letter-grid\s*\{[^}]*width: min\(100%, 26rem\);/s,
     );
     expect(styles).toMatch(
-      /@media \(min-width: 62rem\)[\s\S]*?\.room-dashboard--phone \.board-panel,\s*\.room-dashboard--phone \.round-action,\s*\.room-dashboard--phone \.settings-panel,\s*\.room-dashboard--phone \.controller-panel\s*\{[^}]*width: min\(100%, 27\.5rem\);[^}]*justify-self: center;/s,
+      /@media \(min-width: 62rem\)[\s\S]*?\.room-dashboard--phone \.board-panel,\s*\.room-dashboard--phone \.phone-round-summary,\s*\.room-dashboard--phone \.round-action,\s*\.room-dashboard--phone \.settings-panel,\s*\.room-dashboard--phone \.controller-panel\s*\{[^}]*width: min\(100%, 27\.5rem\);[^}]*justify-self: center;/s,
     );
     const basePlayerStyles = styles.slice(
       styles.indexOf('.room-dashboard--phone {'),
@@ -166,6 +166,12 @@ describe('tile typography', () => {
     );
     expect(styles).toMatch(
       /\.display-player-list__count\s*\{[^}]*justify-self: end;[^}]*min-width: 3ch;[^}]*color: var\(--mint-strong\);[^}]*font-size: clamp\(1rem, 1\.5vw, 1\.25rem\);[^}]*font-variant-numeric: tabular-nums;[^}]*font-weight: 900;[^}]*text-align: right;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-results\s*\{[^}]*justify-content: flex-start;[^}]*padding-top: clamp\(0\.75rem, 1\.5vh, 1\.25rem\);[^}]*padding-bottom: 1rem;/s,
+    );
+    expect(styles).not.toMatch(
+      /\.display-results\s*\{[^}]*justify-content: center;/s,
     );
     expect(styles).toMatch(
       /\.display-results__cards\s*\{[^}]*width: fit-content;[^}]*max-width: 96vw;[^}]*grid-template-columns: repeat\(2, minmax\(16rem, max-content\)\);/s,

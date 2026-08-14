@@ -45,7 +45,7 @@ contract.
 - The server loads and verifies the 79,370-word production dictionary before
   listening, then uses cryptographic randomness for bounded board generation.
 - A single 250 ms server lifecycle sweep ends due rounds at their exact
-  deadline, keeps final results for one server-owned 15-second window, then
+  deadline, keeps final results for one server-owned 30-second window, then
   resets the room to `LOBBY`. Disconnects, reconnects, and controller
   transfers do not pause or extend it.
 - Browser countdowns use `serverTime` plus a monotonic elapsed clock; only the
@@ -67,8 +67,8 @@ contract.
   beside the complete official board, with a compact timer and accepted-word
   counts; it has no QR, word identities, or provisional scores. In
   `ROUND_ENDED`, compact dark result cards use authoritative podium levels and
-  the footer remains. Phones show only their personal score summary without
-  administration or detailed opponent results.
+  the footer remains. Phones keep the finished board frozen above their
+  personal score summary without administration or detailed opponent results.
 - Phone puzzle bubbles use semantic labels without a visible puzzle heading.
   The compact Tap/Trace control stays centred in the phone header throughout
   lobby and active phases; phones do not show provisional scores or accepted-word
@@ -108,7 +108,7 @@ contract.
 
 Each round stands alone. Words is designed for casual drop-in play rather than
 a committed match or campaign. The server destroys detailed results and private
-submissions after its 15-second results window, retaining only bounded room
+submissions after its 30-second results window, retaining only bounded room
 highlights. Players can join, play a round, see that round's result, continue,
 or leave. Starting the next round does not restore a previous result.
 
