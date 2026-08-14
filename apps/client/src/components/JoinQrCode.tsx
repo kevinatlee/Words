@@ -37,7 +37,7 @@ const contextCopy = {
     instruction: '',
   },
   'active-round': {
-    heading: 'Join Next Round',
+    heading: 'Scan to Join',
     instruction: '',
   },
   'ended-round': {
@@ -45,6 +45,24 @@ const contextCopy = {
     instruction: '',
   },
 } as const;
+
+export function JoinQrVisual({ joinUrl }: { readonly joinUrl: string }) {
+  return (
+    <QrVisualBoundary key={joinUrl}>
+      <QRCodeSVG
+        value={joinUrl}
+        size={320}
+        level="M"
+        boostLevel={false}
+        marginSize={4}
+        bgColor="#FFFFFF"
+        fgColor="#000000"
+        aria-hidden="true"
+        focusable="false"
+      />
+    </QrVisualBoundary>
+  );
+}
 
 export function JoinQrCode({
   joinUrl,
@@ -60,19 +78,7 @@ export function JoinQrCode({
       aria-labelledby={headingId}
     >
       <div className="join-qr__visual" aria-hidden="true">
-        <QrVisualBoundary key={joinUrl}>
-          <QRCodeSVG
-            value={joinUrl}
-            size={320}
-            level="M"
-            boostLevel={false}
-            marginSize={4}
-            bgColor="#FFFFFF"
-            fgColor="#000000"
-            aria-hidden="true"
-            focusable="false"
-          />
-        </QrVisualBoundary>
+        <JoinQrVisual joinUrl={joinUrl} />
       </div>
       <div className="join-qr__copy">
         <h2 id={headingId}>{copy.heading}</h2>

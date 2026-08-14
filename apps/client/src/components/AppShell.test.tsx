@@ -48,8 +48,29 @@ function createDisplayRoom(overrides: Partial<RoomState> = {}): RoomState {
   };
 }
 
+function createActiveDisplayRoom(): RoomState {
+  const room = createDisplayRoom();
+  return {
+    ...room,
+    phase: 'ROUND_ACTIVE',
+    round: {
+      id: '00000000-0000-4000-8000-000000000100',
+      number: 1,
+      settings: room.settings,
+      board: { size: 5, tiles: Array.from({ length: 25 }, () => 'A') },
+      participants: [{ playerId: hostId, displayName: 'Bright Fox' }],
+      acceptedWordCounts: [{ playerId: hostId, count: 0 }],
+      startedAt: '2026-07-31T00:00:00.000Z',
+      deadlineAt: '2026-07-31T00:02:00.000Z',
+      endedAt: null,
+      results: null,
+      generationAttempts: 1,
+    },
+  };
+}
+
 describe('AppShell display header', () => {
-  it('exposes four equal display header regions in display order', () => {
+  it('keeps an empty center slot in the five-region lobby display header', () => {
     const { container } = render(
       <AppShell
         displayRoom={createDisplayRoom()}
@@ -60,22 +81,54 @@ describe('AppShell display header', () => {
     );
 
     const header = container.querySelector('.site-header--display');
-    expect(header?.children).toHaveLength(4);
+    expect(header?.children).toHaveLength(5);
     expect(header?.children[0]).toHaveClass('display-header__logo');
     expect(header?.children[1]).toHaveClass('display-header__host');
-    expect(header?.children[2]).toHaveClass('display-header__settings-region');
-    expect(header?.children[3]).toHaveClass('display-header__connection');
+    expect(header?.children[2]).toHaveClass('display-header__qr');
+    expect(header?.children[3]).toHaveClass('display-header__settings-region');
+    expect(header?.children[4]).toHaveClass('display-header__connection');
     expect(
       Array.from(header?.children ?? []).map((region) =>
         region.getAttribute('data-display-header-region'),
       ),
-    ).toEqual(['logo', 'host', 'settings', 'connection']);
+    ).toEqual(['logo', 'host', 'qr', 'settings', 'connection']);
+    expect(screen.queryByLabelText('Scan to join room ABC234')).toBeNull();
     expect(screen.getByRole('link', { name: 'Words home' })).toBeVisible();
     expect(screen.getByLabelText('Game Host')).toBeVisible();
     expect(screen.getByText('Bright Fox')).toBeVisible();
     expect(screen.getByText('5×5 • 2 minutes')).toBeVisible();
     expect(screen.getByText('Connected')).toBeVisible();
     expect(screen.queryByText('Amber Kite')).toBeNull();
+  });
+
+  it('renders the direct join QR as the center child only for an active display', () => {
+    const { container, rerender } = render(
+      <AppShell
+        displayRoom={createActiveDisplayRoom()}
+        displayConnectionStatus="disconnected"
+      >
+        <p>Room</p>
+      </AppShell>,
+    );
+
+    const header = container.querySelector('.site-header--display');
+    expect(header?.children[2]).toHaveAttribute(
+      'data-display-header-region',
+      'qr',
+    );
+    expect(screen.getByLabelText('Scan to join room ABC234')).toBeVisible();
+    expect(screen.getByText('5×5 • 2 minutes')).toBeVisible();
+    expect(screen.getByText('Disconnected')).toBeVisible();
+
+    rerender(
+      <AppShell
+        displayRoom={createDisplayRoom({ phase: 'ROUND_ENDED' })}
+        displayConnectionStatus="connected"
+      >
+        <p>Results</p>
+      </AppShell>,
+    );
+    expect(screen.queryByLabelText('Scan to join room ABC234')).toBeNull();
   });
 
   it('updates the host, truncation hook, and no-host fallback from room state', () => {
@@ -147,5 +200,6 @@ describe('AppShell display header', () => {
       'connection-status--phone',
     );
     expect(screen.queryByText('No Game Host')).toBeNull();
+    expect(container.querySelector('.display-header__qr')).toBeNull();
   });
 });

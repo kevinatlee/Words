@@ -26,9 +26,11 @@ are not ordinary deferred enhancements.
 buildJoinUrl(window.location.origin, room.code);
 ```
 
-The completed string is passed to `DisplayJoinBoard`. The component does not
-parse, normalize, or rebuild it. The same authoritative string is the QR
-payload and the display footer URL.
+The completed string is passed to the lobby `DisplayJoinBoard` and reused by
+the active display-header QR. Neither presentation parses, normalizes, or
+rebuilds it. The same authoritative string is the QR payload and the display
+footer URL. No shortener, redirect, lookup service, alternate room identifier,
+or server-side registration is involved.
 
 The shared helper normalizes the public room code, replaces any stale path with
 `/join/<ROOM_CODE>`, removes query parameters and fragments, and removes URL
@@ -81,21 +83,23 @@ gzip) to 23.45 kB (5.41 kB gzip), an approximate delta of 0.72 kB minified and
 
 ## Rendering policy
 
-`JoinQrCode` renders `QRCodeCanvas` with:
+The shared QR visual renders locally with:
 
 - black `#000000` modules;
 - a permanently white `#FFFFFF` background;
 - error-correction level M with automatic level boosting disabled;
 - an embedded four-module quiet zone;
-- ordinary square modules in one opaque canvas bitmap;
+- ordinary square modules with no interpolation or decorative treatment;
 - no logo, image, overlay, gradient, transparency, animation, rotation,
   inversion, or decorative module styling.
 
-The canvas stays square through CSS and is hidden from the accessibility tree.
-The embedded display QR sits in one merged
-letter-tile-tone 3 × 3 center region of a noninteractive 5 × 5 demonstration
-board; the five top tiles spell `WORDS`. Its four-module quiet zone remains
-inside the rounded clipped tile surface.
+The lobby canvas stays square through CSS and is hidden from the accessibility
+tree. It remains embedded in one merged letter-tile-tone 3 × 3 center region
+of a noninteractive 5 × 5 demonstration board; the five top tiles spell
+`WORDS`. During an active round, the same policy is rendered as a 4rem square
+inline SVG on white in the true center of the display header. Its surrounding
+region is labelled for assistive technology while the visual encoding remains
+hidden.
 The exact URL appears in the display footer. No live region or automatic focus
 movement is used.
 
@@ -107,10 +111,11 @@ gameplay, and reconnect behavior remain available outside that visual boundary.
 
 - **Lobby:** the QR is merged into the centered demonstration board, with
   Players and Room Highlights side bubbles and the join URL footer.
-- **Active round:** the QR is absent; the official board and Time Remaining are
-  primary beside the same side bubbles.
-- **Ended round:** the QR, board, timer, and side bubbles are absent; only
-  result cards and the footer remain.
+- **Active round:** a small direct-join QR occupies the fixed center column of
+  the five-region display header. The official board, Time Remaining, side
+  bubbles, and footer remain unchanged.
+- **Ended round:** the header QR, board, timer, and side bubbles are absent;
+  only result cards and the footer remain.
 
 The QR appears only for the display role. Controller phones, ordinary phones,
 mid-round joining phones, `/join`, `/join/:roomCode`, `/play/demo`, errors, and
@@ -125,12 +130,11 @@ prefilled, but the person must still enter a valid display name and submit the
 ordinary join action. Capacity, validation, rate limiting, expiration, and
 first-player controller assignment remain server-owned.
 
-A person joining during `ROUND_ACTIVE` enters the room as a normal phone player
-and waits. They cannot submit in the current round, do not enter its immutable
-participant snapshot or result, and become eligible only when the controller
-starts the next round while they remain connected. Starting that next round
-replaces the old board, private submissions, and result instead of creating
-history.
+A person successfully joining during a playable `ROUND_ACTIVE` enters the
+current round immediately when its bounded participant roster has room. They
+receive the existing board and only the remaining authoritative time. At or
+after the deadline, during finalized results, or when the active roster is
+already full, they wait for the next round.
 
 Display reconnect rebuilds the same public URL from the restored room code and
 current browser origin. Player reconnect and controller transfer do not grant
@@ -154,19 +158,21 @@ display or player.
 Automated coverage verifies:
 
 - the exact payload and renderer options;
-- merged lobby presentation and active/ended absence;
+- merged lobby presentation, centered active-header presentation, and ended
+  absence;
 - display-only role enforcement and route exclusions;
 - accessible text and visual-tree hiding;
 - deterministic rerendering and renderer-failure containment;
 - current-origin behavior, normalization, stale path replacement, query,
   fragment, and userinfo removal;
 - browser-origin and route-normalization fixtures;
-- unchanged active-round waiting and next-round behavior.
+- direct active-round joining with remaining-time-only gameplay.
 
-Browser validation verifies the exact credential-free canvas payload, lobby
-placement, active/ended absence, manual room-code fallback, reconnect behavior,
-and phone-route exclusion. Native-camera scan reliability still depends on the
-physical display and device; automated tests do not claim a physical scan.
+Browser validation verifies the exact credential-free payload, lobby
+placement, active-header placement, ended absence, manual room-code fallback,
+reconnect behavior, and phone-route exclusion. Native-camera scan reliability
+at the initial 4rem header size still depends on the physical display and
+device; automated tests do not claim a physical scan.
 
 ## Known limitations and Stage 4H boundary
 
