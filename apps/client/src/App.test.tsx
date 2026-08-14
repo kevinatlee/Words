@@ -19,6 +19,7 @@ import {
 
 import { App } from './App';
 import type { LobbyClient } from './lobby-client';
+import { resetPerformanceDiagnosticsForTests } from './performance-diagnostics';
 import type { LobbySessionStore, StoredLobbySession } from './session-store';
 
 const controllerPlayer: PlayerState = {
@@ -352,6 +353,7 @@ async function chooseTap(user: ReturnType<typeof userEvent.setup>) {
 describe('Stage 4B display and player room routes', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/');
+    resetPerformanceDiagnosticsForTests();
   });
 
   it('automatically creates one passive display room at the root', async () => {
@@ -593,6 +595,69 @@ describe('Stage 4B display and player room routes', () => {
       displayName: 'Silver Owl',
     });
     expect(client.createDisplay).not.toHaveBeenCalled();
+  });
+
+  it('keeps opt-in diagnostics through join navigation and hides them otherwise', async () => {
+    const user = userEvent.setup();
+    const stopDiagnostics = vi.fn();
+    const enableDiagnostics = vi.fn(() => stopDiagnostics);
+    const client = createFakeClient({
+      joinPlayer: vi.fn(
+        async (): Promise<PlayerActionResponse> => controllerSuccess,
+      ),
+      enablePerformanceDiagnostics: enableDiagnostics,
+      getPerformanceDiagnostics: () => ({
+        connected: true,
+        transport: 'websocket',
+        connections: 1,
+        reconnects: 0,
+        connectionStatusTransitions: 1,
+        transportUpgrades: 1,
+        roomStatesReceived: 1,
+        roomErrorsReceived: 0,
+        enginePacketsReceived: 3,
+        enginePacketsSent: 2,
+      }),
+    });
+    window.history.replaceState({}, '', '/join/ABC234?perf=1');
+
+    const view = render(
+      <App client={client} sessionStore={createFakeSessionStore()} />,
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: 'Display name' }),
+      'Silver Owl',
+    );
+    await user.click(screen.getByRole('button', { name: 'Join Room' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Performance Diagnostics' }),
+    ).toBeVisible();
+    expect(enableDiagnostics).toHaveBeenCalledTimes(1);
+    expect(window.location.pathname).toBe('/room/ABC234');
+    expect(window.location.search).toBe('');
+    view.unmount();
+    expect(stopDiagnostics).toHaveBeenCalledTimes(1);
+
+    resetPerformanceDiagnosticsForTests();
+    window.history.replaceState({}, '', '/join/ABC234');
+    const normalClient = createFakeClient({
+      joinPlayer: vi.fn(
+        async (): Promise<PlayerActionResponse> => controllerSuccess,
+      ),
+    });
+    render(
+      <App client={normalClient} sessionStore={createFakeSessionStore()} />,
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: 'Display name' }),
+      'Silver Owl',
+    );
+    await user.click(screen.getByRole('button', { name: 'Join Room' }));
+    await screen.findByRole('region', { name: 'Puzzle' });
+    expect(
+      screen.queryByRole('heading', { name: 'Performance Diagnostics' }),
+    ).toBeNull();
   });
 
   it('shows the first joining phone player as the game host', async () => {
@@ -2189,6 +2254,67 @@ describe('Stage 4B display and player room routes', () => {
     act(() => reportRoomState?.(controllerWithPlayersSuccess.room));
 
     expect(commits).toBe(commitsBeforeDuplicate);
+  });
+
+  it('counts accepted, duplicate, and rejected snapshots without changing acceptance', async () => {
+    let reportRoomState: ((room: RoomState) => void) | undefined;
+    window.history.replaceState({}, '', '/room/ABC234?perf=1');
+    const client = createFakeClient({
+      reconnectPlayer: vi.fn(
+        async (): Promise<PlayerActionResponse> => controllerWithPlayersSuccess,
+      ),
+      onRoomState: (listener) => {
+        reportRoomState = listener;
+        return () => undefined;
+      },
+      enablePerformanceDiagnostics: () => () => undefined,
+    });
+    render(
+      <App
+        routePath="/room/ABC234"
+        client={client}
+        sessionStore={createFakeSessionStore({
+          role: 'player',
+          roomCode: 'ABC234',
+          playerId: controllerPlayer.id,
+          playerReconnectToken: 'r'.repeat(43),
+          displayName: controllerPlayer.displayName,
+        })}
+      />,
+    );
+    await screen.findByRole('button', { name: 'Start Round' });
+
+    act(() => reportRoomState?.(controllerWithPlayersSuccess.room));
+    act(() =>
+      reportRoomState?.({
+        ...controllerWithPlayersSuccess.room,
+        stateVersion: 0,
+      }),
+    );
+    act(() =>
+      reportRoomState?.({
+        ...controllerWithPlayersSuccess.room,
+        stateVersion: 2,
+        settings: {
+          ...controllerWithPlayersSuccess.room.settings,
+          gridSize: 6,
+        },
+      }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Refresh Diagnostics' }),
+    );
+
+    const snapshot = screen.getByLabelText('Diagnostic snapshot');
+    expect(snapshot).toHaveTextContent('Room states accepted: 2');
+    expect(snapshot).toHaveTextContent('Duplicates ignored: 1');
+    expect(snapshot).toHaveTextContent(
+      'Stale/conflicting snapshots rejected: 1',
+    );
+    expect(screen.getByRole('button', { name: '6 × 6' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   it('still accepts a meaningful same-version snapshot with the same server time', async () => {

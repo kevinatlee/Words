@@ -9,6 +9,7 @@ import {
 } from 'react';
 
 import type { WordEntryMode } from '../utils/word-entry';
+import { incrementPerformanceCounter } from '../performance-diagnostics';
 import {
   resolveTraceSegment,
   type TracePoint,
@@ -52,6 +53,7 @@ export const LetterGrid = memo(function LetterGrid({
   onTraceEnd,
   onTraceCancel,
 }: LetterGridProps) {
+  incrementPerformanceCounter('letterGridRenders');
   const gridRef = useRef<HTMLDivElement>(null);
   const tileElementsRef = useRef<Array<HTMLElement | null>>([]);
   const activePointerIdRef = useRef<number | null>(null);

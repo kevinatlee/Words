@@ -27,6 +27,21 @@ import {
   type UpdateRoomSettingsInput,
 } from '@words/shared';
 
+import { performanceDiagnosticsEnabled } from './performance-diagnostics';
+
+export type SocketPerformanceDiagnostics = {
+  connected: boolean;
+  transport: string;
+  connections: number;
+  reconnects: number;
+  connectionStatusTransitions: number;
+  transportUpgrades: number;
+  roomStatesReceived: number;
+  roomErrorsReceived: number;
+  enginePacketsReceived: number;
+  enginePacketsSent: number;
+};
+
 export type LobbyClient = {
   getConnectionStatus: () => ConnectionStatus;
   createDisplay: (input: CreateDisplayInput) => Promise<DisplayActionResponse>;
@@ -53,6 +68,8 @@ export type LobbyClient = {
   onConnectionStatus: (
     listener: (status: ConnectionStatus) => void,
   ) => () => void;
+  enablePerformanceDiagnostics?: () => () => void;
+  getPerformanceDiagnostics?: () => SocketPerformanceDiagnostics;
 };
 
 const connectionError: RoomError = {
@@ -92,12 +109,33 @@ const submissionConnectionFailure: SubmitWordResponse = {
 export class SocketLobbyClient implements LobbyClient {
   private readonly socket: Socket<ServerToClientEvents, ClientToServerEvents>;
   private connectionPromise: Promise<void> | null = null;
+  private performanceCleanup: (() => void) | null = null;
+  private enginePerformanceCleanup: (() => void) | null = null;
+  private lastDiagnosticConnectionStatus: ConnectionStatus = 'disconnected';
+  private lastDiagnosticTransport = 'unknown';
+  private performanceDiagnostics: Omit<
+    SocketPerformanceDiagnostics,
+    'connected' | 'transport'
+  > = {
+    connections: 0,
+    reconnects: 0,
+    connectionStatusTransitions: 0,
+    transportUpgrades: 0,
+    roomStatesReceived: 0,
+    roomErrorsReceived: 0,
+    enginePacketsReceived: 0,
+    enginePacketsSent: 0,
+  };
 
-  constructor() {
-    this.socket = io({
-      autoConnect: false,
-      timeout: 5_000,
-    });
+  constructor(
+    socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null,
+  ) {
+    this.socket =
+      socket ??
+      io({
+        autoConnect: false,
+        timeout: 5_000,
+      });
   }
 
   getConnectionStatus(): ConnectionStatus {
@@ -348,6 +386,112 @@ export class SocketLobbyClient implements LobbyClient {
       this.socket.off('connect', onConnect);
       this.socket.off('disconnect', onDisconnect);
       this.socket.off('connect_error', onConnectError);
+    };
+  }
+
+  enablePerformanceDiagnostics(): () => void {
+    if (!performanceDiagnosticsEnabled() || this.performanceCleanup) {
+      return () => undefined;
+    }
+
+    this.lastDiagnosticConnectionStatus = this.getConnectionStatus();
+    this.lastDiagnosticTransport = this.currentTransport();
+    if (this.socket.connected) {
+      this.performanceDiagnostics.connections = 1;
+    }
+
+    const recordConnectionStatus = (status: ConnectionStatus) => {
+      if (status !== this.lastDiagnosticConnectionStatus) {
+        this.performanceDiagnostics.connectionStatusTransitions += 1;
+        this.lastDiagnosticConnectionStatus = status;
+      }
+    };
+    const onConnect = () => {
+      this.performanceDiagnostics.connections += 1;
+      this.lastDiagnosticTransport = this.currentTransport();
+      recordConnectionStatus('connected');
+    };
+    const onDisconnect = () => recordConnectionStatus('disconnected');
+    const onConnectError = () => recordConnectionStatus('disconnected');
+    const onReconnect = () => {
+      this.performanceDiagnostics.reconnects += 1;
+    };
+    const onRoomState = () => {
+      this.performanceDiagnostics.roomStatesReceived += 1;
+    };
+    const onRoomError = () => {
+      this.performanceDiagnostics.roomErrorsReceived += 1;
+    };
+    const onManagerOpen = () => this.attachEnginePerformanceDiagnostics();
+
+    this.socket.on('connect', onConnect);
+    this.socket.on('disconnect', onDisconnect);
+    this.socket.on('connect_error', onConnectError);
+    this.socket.on('room:state', onRoomState);
+    this.socket.on('room:error', onRoomError);
+    this.socket.io.on('open', onManagerOpen);
+    this.socket.io.on('reconnect', onReconnect);
+    this.attachEnginePerformanceDiagnostics();
+
+    const cleanup = () => {
+      if (this.performanceCleanup !== cleanup) {
+        return;
+      }
+      this.socket.off('connect', onConnect);
+      this.socket.off('disconnect', onDisconnect);
+      this.socket.off('connect_error', onConnectError);
+      this.socket.off('room:state', onRoomState);
+      this.socket.off('room:error', onRoomError);
+      this.socket.io.off('open', onManagerOpen);
+      this.socket.io.off('reconnect', onReconnect);
+      this.enginePerformanceCleanup?.();
+      this.enginePerformanceCleanup = null;
+      this.performanceCleanup = null;
+    };
+    this.performanceCleanup = cleanup;
+    return cleanup;
+  }
+
+  getPerformanceDiagnostics(): SocketPerformanceDiagnostics {
+    const transport = this.currentTransport();
+    if (transport !== 'unknown') {
+      this.lastDiagnosticTransport = transport;
+    }
+    return {
+      connected: this.socket.connected,
+      transport: this.lastDiagnosticTransport,
+      ...this.performanceDiagnostics,
+    };
+  }
+
+  private currentTransport(): string {
+    return this.socket.io.engine?.transport?.name ?? 'unknown';
+  }
+
+  private attachEnginePerformanceDiagnostics(): void {
+    const engine = this.socket.io.engine;
+    if (!engine) {
+      return;
+    }
+    this.enginePerformanceCleanup?.();
+    const onPacket = () => {
+      this.performanceDiagnostics.enginePacketsReceived += 1;
+    };
+    const onPacketCreate = () => {
+      this.performanceDiagnostics.enginePacketsSent += 1;
+    };
+    const onUpgrade = (transport: { name: string }) => {
+      this.performanceDiagnostics.transportUpgrades += 1;
+      this.lastDiagnosticTransport = transport.name;
+    };
+    engine.on('packet', onPacket);
+    engine.on('packetCreate', onPacketCreate);
+    engine.on('upgrade', onUpgrade);
+    this.lastDiagnosticTransport = engine.transport?.name ?? 'unknown';
+    this.enginePerformanceCleanup = () => {
+      engine.off('packet', onPacket);
+      engine.off('packetCreate', onPacketCreate);
+      engine.off('upgrade', onUpgrade);
     };
   }
 

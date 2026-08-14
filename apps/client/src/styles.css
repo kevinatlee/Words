@@ -2008,6 +2008,48 @@ button:disabled {
   color: var(--coral);
 }
 
+.performance-diagnostics {
+  width: min(100% - 1rem, 44rem);
+  margin: 1rem auto;
+}
+
+.performance-diagnostics__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.performance-diagnostics__actions .button {
+  min-height: 2.5rem;
+  padding: 0.55rem 0.75rem;
+}
+
+.performance-diagnostics pre {
+  max-height: 28rem;
+  margin: 1rem 0 0;
+  padding: 0.8rem;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(6, 16, 27, 0.52);
+  color: var(--paper-muted);
+  font:
+    0.78rem/1.5 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace;
+  white-space: pre-wrap;
+}
+
+.performance-diagnostics__status {
+  min-height: 1.5em;
+  margin: 0.5rem 0 0;
+  color: var(--paper-muted);
+  font-size: 0.8rem;
+}
+
 .lobby-toolbar {
   display: flex;
   align-items: center;

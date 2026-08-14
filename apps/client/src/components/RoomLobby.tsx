@@ -14,6 +14,7 @@ import {
 } from '@words/shared';
 
 import { useRoundDeadlineReached } from '../useRoundCountdown';
+import { incrementPerformanceCounter } from '../performance-diagnostics';
 import { createDemoBoard } from '../utils/demoBoard';
 import {
   isExpectedSubmissionRejection,
@@ -62,6 +63,7 @@ export function RoomLobby({
   onReturnToLobby,
   onSubmitWord,
 }: RoomLobbyProps) {
+  incrementPerformanceCounter('roomLobbyRenders');
   const [actionPending, setActionPending] = useState(false);
   const [actionError, setActionError] = useState<RoomError | null>(null);
   const [selectedPath, setSelectedPath] = useState<number[]>([]);

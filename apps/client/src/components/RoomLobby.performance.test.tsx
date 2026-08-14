@@ -7,6 +7,12 @@ import {
   type SubmitWordResponse,
 } from '@words/shared';
 
+import {
+  enablePerformanceDiagnosticsForTests,
+  readPerformanceCounters,
+  resetPerformanceDiagnosticsForTests,
+} from '../performance-diagnostics';
+
 const renderMetrics = vi.hoisted(() => ({ letterGrid: 0 }));
 
 vi.mock('./LetterGrid', async (importOriginal) => {
@@ -110,6 +116,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   monotonicTime = 0;
   vi.spyOn(performance, 'now').mockImplementation(() => monotonicTime);
+  enablePerformanceDiagnosticsForTests(monotonicTime);
   renderMetrics.letterGrid = 0;
   const slot = document.createElement('div');
   slot.id = 'phone-entry-mode-slot';
@@ -120,9 +127,36 @@ afterEach(() => {
   document.getElementById('phone-entry-mode-slot')?.remove();
   vi.useRealTimers();
   vi.restoreAllMocks();
+  resetPerformanceDiagnosticsForTests();
 });
 
 describe('RoomLobby runtime isolation', () => {
+  it('does no recurring application work over ten idle lobby minutes', () => {
+    const timeout = vi.spyOn(window, 'setTimeout');
+    const interval = vi.spyOn(window, 'setInterval');
+    const animationFrame = vi.spyOn(window, 'requestAnimationFrame');
+    render(
+      <RoomLobby {...props(createRoom({ phase: 'LOBBY', round: null }))} />,
+    );
+    const initialCounters = readPerformanceCounters();
+    const timeoutCalls = timeout.mock.calls.length;
+
+    expect(vi.getTimerCount()).toBe(0);
+    act(() => {
+      monotonicTime += 600_000;
+      vi.advanceTimersByTime(600_000);
+    });
+
+    expect(readPerformanceCounters()).toMatchObject({
+      roomLobbyRenders: initialCounters.roomLobbyRenders,
+      letterGridRenders: initialCounters.letterGridRenders,
+    });
+    expect(timeout).toHaveBeenCalledTimes(timeoutCalls);
+    expect(interval).not.toHaveBeenCalled();
+    expect(animationFrame).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('does not rerender LetterGrid for visible countdown changes', () => {
     render(<RoomLobby {...props()} />);
     const initialGridRenders = renderMetrics.letterGrid;

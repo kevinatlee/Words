@@ -184,6 +184,61 @@ reduces resolver work to 31 calls over one simulated second, but this work-count
 reduction is not proof of a battery-percentage improvement; real-device battery
 testing remains required.
 
+## Idle lobby battery investigation
+
+Physical iPhone testing reported approximately four battery-percentage points
+of use during ten minutes in an idle player lobby with the screen on at roughly
+medium brightness. This is a field observation, not a controlled electrical
+measurement: radio conditions, battery health, temperature, display power, and
+browser behavior were not isolated.
+
+The idle player path has no active round countdown or deadline timeout, no idle
+Trace sample timeout, no application `requestAnimationFrame` loop, and no
+application polling interval. The server lifecycle sweep does not intentionally
+broadcast room snapshots every 250 ms. An idle-lobby CSS audit found no
+continuous player animation, `backdrop-filter`, or filter effect. The fixed
+skip link is normally translated off-screen; player shadows are static, the
+viewport-unit rules are not themselves animated, and transitions are limited
+to interaction states. Those static design properties are not evidence of
+continuous invalidation, so this diagnostic pass does not alter them.
+
+Pages initially loaded with `?perf=1` now enable an in-memory diagnostic
+registry for that page lifetime, including navigation from `/join/...` to
+`/room/...`. Integer counters advance only when the measured socket event,
+snapshot decision, or component render already occurs. The visible snapshot is
+static until the tester presses **Refresh Diagnostics**; there is no diagnostic
+polling timer or animation-frame sampler. The panel reports connection and
+Engine.IO transport state, connections and reconnects, transport upgrades,
+room state/error events, packet counts, accepted/duplicate/rejected snapshot
+decisions, and App/RoomLobby/LetterGrid renders. It omits names, room codes,
+credentials, packet bodies, and reconnect tokens.
+
+`SocketLobbyClient` still calls `io({ autoConnect: false, timeout: 5_000 })`
+without a `transports` override. Socket.IO therefore retains its normal
+Engine.IO transport negotiation and fallback behavior. HTTP polling or a failed
+WebSocket upgrade is a hypothesis for physical testing, not a conclusion, and
+this pass does not force WebSocket or change heartbeat/reconnect behavior.
+
+Run the first diagnostic comparison for ten idle minutes under approximately
+the reported conditions:
+
+1. Load the player join URL with `?perf=1` and join the room.
+2. Record starting battery percentage, whether the phone feels cool or warm,
+   and whether the player is the Game Host or an ordinary player.
+3. Leave the screen on at approximately medium brightness and do not interact
+   for ten minutes while the room remains in `LOBBY`.
+4. Record ending battery percentage and phone temperature.
+5. Press **Refresh Diagnostics**, then **Copy Diagnostics**, and retain the text
+   or a screenshot.
+6. Repeat for both Game Host and ordinary-player lobby roles when practical.
+
+The key interpretation inputs are transport, reconnect count, room states
+received/accepted, App/RoomLobby/LetterGrid renders, and Engine.IO packet
+counts. Polling points to transport-upgrade investigation; flat WebSocket,
+snapshot, and render counters shift attention toward iOS paint/compositing or
+host-only controls; frequent snapshots or renders should be traced to their
+specific event or local-state source before any optimization is attempted.
+
 ## Final practical phone validation
 
 Run one normal 30–60 minute two-player session under conditions similar to the

@@ -22,6 +22,7 @@ import { AppShell } from './components/AppShell';
 import { JoinRoomForm } from './components/JoinRoomForm';
 import { LobbyError } from './components/LobbyError';
 import { NotFound } from './components/NotFound';
+import { PerformanceDiagnostics } from './components/PerformanceDiagnostics';
 import { PlayerPrototype } from './components/PlayerPrototype';
 import { RoomLobby } from './components/RoomLobby';
 import { useDisplayAudio } from './hooks/useDisplayAudio';
@@ -34,6 +35,10 @@ import {
   type LobbySessionStore,
   type StoredLobbySession,
 } from './session-store';
+import {
+  incrementPerformanceCounter,
+  initializePerformanceDiagnostics,
+} from './performance-diagnostics';
 
 type AppProps = {
   routePath?: string;
@@ -285,6 +290,8 @@ export function App({
   client = defaultLobbyClient,
   sessionStore = defaultSessionStore,
 }: AppProps) {
+  const diagnosticsEnabled = initializePerformanceDiagnostics();
+  incrementPerformanceCounter('appRenders');
   const [currentPath, setCurrentPath] = useState(
     canonicalPath(routePath ?? window.location.pathname),
   );
@@ -311,6 +318,13 @@ export function App({
   const displayRecoveryTimerRef = useRef<number | null>(null);
   const attemptedRoomCodeRef = useRef<string | null>(null);
 
+  useEffect(() => {
+    if (!diagnosticsEnabled) {
+      return;
+    }
+    return client.enablePerformanceDiagnostics?.();
+  }, [client, diagnosticsEnabled]);
+
   const cancelDisplayRecovery = useCallback(() => {
     if (displayRecoveryTimerRef.current !== null) {
       window.clearTimeout(displayRecoveryTimerRef.current);
@@ -332,6 +346,7 @@ export function App({
       const currentRoom = roomRef.current;
       if (currentRoom?.code === nextRoom.code) {
         if (nextRoom.stateVersion < currentRoom.stateVersion) {
+          incrementPerformanceCounter('roomSnapshotsRejected');
           return;
         }
         if (nextRoom.stateVersion === currentRoom.stateVersion) {
@@ -341,6 +356,7 @@ export function App({
             nextServerTime < currentServerTime ||
             !finalizedResultsMatch(currentRoom, nextRoom)
           ) {
+            incrementPerformanceCounter('roomSnapshotsRejected');
             return;
           }
           // Action acknowledgements can be followed by the exact same
@@ -350,6 +366,7 @@ export function App({
             nextServerTime === currentServerTime &&
             roomSnapshotsMatch(currentRoom, nextRoom)
           ) {
+            incrementPerformanceCounter('roomSnapshotDuplicatesIgnored');
             return;
           }
         }
@@ -357,6 +374,7 @@ export function App({
 
       const renderRoom = shareStableRoundReferences(currentRoom, nextRoom);
       roomRef.current = renderRoom;
+      incrementPerformanceCounter('roomSnapshotsAccepted');
       setRoom(renderRoom);
 
       if (currentSession.role === 'player' && nextRoom.round) {
@@ -402,6 +420,7 @@ export function App({
       sessionRef.current = nextSession;
       setSession(nextSession);
       roomRef.current = nextRoom;
+      incrementPerformanceCounter('roomSnapshotsAccepted');
       setRoom(nextRoom);
       if (nextSession.role === 'player' && nextRoom.round) {
         const isParticipant = nextRoom.round.participants.some(
@@ -985,6 +1004,19 @@ export function App({
   let pageClassName: string;
   const routeRoomCode = roomCodeFromPath(currentPath);
   const routeJoinRoomCode = joinRoomCodeFromPath(currentPath);
+  const diagnosticsPanel =
+    diagnosticsEnabled && room && session ? (
+      <PerformanceDiagnostics
+        role={session.role}
+        phase={room.phase}
+        isController={
+          session.role === 'player' &&
+          room.controllerPlayerId === session.playerId
+        }
+        connectionStatus={connectionStatus}
+        client={client}
+      />
+    ) : null;
 
   if (currentPath === '/') {
     if (room && session?.role === 'display') {
@@ -1004,6 +1036,7 @@ export function App({
             submissionState={null}
             onSubmitWord={submitWord}
           />
+          {diagnosticsPanel}
         </>
       );
     } else if (displayStarting || !roomError) {
@@ -1070,6 +1103,7 @@ export function App({
             submissionState={submissionState}
             onSubmitWord={submitWord}
           />
+          {diagnosticsPanel}
         </>
       );
     } else if (reconnecting) {
