@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Words</Name>
+  <Repository>ghcr.io/kevinatlee/words:latest</Repository>
+  <Registry>https://ghcr.io</Registry>
+  <Network>bridge</Network>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+
+  <Icon>https://raw.githubusercontent.com/kevinatlee/Words/main/assets/words-icon.png</Icon>
+  <WebUI>http://[IP]:[PORT:6532]</WebUI>
+
+  <Overview>Words is a self-hosted real-time letter-grid party game. Open the WebUI on a shared display, then have players join from their phones using the room link or QR code. No accounts or persistent database are required.</Overview>
+  <Support>https://github.com/kevinatlee/Words/issues</Support>
+  <Project>https://github.com/kevinatlee/Words</Project>
+  <TemplateURL>https://raw.githubusercontent.com/kevinatlee/Words/main/templates/words.xml</TemplateURL>
+  <ReadMe>https://raw.githubusercontent.com/kevinatlee/Words/main/docs/UNRAID.md</ReadMe>
+
+  <Category>GameServers: Network:Web Other:</Category>
+  <Requires>Player devices must be able to reach the Words WebUI. Rooms and game state are intentionally temporary and are lost when the container restarts.</Requires>
+
+  <Config Name="WebUI" Target="6532" Default="6532" Mode="tcp" Description="HTTP and WebSocket port for Words." Type="Port" Display="always" Required="true" Mask="false"/>
+</Container>
