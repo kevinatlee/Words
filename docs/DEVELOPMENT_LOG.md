@@ -16,9 +16,11 @@
   pointer moves used only 38.6 ms total. Active Trace now uses non-native tile
   targets as a controlled WebKit experiment; Tap buttons and all Trace
   pointer/resolver behavior remain unchanged.
+
 ## 2026-08-09 — Player reconnect and controller lifecycle (draft)
 
-- Player identities and names remain reserved through reconnect grace, including after tab closure through a room-scoped persistent player pointer. Controller authority is immediately reassigned away from an offline player; explicit Leave still removes identity immediately.
+- Physical iPhone reproduction showed that closing a player tab left the credential persisted but its active pointer tab-scoped, causing a later same-name fresh join to receive `INVALID_NAME`. The room-scoped player pointer now persists in `localStorage`, reconnect is attempted before a fresh join, and identity grace remains separate from immediate controller failover.
+- Added a small phone-only gap below the mid-round `Waiting this round.` notice; display and active-player layouts are unchanged.
 
 ## 2026-08-07 — Display result celebration (draft)
 
