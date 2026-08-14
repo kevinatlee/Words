@@ -810,16 +810,18 @@ button:disabled {
   place-items: center;
   padding: 0.65rem;
 }
-.display-active-join-qr__visual,
-.display-active-join-qr__visual svg {
-  display: block;
-  width: 7rem;
-  height: 7rem;
-}
 .display-active-join-qr__visual {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
   overflow: hidden;
   border-radius: calc(var(--radius-lg) - 0.65rem);
   background: #fff;
+}
+.display-active-join-qr__visual svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 .display-side-panel h2 {
   margin-top: 0;

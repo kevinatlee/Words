@@ -97,11 +97,12 @@ describe('tile typography', () => {
       /\.panel\.display-active-join-qr\s*\{[^}]*display: grid;[^}]*place-items: center;[^}]*padding: 0\.65rem;/s,
     );
     expect(styles).toMatch(
-      /\.display-active-join-qr__visual,[^}]*width: 7rem;[^}]*height: 7rem;/s,
+      /\.display-active-join-qr__visual\s*\{[^}]*display: block;[^}]*width: 100%;[^}]*aspect-ratio: 1;[^}]*overflow: hidden;[^}]*border-radius: calc\(var\(--radius-lg\) - 0\.65rem\);[^}]*background: #fff;/s,
     );
     expect(styles).toMatch(
-      /\.display-active-join-qr__visual\s*\{[^}]*overflow: hidden;[^}]*border-radius: calc\(var\(--radius-lg\) - 0\.65rem\);[^}]*background: #fff;/s,
+      /\.display-active-join-qr__visual svg\s*\{[^}]*display: block;[^}]*width: 100%;[^}]*height: 100%;/s,
     );
+    expect(styles).not.toMatch(/\.display-active-join-qr__visual[^}]*7rem/s);
     expect(styles).not.toContain('100dvh - 14.5rem');
     expect(styles).not.toMatch(
       /\.panel\.display-puzzle-panel--active\s*\{[^}]*padding:/s,
