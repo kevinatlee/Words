@@ -171,6 +171,7 @@ describe('LetterGrid accepted feedback', () => {
 });
 
 describe('LetterGrid Trace runtime', () => {
+  const traceSampleIntervalMs = 1000 / 60;
   let monotonicTime = 0;
 
   const advanceTraceTime = (milliseconds: number) => {
@@ -240,10 +241,37 @@ describe('LetterGrid Trace runtime', () => {
 
     expect(callbacks.getPath()).toEqual([0, 1]);
     expect(vi.getTimerCount()).toBe(1);
-    advanceTraceTime(33);
+    advanceTraceTime(traceSampleIntervalMs);
     expect(callbacks.getPath()).toEqual([0, 1, 2, 3]);
     expect(callbacks.onTraceMove).toHaveBeenCalledTimes(3);
     expect([...reads.values()].every((count) => count === 1)).toBe(true);
+  });
+
+  it('preserves fast direction changes across multiple samples', () => {
+    mockTraceGeometry();
+    const callbacks = traceCallbacks();
+    const { grid, tiles } = renderTraceGrid(callbacks);
+
+    fireEvent.pointerDown(tiles[0]!, {
+      clientX: 50,
+      clientY: 50,
+      pointerId: 10,
+      pointerType: 'touch',
+    });
+    for (const point of [
+      { clientX: 150, clientY: 50 },
+      { clientX: 150, clientY: 150 },
+      { clientX: 50, clientY: 150 },
+    ]) {
+      fireEvent.pointerMove(grid, {
+        ...point,
+        pointerId: 10,
+        pointerType: 'touch',
+      });
+      advanceTraceTime(traceSampleIntervalMs);
+    }
+
+    expect(callbacks.getPath()).toEqual([0, 1, 5, 4]);
   });
 
   it('flushes pending movement before pointer-up submits the final complete path', () => {
@@ -305,7 +333,7 @@ describe('LetterGrid Trace runtime', () => {
         pointerType: 'touch',
       });
     }
-    advanceTraceTime(33);
+    advanceTraceTime(traceSampleIntervalMs);
     expect(callbacks.getPath()).toEqual([0, 5, 9]);
   });
 
@@ -337,7 +365,7 @@ describe('LetterGrid Trace runtime', () => {
       pointerId: 4,
       pointerType: 'touch',
     });
-    advanceTraceTime(33);
+    advanceTraceTime(traceSampleIntervalMs);
     expect(
       [...reads.values()].reduce((total, count) => total + count, 0),
     ).toBeGreaterThan(readsBeforeResize);
@@ -452,7 +480,7 @@ describe('LetterGrid Trace runtime', () => {
     expect(screen.getAllByRole('button')[0]?.tagName).toBe('BUTTON');
   });
 
-  it('bounds 240 incoming moves over one second to the 30 Hz trace work budget', () => {
+  it('bounds 240 incoming moves over one second to the 60 Hz trace work budget', () => {
     const resolver = vi.spyOn(traceResolver, 'resolveTraceSegment');
     mockTraceGeometry();
     const { grid, tiles } = renderTraceGrid();
@@ -473,7 +501,9 @@ describe('LetterGrid Trace runtime', () => {
       advanceTraceTime(1000 / 240);
     }
 
-    expect(resolver).toHaveBeenCalledTimes(31);
+    expect(resolver.mock.calls.length).toBeGreaterThanOrEqual(59);
+    expect(resolver.mock.calls.length).toBeLessThanOrEqual(61);
+    expect(resolver.mock.calls.length).toBeLessThan(240);
     expect(vi.getTimerCount()).toBe(0);
   });
 

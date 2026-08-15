@@ -69,8 +69,8 @@ immediately before scheduling anything further.
 ### Tap and Trace
 
 Tap activation remains synchronous and unchanged. Trace now retains only the
-newest pointer coordinate and resolves it at most once per approximately 33 ms
-sample interval. It does not read or replay browser-coalesced events. The
+newest pointer coordinate and resolves it at most once per approximately 16.7 ms
+(60 Hz) sample interval. It does not read or replay browser-coalesced events. The
 existing segment resolver still resolves every legal crossed tile between the
 previous processed coordinate and the newest sample, and pointer-up
 synchronously flushes the pending coordinate plus a distinct final coordinate.
@@ -177,12 +177,12 @@ explicit authoritative snapshot comparison, and Trace lifecycle handling.
 Physical testing found expected power use in Tap mode and with an idle active
 board, while severe drain was isolated to Trace mode. The earlier animation-frame
 batching still replayed every browser-coalesced coordinate through trace
-resolution. Trace now samples only the newest coordinate at approximately 30 Hz,
+resolution. Trace now samples only the newest coordinate at approximately 60 Hz,
 while segment resolution preserves fast multi-tile swipes and pointer-up flushes
 the final position synchronously. The deterministic 240-events-per-second test
-reduces resolver work to 31 calls over one simulated second, but this work-count
-reduction is not proof of a battery-percentage improvement; real-device battery
-testing remains required.
+reduces resolver work to approximately 60 calls over one simulated second, but
+this work-count reduction is not proof of a battery-percentage improvement;
+real-device battery testing remains required.
 
 ## Final practical phone validation
 

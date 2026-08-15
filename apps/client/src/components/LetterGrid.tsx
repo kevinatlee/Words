@@ -15,7 +15,7 @@ import {
   type TraceRect,
 } from '../utils/trace-resolver';
 
-const TRACE_SAMPLE_INTERVAL_MS = 33;
+const TRACE_SAMPLE_INTERVAL_MS = 1000 / 60;
 
 type LetterGridProps = {
   letters: string[];
