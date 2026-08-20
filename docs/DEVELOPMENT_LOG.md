@@ -8,8 +8,9 @@
 - Audited 500 deterministic selections per size twice with seed
   `strong-board-selection-v1`; outputs were byte-identical and selected medians
   exceeded the retained original corpus P95 for 4 × 4, 5 × 5, and 6 × 6.
-- Let the display result quip use its intrinsic width up to the available
-  container while retaining safe normal wrapping and the heading's 44rem bound.
+- Let the display result quip prefer its intrinsic width with `fit-content`
+  while shrinking safely on narrow portrait screens; normal wrapping and the
+  heading's 44rem bound remain intact.
 - Kept generation profiles, dictionary, `QU`, network contracts, lifecycle,
   result content, and production publication unchanged. This branch is only a
   physical gameplay and TV test candidate.

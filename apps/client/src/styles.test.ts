@@ -177,7 +177,10 @@ describe('tile typography', () => {
       /\.display-results > h1\s*\{[^}]*max-width: 44rem;/s,
     );
     expect(styles).toMatch(
-      /\.display-results__quip\s*\{[^}]*width: max-content;[^}]*max-width: 100%;[^}]*overflow-wrap: anywhere;[^}]*white-space: normal;/s,
+      /\.display-results__quip\s*\{[^}]*width: fit-content;[^}]*max-width: 100%;[^}]*min-width: 0;[^}]*overflow-wrap: anywhere;[^}]*white-space: normal;/s,
+    );
+    expect(styles).not.toMatch(
+      /\.display-results__quip\s*\{[^}]*width: max-content;/s,
     );
     expect(styles).not.toMatch(
       /\.display-results__quip\s*\{[^}]*max-width: 44rem;/s,

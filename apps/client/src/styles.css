@@ -201,8 +201,9 @@ button:disabled {
   max-width: 44rem;
 }
 .display-results__quip {
-  width: max-content;
+  width: fit-content;
   max-width: 100%;
+  min-width: 0;
   overflow-wrap: anywhere;
   white-space: normal;
 }
