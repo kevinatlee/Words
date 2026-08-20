@@ -1,5 +1,19 @@
 # Development log
 
+## 2026-08-20 — Strong high-density board candidate (draft)
+
+- Added a separate server-only strong selector that chooses the highest
+  playable-word count from 32 production-valid candidates, breaking ties by
+  cell coverage and then generation order. The median selector remains intact.
+- Audited 500 deterministic selections per size twice with seed
+  `strong-board-selection-v1`; outputs were byte-identical and selected medians
+  exceeded the retained original corpus P95 for 4 × 4, 5 × 5, and 6 × 6.
+- Let the display result quip use its intrinsic width up to the available
+  container while retaining safe normal wrapping and the heading's 44rem bound.
+- Kept generation profiles, dictionary, `QU`, network contracts, lifecycle,
+  result content, and production publication unchanged. This branch is only a
+  physical gameplay and TV test candidate.
+
 ## 2026-08-14 — Post-round player board review (draft)
 
 - Player phones now retain the exact authoritative finished board as a frozen,

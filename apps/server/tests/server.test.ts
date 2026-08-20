@@ -1978,7 +1978,7 @@ describe('Words Stage 4B server', () => {
     });
   });
 
-  it('uses the median selector with eight production-valid candidates', async () => {
+  it('uses the strong selector with 32 production-valid candidates', async () => {
     await server.stop();
     const randomSource = { next: vi.fn(() => 0.5) };
     const boardGenerator = vi.fn(({ size, random }) => {
@@ -2013,7 +2013,7 @@ describe('Words Stage 4B server', () => {
       ok: true,
       room: { round: { generationAttempts: 1 } },
     });
-    expect(boardGenerator).toHaveBeenCalledTimes(8);
+    expect(boardGenerator).toHaveBeenCalledTimes(32);
   });
 
   it('broadcasts one count-only progress snapshot while keeping accepted words private', async () => {

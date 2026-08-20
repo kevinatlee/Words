@@ -21,6 +21,7 @@
     "data:boards:audit": "tsx packages/game-data/scripts/audit-boards.mjs",
     "research:boards": "tsx scripts/research-board-quality.ts",
     "research:median-selection": "tsx scripts/audit-median-board-selection.ts",
+    "research:strong-selection": "tsx scripts/audit-strong-board-selection.ts",
     "privacy:check": "node scripts/check-public-privacy.mjs",
     "build:production": "npm run build --workspace @words/client && node scripts/build-production.mjs",
     "start:production": "node dist/production/server/index.mjs",

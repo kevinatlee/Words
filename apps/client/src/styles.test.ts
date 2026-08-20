@@ -174,6 +174,18 @@ describe('tile typography', () => {
       /\.display-results\s*\{[^}]*justify-content: center;/s,
     );
     expect(styles).toMatch(
+      /\.display-results > h1\s*\{[^}]*max-width: 44rem;/s,
+    );
+    expect(styles).toMatch(
+      /\.display-results__quip\s*\{[^}]*width: max-content;[^}]*max-width: 100%;[^}]*overflow-wrap: anywhere;[^}]*white-space: normal;/s,
+    );
+    expect(styles).not.toMatch(
+      /\.display-results__quip\s*\{[^}]*max-width: 44rem;/s,
+    );
+    expect(styles).not.toMatch(
+      /\.display-results__quip\s*\{[^}]*white-space: nowrap;/s,
+    );
+    expect(styles).toMatch(
       /\.display-results__cards\s*\{[^}]*width: fit-content;[^}]*max-width: 96vw;[^}]*grid-template-columns: repeat\(2, minmax\(16rem, max-content\)\);/s,
     );
     expect(styles).toMatch(
