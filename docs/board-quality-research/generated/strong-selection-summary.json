@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "seed": "strong-board-selection-v1",
+  "selectionsPerSize": 500,
+  "candidatePoolSize": 32,
+  "ranking": [
+    "highest playable-word count",
+    "highest cell coverage",
+    "earliest candidate generation index"
+  ],
+  "sizes": {
+    "4": {
+      "originalFiveThousandBoardCorpus": {
+        "playableWordCount": {
+          "min": 6,
+          "p5": 31,
+          "p50": 72,
+          "p95": 144,
+          "p99": 180,
+          "max": 276
+        },
+        "longPlayableWordCount": {
+          "min": 0,
+          "p5": 3,
+          "p50": 18,
+          "p95": 58,
+          "p99": 81.01000000000022,
+          "max": 155
+        },
+        "cellCoverage": {
+          "min": 0.5625,
+          "p5": 0.875,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1,
+          "max": 1
+        }
+      },
+      "selected": {
+        "playableWordCount": {
+          "p5": 125.95,
+          "p50": 164,
+          "p95": 226.04999999999995
+        },
+        "longPlayableWordCount": {
+          "p5": 38,
+          "p50": 67,
+          "p95": 107.04999999999995
+        },
+        "cellCoverage": { "p5": 0.9375, "p50": 1, "p95": 1 }
+      },
+      "upperTailComparison": {
+        "selectedP5MinusOriginalP95": -18.049999999999997,
+        "selectedP50MinusOriginalP95": 20,
+        "selectedP5AtOrAboveOriginalP95": false
+      },
+      "meanSuccessfulCandidateCount": 32,
+      "meanUnderlyingGenerationAttempts": 39.316
+    },
+    "5": {
+      "originalFiveThousandBoardCorpus": {
+        "playableWordCount": {
+          "min": 23,
+          "p5": 77,
+          "p50": 153,
+          "p95": 267,
+          "p99": 330.0100000000002,
+          "max": 436
+        },
+        "longPlayableWordCount": {
+          "min": 2,
+          "p5": 15,
+          "p50": 51,
+          "p95": 126,
+          "p99": 172,
+          "max": 256
+        },
+        "cellCoverage": {
+          "min": 0.6,
+          "p5": 0.88,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1,
+          "max": 1
+        }
+      },
+      "selected": {
+        "playableWordCount": { "p5": 250, "p50": 307, "p95": 398 },
+        "longPlayableWordCount": {
+          "p5": 98,
+          "p50": 147,
+          "p95": 220.0999999999999
+        },
+        "cellCoverage": { "p5": 0.92, "p50": 1, "p95": 1 }
+      },
+      "upperTailComparison": {
+        "selectedP5MinusOriginalP95": -17,
+        "selectedP50MinusOriginalP95": 40,
+        "selectedP5AtOrAboveOriginalP95": false
+      },
+      "meanSuccessfulCandidateCount": 32,
+      "meanUnderlyingGenerationAttempts": 38.832
+    },
+    "6": {
+      "originalFiveThousandBoardCorpus": {
+        "playableWordCount": {
+          "min": 51,
+          "p5": 148,
+          "p50": 262,
+          "p95": 428.0500000000002,
+          "p99": 514.0100000000002,
+          "max": 672
+        },
+        "longPlayableWordCount": {
+          "min": 2,
+          "p5": 38,
+          "p50": 101,
+          "p95": 215,
+          "p99": 282,
+          "max": 423
+        },
+        "cellCoverage": {
+          "min": 0.75,
+          "p5": 0.9166666666666666,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1,
+          "max": 1
+        }
+      },
+      "selected": {
+        "playableWordCount": { "p5": 404.95, "p50": 479, "p95": 603.05 },
+        "longPlayableWordCount": {
+          "p5": 179.95,
+          "p50": 244,
+          "p95": 357.04999999999995
+        },
+        "cellCoverage": { "p5": 0.9444444444444444, "p50": 1, "p95": 1 }
+      },
+      "upperTailComparison": {
+        "selectedP5MinusOriginalP95": -23.100000000000193,
+        "selectedP50MinusOriginalP95": 50.94999999999982,
+        "selectedP5AtOrAboveOriginalP95": false
+      },
+      "meanSuccessfulCandidateCount": 31.998,
+      "meanUnderlyingGenerationAttempts": 43.086
+    }
+  }
+}

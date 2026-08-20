@@ -5,7 +5,7 @@ import {
   generateDefaultBoard,
   loadProductionDictionary,
   PRODUCTION_DICTIONARY_IDENTITY,
-  selectMedianBoard,
+  selectStrongBoard,
   type ProductionDictionaryLoadResult,
 } from '@words/game-data';
 import {
@@ -243,7 +243,7 @@ export function createWordsServer(
           attempts: 0,
         };
       }
-      return selectMedianBoard({
+      return selectStrongBoard({
         size,
         random: randomSource,
         dictionary: gameDataRuntime.dictionary,

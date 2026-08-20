@@ -193,10 +193,19 @@ button:disabled {
   position: relative;
   z-index: 1;
   margin: 0 auto 1rem;
-  max-width: 44rem;
   text-align: center;
   font-weight: 700;
   font-size: clamp(1rem, 2vw, 1.4rem);
+}
+.display-results > h1 {
+  max-width: 44rem;
+}
+.display-results__quip {
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 .display-results__fireworks {
   position: absolute;

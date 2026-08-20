@@ -29,6 +29,13 @@ export {
   type SelectMedianBoardOptions,
 } from './median-board-selector.js';
 export {
+  MAXIMUM_STRONG_BOARD_CANDIDATE_POOL_SIZE,
+  STRONG_BOARD_CANDIDATE_POOL_SIZE,
+  selectStrongBoard,
+  type SelectStrongBoardOptions,
+  type StrongBoardSelectionResult,
+} from './strong-board-selector.js';
+export {
   DEFAULT_DISTRIBUTION_METADATA,
   DEFAULT_TILE_DISTRIBUTION,
 } from './distribution.js';
